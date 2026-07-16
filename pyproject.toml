@@ -56,6 +56,10 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
 ]
+# Opt-in Playwright browser e2e (tests/e2e/, run with `-m browser`; needs `playwright install chromium`).
+browser = [
+    "pytest-playwright>=0.5",
+]
 
 [project.urls]
 Homepage = "https://github.com/smidooo/MolDeTr"

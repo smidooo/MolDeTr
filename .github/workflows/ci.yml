@@ -35,3 +35,22 @@ jobs:
         run: pytest -q -rs
       - name: Reproduce headline numbers (committed data, no weights)
         run: python scripts/aggregate_experimental.py
+
+  browser-e2e:
+    name: browser e2e (chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install (CPU PyTorch + app + browser)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,app,browser]"
+          python -m playwright install --with-deps chromium
+      - name: Browser e2e
+        env:
+          MPLBACKEND: Agg
+        run: pytest tests/e2e -m browser -q
