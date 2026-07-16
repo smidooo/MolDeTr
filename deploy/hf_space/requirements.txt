@@ -1,0 +1,14 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch>=1.13
+fastai>=2.7
+hydra-core>=1.2
+omegaconf>=2.2
+numpy>=1.23
+scipy>=1.9
+matplotlib>=3.5
+adjustText>=1.0
+multipledispatch>=0.6
+pandas>=1.5
+gradio>=6.0,<7
+plotly>=5
+huggingface_hub>=0.20

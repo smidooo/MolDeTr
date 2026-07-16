@@ -1,0 +1,80 @@
+{
+  "roi_id": "S8",
+  "base_sid": "S8",
+  "region_index": 1,
+  "compound": "Vanillin",
+  "solvent": "DMSO-d6",
+  "num_spin_systems": 3,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3460.37724763155,
+        "coupling_constants": [
+          8.537154045350187,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3468.0,
+        "coupling_constants": [
+          8.0
+        ],
+        "chemical_shift_ppm": 6.959
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2763.283694088459,
+        "coupling_constants": [
+          8.906807265623165,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2760.0,
+        "coupling_constants": [
+          8.0
+        ],
+        "chemical_shift_ppm": 7.42
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2808.975901991129,
+        "coupling_constants": [
+          1.6929167486812124,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2813.0,
+        "coupling_constants": [
+          2.0
+        ],
+        "chemical_shift_ppm": 7.385
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 17500,
+    "roi_end": 21000,
+    "roi_padding": 1000,
+    "base_frequency_mhz": 300.13,
+    "points_per_hz": 5.12
+  }
+}

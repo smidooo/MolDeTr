@@ -1,0 +1,122 @@
+{
+  "roi_id": "S13",
+  "base_sid": "S13",
+  "region_index": 1,
+  "compound": "Caffeic Acid",
+  "solvent": "Acetone-d6",
+  "num_spin_systems": 5,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5064.187823534012,
+        "coupling_constants": [
+          14.988607121115221,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5068.0,
+        "coupling_constants": [
+          16.2
+        ],
+        "chemical_shift_ppm": 6.26
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1127.6440405100584,
+        "coupling_constants": [
+          15.170961438414315,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1117.0,
+        "coupling_constants": [
+          16.0
+        ],
+        "chemical_shift_ppm": 7.546
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2314.4378150105476,
+        "coupling_constants": [
+          1.2727546483148067,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2331.0,
+        "coupling_constants": [
+          2.2
+        ],
+        "chemical_shift_ppm": 7.151
+      }
+    },
+    {
+      "match_id": 3,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2703.575945466757,
+        "coupling_constants": [
+          11.274135673118154,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2687.0,
+        "coupling_constants": [
+          8.3
+        ],
+        "chemical_shift_ppm": 7.035
+      }
+    },
+    {
+      "match_id": 4,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3207.4029256105423,
+        "coupling_constants": [
+          6.851524705344136,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3209.0,
+        "coupling_constants": [
+          8.1
+        ],
+        "chemical_shift_ppm": 6.865
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 25500,
+    "roi_end": null,
+    "roi_padding": 0,
+    "base_frequency_mhz": 600.13,
+    "points_per_hz": 5.12
+  }
+}

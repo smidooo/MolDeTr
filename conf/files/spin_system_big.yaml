@@ -1,0 +1,2 @@
+data_filename: custom_spin_systems  #spin_system_ABCD #spin_system_AA_Star
+num_multiplet_pred: 10

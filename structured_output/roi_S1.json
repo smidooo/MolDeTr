@@ -1,0 +1,78 @@
+{
+  "roi_id": "S1",
+  "base_sid": "S1",
+  "region_index": 1,
+  "compound": "Ethyl Acetate",
+  "solvent": "\u2014",
+  "num_spin_systems": 3,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3982.408356666565,
+        "coupling_constants": [
+          7.246872846185328,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3983.0,
+        "coupling_constants": [
+          7.13
+        ],
+        "chemical_shift_ppm": -3.3
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2816.1850555837154,
+        "coupling_constants": [
+          7.22439783599447,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2814.0,
+        "coupling_constants": [
+          7.13
+        ],
+        "chemical_shift_ppm": -0.45
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3658.124231815338,
+        "coupling_constants": [
+          12.310870533203637,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3676.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": -2.55
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 6000,
+    "roi_end": null,
+    "roi_padding": 0,
+    "base_frequency_mhz": 80.155,
+    "points_per_hz": 5.12
+  }
+}

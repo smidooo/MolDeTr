@@ -1,0 +1,7 @@
+phase_0_custom: 3.
+phase_1_custom: 1.5
+base_left_custom: -0.00005
+base_right_custom: 0.0001
+custom_snr_value: 20.0
+sigma_custom: 50000.
+

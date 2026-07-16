@@ -1,0 +1,116 @@
+{
+  "roi_id": "S2",
+  "base_sid": "S2",
+  "region_index": 1,
+  "compound": "Ethylbenzene",
+  "solvent": "CDCl3",
+  "num_spin_systems": 5,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3546.6457970142365,
+        "coupling_constants": [
+          7.62794384601036,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3546.0,
+        "coupling_constants": [
+          7.6
+        ],
+        "chemical_shift_ppm": 1.756
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2970.85927850008,
+        "coupling_constants": [
+          7.627971855595357,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2968.0,
+        "coupling_constants": [
+          7.53
+        ],
+        "chemical_shift_ppm": 3.166
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1078.9830776005983,
+        "coupling_constants": [
+          8.993921246602378,
+          1.5713915026623442,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1086.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.75
+      }
+    },
+    {
+      "match_id": 3,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1111.0335852950811,
+        "coupling_constants": [
+          9.682516631486607,
+          1.2908580774260625,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1086.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.75
+      }
+    },
+    {
+      "match_id": 4,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1087.4630509316921,
+        "coupling_constants": [
+          10.978004037769102,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1086.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.75
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 2000,
+    "roi_end": null,
+    "roi_padding": 0,
+    "base_frequency_mhz": 80.1526,
+    "points_per_hz": 5.12
+  }
+}

@@ -1,0 +1,55 @@
+{
+  "roi_id": "S4",
+  "base_sid": "S4",
+  "region_index": 1,
+  "compound": "Ibuprofen",
+  "solvent": "\u2014",
+  "num_spin_systems": 2,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2120.6558836102486,
+        "coupling_constants": [
+          6.43562050885865,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2140.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 8.0
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2139.362921357155,
+        "coupling_constants": [
+          2.4572874471714994,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2140.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 8.0
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 2800,
+    "roi_end": 4800,
+    "roi_padding": 1300,
+    "base_frequency_mhz": 80.1483,
+    "points_per_hz": 5.12
+  }
+}

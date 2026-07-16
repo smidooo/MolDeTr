@@ -1,0 +1,66 @@
+cff-version: 1.2.0
+title: "MolDeTr: A Chemistry-Informed Deep Learning Model for Next-Generation Automated Analysis of 1H NMR Spectra"
+message: "If you use these materials, please cite the article below."
+type: software
+license: Apache-2.0
+authors:
+  - family-names: Schmid
+    given-names: Nicolas
+    orcid: "https://orcid.org/0000-0003-1930-7654"
+  - family-names: Wanner
+    given-names: Marc
+  - family-names: Fischetti
+    given-names: Giulia
+  - family-names: Henrici
+    given-names: Andreas
+  - family-names: Meshkian
+    given-names: Mohsen
+  - family-names: Bruderer
+    given-names: Simon
+  - family-names: Füchslin
+    given-names: Rudolf M.
+  - family-names: Heitmann
+    given-names: Bjoern
+  - family-names: Wegner
+    given-names: Jan Dirk
+  - family-names: Sigel
+    given-names: Roland K. O.
+  - family-names: Wilhelm
+    given-names: Dirk
+    orcid: "https://orcid.org/0000-0001-5109-9803"
+identifiers:
+  - type: doi
+    value: 10.1021/acs.analchem.5c03465
+    description: Journal article
+  - type: doi
+    value: 10.5281/zenodo.21214876
+    description: Archived materials (Zenodo, all versions)
+preferred-citation:
+  type: article
+  title: "MolDeTr: A Chemistry-Informed Deep Learning Model for Next-Generation Automated Analysis of 1H NMR Spectra"
+  journal: "Analytical Chemistry"
+  year: 2026
+  doi: "10.1021/acs.analchem.5c03465"
+  authors:
+    - family-names: Schmid
+      given-names: Nicolas
+    - family-names: Wanner
+      given-names: Marc
+    - family-names: Fischetti
+      given-names: Giulia
+    - family-names: Henrici
+      given-names: Andreas
+    - family-names: Meshkian
+      given-names: Mohsen
+    - family-names: Bruderer
+      given-names: Simon
+    - family-names: Füchslin
+      given-names: Rudolf M.
+    - family-names: Heitmann
+      given-names: Bjoern
+    - family-names: Wegner
+      given-names: Jan Dirk
+    - family-names: Sigel
+      given-names: Roland K. O.
+    - family-names: Wilhelm
+      given-names: Dirk

@@ -1,0 +1,385 @@
+[
+  {
+    "sid": "S1",
+    "roi": {
+      "start": 6000,
+      "end": null,
+      "padding": 0
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.13
+      }
+    ],
+    "override": {
+      "compound": "Ethyl Acetate",
+      "solvent": "\u2014"
+    }
+  },
+  {
+    "sid": "S2",
+    "roi": {
+      "start": 2000,
+      "end": null,
+      "padding": 0
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.75
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.166,
+        "coupling_constants": 7.53
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.756,
+        "coupling_constants": 7.6
+      }
+    ],
+    "override": {
+      "compound": "Ethylbenzene",
+      "solvent": "CDCl3"
+    }
+  },
+  {
+    "sid": "S3",
+    "roi": {
+      "start": 2000,
+      "end": null,
+      "padding": 0
+    },
+    "labels": [
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.533,
+        "coupling_constants": 8.84
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.965,
+        "coupling_constants": 8.9
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.34,
+        "coupling_constants": 7.1
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.4,
+        "coupling_constants": 7.0
+      }
+    ],
+    "override": {
+      "compound": "Ethyl-cis-3-iodacrylate",
+      "solvent": "CDCl3"
+    }
+  },
+  {
+    "sid": "S4",
+    "roi": {
+      "start": 2800,
+      "end": 4800,
+      "padding": 1300
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0
+      }
+    ],
+    "override": {
+      "compound": "Ibuprofen",
+      "solvent": "\u2014"
+    }
+  },
+  {
+    "sid": "S5",
+    "roi": {
+      "start": 3400,
+      "end": 3900,
+      "padding": 1600
+    },
+    "labels": [
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.5
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.4
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.1
+      }
+    ],
+    "override": {
+      "compound": "Ethyl Vanillin",
+      "solvent": "\u2014"
+    }
+  },
+  {
+    "sid": "S5",
+    "roi": {
+      "start": 4500,
+      "end": null,
+      "padding": 2000
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.27,
+        "coupling_constants": 6.96
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.55,
+        "coupling_constants": 7.0
+      }
+    ],
+    "override": {
+      "compound": "Ethyl Vanillin",
+      "solvent": "\u2014"
+    }
+  },
+  {
+    "sid": "S6",
+    "roi": {
+      "start": 8000,
+      "end": null,
+      "padding": 1500
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.14
+      }
+    ],
+    "override": {
+      "compound": "Ethyl Acetate",
+      "solvent": "\u2014"
+    }
+  },
+  {
+    "sid": "S7",
+    "roi": {
+      "start": 2000,
+      "end": 6000,
+      "padding": 1500
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.745
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.164,
+        "coupling_constants": 7.65
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.754,
+        "coupling_constants": 7.65
+      }
+    ],
+    "override": {
+      "compound": "Ethylbenzene",
+      "solvent": "CDCl3"
+    }
+  },
+  {
+    "sid": "S12",
+    "roi": {
+      "start": 10000,
+      "end": null,
+      "padding": 0
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.955
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.74
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.57
+      }
+    ],
+    "override": {
+      "compound": "Cocaine",
+      "solvent": "D2O"
+    }
+  },
+  {
+    "sid": "S10",
+    "roi": {
+      "start": 18000,
+      "end": 22000,
+      "padding": 0
+    },
+    "labels": [
+      {
+        "proton_count": 1,
+        "chemical_shift": 8.221,
+        "coupling_constants": 1.8
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.694,
+        "coupling_constants": 3.7
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.313,
+        "coupling_constants": 3.7
+      }
+    ],
+    "override": {
+      "compound": "Guajazulene",
+      "solvent": "C6D6"
+    }
+  },
+  {
+    "sid": "S13",
+    "roi": {
+      "start": 25500,
+      "end": null,
+      "padding": 0
+    },
+    "labels": [
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.546,
+        "coupling_constants": 16.0
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.151,
+        "coupling_constants": 2.2
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.035,
+        "coupling_constants": 8.3
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.865,
+        "coupling_constants": 8.1
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.26,
+        "coupling_constants": 16.2
+      }
+    ],
+    "override": {
+      "compound": "Caffeic Acid",
+      "solvent": "Acetone-d6"
+    }
+  },
+  {
+    "sid": "S8",
+    "roi": {
+      "start": 17500,
+      "end": 21000,
+      "padding": 1000
+    },
+    "labels": [
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "coupling_constants": 8
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.385,
+        "coupling_constants": 2
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.959,
+        "coupling_constants": 8
+      }
+    ],
+    "override": {
+      "compound": "Vanillin",
+      "solvent": "DMSO-d6"
+    }
+  },
+  {
+    "sid": "S9",
+    "roi": {
+      "start": 13350,
+      "end": 14050,
+      "padding": 2000
+    },
+    "labels": [
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.557
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.4
+      }
+    ],
+    "override": {
+      "compound": "Cinnamic Acid",
+      "solvent": "CDCl3"
+    }
+  }
+]
