@@ -1,6 +1,6 @@
 """Self-test of the conftest stub machinery — the linchpin for every Detect/Simulate test.
 
-If these fail, the whole weight-free CI strategy is invalid, so they run first and assert real
+If these fail, the whole weight-free CI strategy is invalid, so they assert real decoded
 detections (never merely "not an error"). Mirrors the decode contract in moldetr.inference.run +
 moldetr.postprocess.decode_predictions.
 """
@@ -54,9 +54,11 @@ def test_patch_model_enables_predict(patch_model, valid_spectrum, tmp_npz):
 
 
 @pytest.mark.unit
-def test_patch_model_checkpoint_gate_passes(patch_model):
-    # The dummy checkpoint file exists → predict() must NOT return the "Checkpoint not found" message.
+def test_patch_model_checkpoint_gate_passes(patch_model, valid_spectrum, tmp_npz):
+    # A real file traverses the checkpoint-exists branch (a None file would short-circuit at app.py:130
+    # BEFORE the gate at :132). The dummy checkpoint exists → gate passes → the stubbed model runs.
     app = patch_model
-    _table, _fig, msg = app.predict(None, 0.3, app.AUTO, None, None, 5.12)
-    assert "Checkpoint not found" not in msg  # file-None message instead
-    assert "Load a" in msg
+    path = tmp_npz(spectrum_padded=valid_spectrum, ppm_axis_padded=np.linspace(10, 0, 6144))
+    _t, _f, msg = app.predict(path, 0.3, app.AUTO, None, None, 5.12)
+    assert "Checkpoint not found" not in msg
+    assert "Detected" in msg
