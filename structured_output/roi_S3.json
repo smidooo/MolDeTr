@@ -1,0 +1,101 @@
+{
+  "roi_id": "S3",
+  "base_sid": "S3",
+  "region_index": 1,
+  "compound": "Ethyl-cis-3-iodacrylate",
+  "solvent": "CDCl3",
+  "num_spin_systems": 4,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4085.7183213829994,
+        "coupling_constants": [
+          7.342491609876967,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4088.0,
+        "coupling_constants": [
+          7.0
+        ],
+        "chemical_shift_ppm": 1.4
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2873.043231457472,
+        "coupling_constants": [
+          7.269079679498559,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2882.0,
+        "coupling_constants": [
+          7.1
+        ],
+        "chemical_shift_ppm": 4.34
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1574.0113496780396,
+        "coupling_constants": [
+          9.071501837556315,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1572.0,
+        "coupling_constants": [
+          8.84
+        ],
+        "chemical_shift_ppm": 7.533
+      }
+    },
+    {
+      "match_id": 3,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1781.2079674601555,
+        "coupling_constants": [
+          8.934902071271816,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1805.0,
+        "coupling_constants": [
+          8.9
+        ],
+        "chemical_shift_ppm": 6.965
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 2000,
+    "roi_end": null,
+    "roi_padding": 0,
+    "base_frequency_mhz": 80.147,
+    "points_per_hz": 5.12
+  }
+}

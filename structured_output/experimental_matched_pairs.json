@@ -1,0 +1,3778 @@
+{
+  "matched_pairs_total": [
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3982.408356666565,
+        "coupling_constants": [
+          7.246872846185328,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 3983
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2816.1850555837154,
+        "coupling_constants": [
+          7.22439783599447,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2814
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3658.124231815338,
+        "coupling_constants": [
+          12.310870533203637,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3676
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3546.6457970142365,
+        "coupling_constants": [
+          7.62794384601036,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.756,
+        "coupling_constants": 7.6,
+        "chemical_shift_in_points": 3546
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2970.85927850008,
+        "coupling_constants": [
+          7.627971855595357,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.166,
+        "coupling_constants": 7.53,
+        "chemical_shift_in_points": 2968
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1078.9830776005983,
+        "coupling_constants": [
+          8.993921246602378,
+          1.5713915026623442,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1111.0335852950811,
+        "coupling_constants": [
+          9.682516631486607,
+          1.2908580774260625,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1087.4630509316921,
+        "coupling_constants": [
+          10.978004037769102,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4085.7183213829994,
+        "coupling_constants": [
+          7.342491609876967,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.4,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 4088
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2873.043231457472,
+        "coupling_constants": [
+          7.269079679498559,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.34,
+        "coupling_constants": 7.1,
+        "chemical_shift_in_points": 2882
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1574.0113496780396,
+        "coupling_constants": [
+          9.071501837556315,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.533,
+        "coupling_constants": 8.84,
+        "chemical_shift_in_points": 1572
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1781.2079674601555,
+        "coupling_constants": [
+          8.934902071271816,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.965,
+        "coupling_constants": 8.9,
+        "chemical_shift_in_points": 1805
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2120.6558836102486,
+        "coupling_constants": [
+          6.43562050885865,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2139.362921357155,
+        "coupling_constants": [
+          2.4572874471714994,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1949.9237278401852,
+        "coupling_constants": [
+          11.001204317426781,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.1,
+        "chemical_shift_in_points": 1949
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1788.0474912822247,
+        "coupling_constants": [
+          3.5125542234238214,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.5,
+        "chemical_shift_in_points": 1785
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1837.021513581276,
+        "coupling_constants": [
+          11.131441736276773,
+          3.764715875891726,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 1826
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3525.0853419303894,
+        "coupling_constants": [
+          7.077879696878149,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.55,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 3527
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2411.232849061489,
+        "coupling_constants": [
+          7.033097138057795,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.27,
+        "coupling_constants": 6.96,
+        "chemical_shift_in_points": 2411
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3480.3068646788597,
+        "coupling_constants": [
+          7.304574379123823,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.14,
+        "chemical_shift_in_points": 3483
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3169.552763879299,
+        "coupling_constants": [
+          5.229521223477632,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3176
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2313.297070533037,
+        "coupling_constants": [
+          7.261824005087251,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2314
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 5048.250720620155,
+        "coupling_constants": [
+          7.807536537418527,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.754,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 5047
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4473.890727698803,
+        "coupling_constants": [
+          7.793548431481587,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.164,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 4468
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2586.6120144724846,
+        "coupling_constants": [
+          8.552966945952214,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2613.091895788908,
+        "coupling_constants": [
+          9.5480724113496,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2600.953429877758,
+        "coupling_constants": [
+          6.6794773193751125,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4049.222187280655,
+        "coupling_constants": [
+          8.514896556404514,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.57,
+        "chemical_shift_in_points": 4052
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2870.034382879734,
+        "coupling_constants": [
+          8.560467555245086,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.955,
+        "chemical_shift_in_points": 2869
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3526.4174004793167,
+        "coupling_constants": [
+          7.288595208857668,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.74,
+        "chemical_shift_in_points": 3530
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3942.974956572056,
+        "coupling_constants": [
+          3.744402669308837,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.313,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 3944
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1623.7519097924232,
+        "coupling_constants": [
+          1.6602975011327115,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 8.221,
+        "coupling_constants": 1.8,
+        "chemical_shift_in_points": 1619
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2963.5789084732533,
+        "coupling_constants": [
+          3.8374540863586755,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.694,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 2969
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5064.187823534012,
+        "coupling_constants": [
+          14.988607121115221,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.26,
+        "coupling_constants": 16.2,
+        "chemical_shift_in_points": 5068
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1127.6440405100584,
+        "coupling_constants": [
+          15.170961438414315,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.546,
+        "coupling_constants": 16.0,
+        "chemical_shift_in_points": 1117
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2314.4378150105476,
+        "coupling_constants": [
+          1.2727546483148067,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.151,
+        "coupling_constants": 2.2,
+        "chemical_shift_in_points": 2331
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2703.575945466757,
+        "coupling_constants": [
+          11.274135673118154,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.035,
+        "coupling_constants": 8.3,
+        "chemical_shift_in_points": 2687
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3207.4029256105423,
+        "coupling_constants": [
+          6.851524705344136,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.865,
+        "coupling_constants": 8.1,
+        "chemical_shift_in_points": 3209
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3460.37724763155,
+        "coupling_constants": [
+          8.537154045350187,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.959,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 3468
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2763.283694088459,
+        "coupling_constants": [
+          8.906807265623165,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 2760
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2808.975901991129,
+        "coupling_constants": [
+          1.6929167486812124,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.385,
+        "coupling_constants": 2,
+        "chemical_shift_in_points": 2813
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2506.352008461952,
+        "coupling_constants": [
+          9.320026713589312,
+          1.0121834904196103,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 2522
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2285.2390769720078,
+        "coupling_constants": [
+          7.8698971966443,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.557,
+        "chemical_shift_in_points": 2280
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2498.3442788124084,
+        "coupling_constants": [
+          9.030314040793376,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "chemical_shift_in_points": 2491
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3977.863686323166,
+        "coupling_constants": [
+          7.195195757815533,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 3983
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3658.481229364872,
+        "coupling_constants": [
+          10.589372833789499,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3676
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2813.273054033518,
+        "coupling_constants": [
+          7.143765988121771,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2814
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3550.5460410118103,
+        "coupling_constants": [
+          8.21651163933479,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.756,
+        "coupling_constants": 7.6,
+        "chemical_shift_in_points": 3546
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3027.472682207823,
+        "coupling_constants": [
+          8.016923083982258,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.166,
+        "coupling_constants": 7.53,
+        "chemical_shift_in_points": 2968
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1075.225174933672,
+        "coupling_constants": [
+          9.356590545033374,
+          2.1809487552627416,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1107.8001944124699,
+        "coupling_constants": [
+          9.585028972932227,
+          1.8979364817542759,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1088.548323482275,
+        "coupling_constants": [
+          10.542079543445954,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4087.416531264782,
+        "coupling_constants": [
+          7.333230568369636,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.4,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 4088
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2874.4294804036617,
+        "coupling_constants": [
+          7.273879449659438,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.34,
+        "coupling_constants": 7.1,
+        "chemical_shift_in_points": 2882
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1576.6007719039917,
+        "coupling_constants": [
+          8.884134996440098,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.533,
+        "coupling_constants": 8.84,
+        "chemical_shift_in_points": 1572
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1798.2056277096272,
+        "coupling_constants": [
+          8.793745085913537,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.965,
+        "coupling_constants": 8.9,
+        "chemical_shift_in_points": 1805
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2148.367131859064,
+        "coupling_constants": [
+          6.562006311797323,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2119.8600536882877,
+        "coupling_constants": [
+          6.896680327998698,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1952.6901842355728,
+        "coupling_constants": [
+          10.453081768888579,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.1,
+        "chemical_shift_in_points": 1949
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1784.8903514146805,
+        "coupling_constants": [
+          2.4419173363918634,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.5,
+        "chemical_shift_in_points": 1785
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1834.1640685796738,
+        "coupling_constants": [
+          10.621359779855421,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 1826
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3529.233836531639,
+        "coupling_constants": [
+          7.212045013062427,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.55,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 3527
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2408.7919012010098,
+        "coupling_constants": [
+          7.089209871983513,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.27,
+        "coupling_constants": 6.96,
+        "chemical_shift_in_points": 2411
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3480.3676458001137,
+        "coupling_constants": [
+          7.30132824700732,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.14,
+        "chemical_shift_in_points": 3483
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3163.3128128647804,
+        "coupling_constants": [
+          5.886475312493769,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3176
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2349.5336033403873,
+        "coupling_constants": [
+          7.31334018733047,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2314
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 5047.261013567448,
+        "coupling_constants": [
+          7.647011222009525,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.754,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 5047
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4475.937513649464,
+        "coupling_constants": [
+          7.631276986624935,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.164,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 4468
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2585.535346478224,
+        "coupling_constants": [
+          10.453320148335356,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2609.9109560847282,
+        "coupling_constants": [
+          12.31247363498322,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2595.811932861805,
+        "coupling_constants": [
+          12.036421892333522,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4049.9563207030296,
+        "coupling_constants": [
+          8.610825213376964,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.57,
+        "chemical_shift_in_points": 4052
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2868.3533821105957,
+        "coupling_constants": [
+          8.304164357863721,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.955,
+        "chemical_shift_in_points": 2869
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3525.1662613749504,
+        "coupling_constants": [
+          7.245986670591929,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.74,
+        "chemical_shift_in_points": 3530
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3943.7043300271034,
+        "coupling_constants": [
+          4.14771417354396,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.313,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 3944
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1623.342552602291,
+        "coupling_constants": [
+          1.8837305565978422,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 8.221,
+        "coupling_constants": 1.8,
+        "chemical_shift_in_points": 1619
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2963.548884063959,
+        "coupling_constants": [
+          4.381039082127457,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.694,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 2969
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5070.111053645611,
+        "coupling_constants": [
+          15.111378495692124,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.26,
+        "coupling_constants": 16.2,
+        "chemical_shift_in_points": 5068
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1124.8563473373652,
+        "coupling_constants": [
+          14.731578058318417,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.546,
+        "coupling_constants": 16.0,
+        "chemical_shift_in_points": 1117
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2317.490967899561,
+        "coupling_constants": [
+          1.6036759760752761,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.151,
+        "coupling_constants": 2.2,
+        "chemical_shift_in_points": 2331
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2708.870310664177,
+        "coupling_constants": [
+          11.672572615640973,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.035,
+        "coupling_constants": 8.3,
+        "chemical_shift_in_points": 2687
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3212.2584584355354,
+        "coupling_constants": [
+          6.763038850648714,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.865,
+        "coupling_constants": 8.1,
+        "chemical_shift_in_points": 3209
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3460.935628414154,
+        "coupling_constants": [
+          8.087632387382817,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.959,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 3468
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2763.027205079794,
+        "coupling_constants": [
+          8.587052823047015,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 2760
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2807.310096502304,
+        "coupling_constants": [
+          1.7747561374389962,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.385,
+        "coupling_constants": 2,
+        "chemical_shift_in_points": 2813
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2505.2465975880623,
+        "coupling_constants": [
+          9.030436806208467,
+          1.001486659706905,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 2522
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2286.6278889775276,
+        "coupling_constants": [
+          7.924681561102847,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.557,
+        "chemical_shift_in_points": 2280
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2500.1852877140045,
+        "coupling_constants": [
+          8.50119212200924,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "chemical_shift_in_points": 2491
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3976.800749003887,
+        "coupling_constants": [
+          7.117521602928734,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 3983
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3658.377242386341,
+        "coupling_constants": [
+          10.01840638286655,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3676
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2815.3370490968227,
+        "coupling_constants": [
+          7.0896157129916535,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2814
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3541.4812324643135,
+        "coupling_constants": [
+          7.710761633410014,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.756,
+        "coupling_constants": 7.6,
+        "chemical_shift_in_points": 3546
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2964.9225007891655,
+        "coupling_constants": [
+          7.714339708906154,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.166,
+        "coupling_constants": 7.53,
+        "chemical_shift_in_points": 2968
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1077.6003986299038,
+        "coupling_constants": [
+          10.115190822052934,
+          1.8908555692748859,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1104.9650846421719,
+        "coupling_constants": [
+          11.671072017023505,
+          1.2901293812546926,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1103.8854874372482,
+        "coupling_constants": [
+          10.740983353837617,
+          3.9230868370504703,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4085.5594117045403,
+        "coupling_constants": [
+          7.407329031554764,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.4,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 4088
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2874.390302211046,
+        "coupling_constants": [
+          7.359408207317575,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.34,
+        "coupling_constants": 7.1,
+        "chemical_shift_in_points": 2882
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1576.0350680947304,
+        "coupling_constants": [
+          9.077918416314965,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.533,
+        "coupling_constants": 8.84,
+        "chemical_shift_in_points": 1572
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1794.1144357919693,
+        "coupling_constants": [
+          8.983477247090411,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.965,
+        "coupling_constants": 8.9,
+        "chemical_shift_in_points": 1805
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2116.4713231027126,
+        "coupling_constants": [
+          6.619706056889968,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2142.251123070717,
+        "coupling_constants": [
+          2.3008272462658352,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1952.367055684328,
+        "coupling_constants": [
+          11.63402904289142,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.1,
+        "chemical_shift_in_points": 1949
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1786.3476337194443,
+        "coupling_constants": [
+          3.671537521786478,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.5,
+        "chemical_shift_in_points": 1785
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1838.4394346177578,
+        "coupling_constants": [
+          11.565833450757134,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 1826
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3524.376106798649,
+        "coupling_constants": [
+          6.956467681096501,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.55,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 3527
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2408.297596901655,
+        "coupling_constants": [
+          6.95747245046467,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.27,
+        "coupling_constants": 6.96,
+        "chemical_shift_in_points": 2411
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3482.42541629076,
+        "coupling_constants": [
+          7.267325802718889,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.14,
+        "chemical_shift_in_points": 3483
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3176.5392974615097,
+        "coupling_constants": [
+          13.00753089072099,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3176
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2316.998677432537,
+        "coupling_constants": [
+          7.192007432714876,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2314
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 5048.058491170406,
+        "coupling_constants": [
+          7.725525664446217,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.754,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 5047
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4479.4635509848595,
+        "coupling_constants": [
+          7.704623958604094,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.164,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 4468
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2589.430098205805,
+        "coupling_constants": [
+          10.32423291031607,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2616.6719404459,
+        "coupling_constants": [
+          11.583990813218223,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2597.950439721346,
+        "coupling_constants": [
+          10.512171266155939,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4049.376336991787,
+        "coupling_constants": [
+          8.505339924383179,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.57,
+        "chemical_shift_in_points": 4052
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2869.9552941918373,
+        "coupling_constants": [
+          8.139500775258652,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.955,
+        "chemical_shift_in_points": 2869
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3527.463494837284,
+        "coupling_constants": [
+          7.3576811482256685,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.74,
+        "chemical_shift_in_points": 3530
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3943.8679996728897,
+        "coupling_constants": [
+          4.325067885998264,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.313,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 3944
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1624.3500179946423,
+        "coupling_constants": [
+          2.0427873056275367,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 8.221,
+        "coupling_constants": 1.8,
+        "chemical_shift_in_points": 1619
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2966.438733458519,
+        "coupling_constants": [
+          4.463038930050354,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.694,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 2969
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5067.7724450826645,
+        "coupling_constants": [
+          14.983543941665655,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.26,
+        "coupling_constants": 16.2,
+        "chemical_shift_in_points": 5068
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1125.8830356746912,
+        "coupling_constants": [
+          14.749458900621246,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.546,
+        "coupling_constants": 16.0,
+        "chemical_shift_in_points": 1117
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2324.9677781164646,
+        "coupling_constants": [
+          1.537364922454927,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.151,
+        "coupling_constants": 2.2,
+        "chemical_shift_in_points": 2331
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2696.916751176119,
+        "coupling_constants": [
+          12.639213191298584,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.035,
+        "coupling_constants": 8.3,
+        "chemical_shift_in_points": 2687
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3202.6729826927185,
+        "coupling_constants": [
+          7.98907917270134,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.865,
+        "coupling_constants": 8.1,
+        "chemical_shift_in_points": 3209
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3460.9945787787437,
+        "coupling_constants": [
+          7.929949150928027,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.959,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 3468
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2762.456558227539,
+        "coupling_constants": [
+          8.578845418694446,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 2760
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2807.062578201294,
+        "coupling_constants": [
+          2.2072895351445694,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.385,
+        "coupling_constants": 2,
+        "chemical_shift_in_points": 2813
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2503.6556700468063,
+        "coupling_constants": [
+          10.962001625506886,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 2522
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2288.7484544217587,
+        "coupling_constants": [
+          9.358201394144977,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.557,
+        "chemical_shift_in_points": 2280
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2497.1784529685974,
+        "coupling_constants": [
+          10.282484325904583,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "chemical_shift_in_points": 2491
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3979.6300003528595,
+        "coupling_constants": [
+          7.230278060997869,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 3983
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2811.87746822834,
+        "coupling_constants": [
+          7.192590866410866,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2814
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3663.6165018081665,
+        "coupling_constants": [
+          13.094877887609426,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3676
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3545.2873755693436,
+        "coupling_constants": [
+          7.672712698012525,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.756,
+        "coupling_constants": 7.6,
+        "chemical_shift_in_points": 3546
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2963.4677815437317,
+        "coupling_constants": [
+          7.743084098547276,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.166,
+        "coupling_constants": 7.53,
+        "chemical_shift_in_points": 2968
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1080.4592166990042,
+        "coupling_constants": [
+          9.838575312011605,
+          1.0732805150967277,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1106.1730178892612,
+        "coupling_constants": [
+          12.213554507850938,
+          1.0452756231956573,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1105.3728856891394,
+        "coupling_constants": [
+          11.237758969539815,
+          3.8830477312466924,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4086.4055874347687,
+        "coupling_constants": [
+          7.34475204298104,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.4,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 4088
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2874.6262867450714,
+        "coupling_constants": [
+          7.298851484555296,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.34,
+        "coupling_constants": 7.1,
+        "chemical_shift_in_points": 2882
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1576.5432861447334,
+        "coupling_constants": [
+          9.001302666171862,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.533,
+        "coupling_constants": 8.84,
+        "chemical_shift_in_points": 1572
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1799.8835161924362,
+        "coupling_constants": [
+          8.94318516109874,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.965,
+        "coupling_constants": 8.9,
+        "chemical_shift_in_points": 1805
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2150.765056937933,
+        "coupling_constants": [
+          7.1852809606754136,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2141.129052311182,
+        "coupling_constants": [
+          2.7240152757347804,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1953.0649401247501,
+        "coupling_constants": [
+          11.571048001155408,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.1,
+        "chemical_shift_in_points": 1949
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1789.645009547472,
+        "coupling_constants": [
+          3.568506349197273,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.5,
+        "chemical_shift_in_points": 1785
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1840.4049349725246,
+        "coupling_constants": [
+          11.668093465836012,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 1826
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3526.995553433895,
+        "coupling_constants": [
+          7.533150471153191,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.55,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 3527
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2410.8249564766884,
+        "coupling_constants": [
+          7.307566637129505,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.27,
+        "coupling_constants": 6.96,
+        "chemical_shift_in_points": 2411
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3482.2170761823654,
+        "coupling_constants": [
+          7.0997086987682385,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.14,
+        "chemical_shift_in_points": 3483
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3175.0596799254417,
+        "coupling_constants": [
+          13.201105728579925,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3176
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2314.4768101274967,
+        "coupling_constants": [
+          7.069826643217368,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2314
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 5046.414837837219,
+        "coupling_constants": [
+          7.713331363846282,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.754,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 5047
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4472.619084119797,
+        "coupling_constants": [
+          7.6739373724203475,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.164,
+        "coupling_constants": 7.65,
+        "chemical_shift_in_points": 4468
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2583.9764571785927,
+        "coupling_constants": [
+          9.775966738161182,
+          1.1083880716017065,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2615.18628141284,
+        "coupling_constants": [
+          10.11561275367373,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2593.146717309952,
+        "coupling_constants": [
+          7.911422300324432,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.745,
+        "chemical_shift_in_points": 2589
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4050.168322324753,
+        "coupling_constants": [
+          8.49072130480951,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.57,
+        "chemical_shift_in_points": 4052
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2868.049476504326,
+        "coupling_constants": [
+          8.356415940700252,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.955,
+        "chemical_shift_in_points": 2869
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3526.755724310875,
+        "coupling_constants": [
+          7.573841246769598,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.74,
+        "chemical_shift_in_points": 3530
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3944.4230850934982,
+        "coupling_constants": [
+          4.10689109733459,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.313,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 3944
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1625.9140334129333,
+        "coupling_constants": [
+          1.6210982359173634,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 8.221,
+        "coupling_constants": 1.8,
+        "chemical_shift_in_points": 1619
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2959.086780846119,
+        "coupling_constants": [
+          4.1758203022163345,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.694,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 2969
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5067.5168714523315,
+        "coupling_constants": [
+          15.097428530466667,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.26,
+        "coupling_constants": 16.2,
+        "chemical_shift_in_points": 5068
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1128.0015872865915,
+        "coupling_constants": [
+          14.776890415459237,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.546,
+        "coupling_constants": 16.0,
+        "chemical_shift_in_points": 1117
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2317.0589093267918,
+        "coupling_constants": [
+          1.7032835728472842,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.151,
+        "coupling_constants": 2.2,
+        "chemical_shift_in_points": 2331
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2720.159488558769,
+        "coupling_constants": [
+          10.808444737275826,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.035,
+        "coupling_constants": 8.3,
+        "chemical_shift_in_points": 2687
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3208.7100858688354,
+        "coupling_constants": [
+          6.940168486423047,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.865,
+        "coupling_constants": 8.1,
+        "chemical_shift_in_points": 3209
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3460.8060108423233,
+        "coupling_constants": [
+          8.130302904304717,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.959,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 3468
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2762.52978849411,
+        "coupling_constants": [
+          8.680189460749078,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 2760
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2805.9081030488014,
+        "coupling_constants": [
+          1.6754468129497693,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.385,
+        "coupling_constants": 2,
+        "chemical_shift_in_points": 2813
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2504.580751389265,
+        "coupling_constants": [
+          8.779757575925213,
+          1.2469802430998083,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 2522
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2287.185537457466,
+        "coupling_constants": [
+          8.343746073103993,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.557,
+        "chemical_shift_in_points": 2280
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2506.0618335306644,
+        "coupling_constants": [
+          8.508844698199434,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "chemical_shift_in_points": 2491
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3978.7644186019897,
+        "coupling_constants": [
+          7.027567926789777,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 3983
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3661.0669900774956,
+        "coupling_constants": [
+          8.428784365050387,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3676
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2815.5668090581894,
+        "coupling_constants": [
+          7.033906436279606,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2814
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3545.473380446434,
+        "coupling_constants": [
+          7.659153675079786,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.756,
+        "coupling_constants": 7.6,
+        "chemical_shift_in_points": 3546
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2969.1674762666225,
+        "coupling_constants": [
+          7.626111899961871,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 3.166,
+        "coupling_constants": 7.53,
+        "chemical_shift_in_points": 2968
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1076.7735373824835,
+        "coupling_constants": [
+          9.288925943116787,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 1108.478032067418,
+        "coupling_constants": [
+          10.16582976793201,
+          2.007405538265186,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1099.6180851906538,
+        "coupling_constants": [
+          9.849534211128612,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.75,
+        "chemical_shift_in_points": 1086
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 4087.780851840973,
+        "coupling_constants": [
+          7.352151341009032,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.4,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 4088
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2877.5247406959534,
+        "coupling_constants": [
+          7.287198901248165,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.34,
+        "coupling_constants": 7.1,
+        "chemical_shift_in_points": 2882
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1576.731487929821,
+        "coupling_constants": [
+          8.93634724666791,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.533,
+        "coupling_constants": 8.84,
+        "chemical_shift_in_points": 1572
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1798.7228164672852,
+        "coupling_constants": [
+          8.922837687470377,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.965,
+        "coupling_constants": 8.9,
+        "chemical_shift_in_points": 1805
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2149.2200813889503,
+        "coupling_constants": [
+          6.573186903799836,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2120.0127387940884,
+        "coupling_constants": [
+          6.850837576588797,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 8.0,
+        "chemical_shift_in_points": 2140
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1951.7586952447891,
+        "coupling_constants": [
+          10.034219283468577,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.1,
+        "chemical_shift_in_points": 1949
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1787.7360795736313,
+        "coupling_constants": [
+          2.2828340676487144,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.5,
+        "chemical_shift_in_points": 1785
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1816.9068070352077,
+        "coupling_constants": [
+          10.21211709701015,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 1826
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3526.781354904175,
+        "coupling_constants": [
+          7.657347950770441,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": 1.55,
+        "coupling_constants": 7.0,
+        "chemical_shift_in_points": 3527
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2412.896091490984,
+        "coupling_constants": [
+          7.350544663537748,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 4.27,
+        "coupling_constants": 6.96,
+        "chemical_shift_in_points": 2411
+      }
+    ],
+    [
+      {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3490.749134540558,
+        "coupling_constants": [
+          7.236785223946295,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -3.3,
+        "coupling_constants": 7.14,
+        "chemical_shift_in_points": 3483
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 3175.1332763433456,
+        "coupling_constants": [
+          12.268218490688861,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 3,
+        "chemical_shift": -2.55,
+        "chemical_shift_in_points": 3176
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2312.7709110677242,
+        "coupling_constants": [
+          7.2147369129651695,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": -0.45,
+        "coupling_constants": 7.13,
+        "chemical_shift_in_points": 2314
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4050.0127080082893,
+        "coupling_constants": [
+          8.452308840755684,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.57,
+        "chemical_shift_in_points": 4052
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2871.0497205257416,
+        "coupling_constants": [
+          8.203474667390495,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.955,
+        "chemical_shift_in_points": 2869
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3526.843966782093,
+        "coupling_constants": [
+          7.362872456627878,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.74,
+        "chemical_shift_in_points": 3530
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3944.340334892273,
+        "coupling_constants": [
+          4.172187995396053,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.313,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 3944
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1623.594281643629,
+        "coupling_constants": [
+          2.0345775174804985,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 8.221,
+        "coupling_constants": 1.8,
+        "chemical_shift_in_points": 1619
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2966.598375439644,
+        "coupling_constants": [
+          4.368463374412677,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.694,
+        "coupling_constants": 3.7,
+        "chemical_shift_in_points": 2969
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 5066.872445106506,
+        "coupling_constants": [
+          14.983810926646047,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.26,
+        "coupling_constants": 16.2,
+        "chemical_shift_in_points": 5068
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1127.2898806333542,
+        "coupling_constants": [
+          14.988580899376078,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.546,
+        "coupling_constants": 16.0,
+        "chemical_shift_in_points": 1117
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2322.5782745182514,
+        "coupling_constants": [
+          1.3086166012752611,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.151,
+        "coupling_constants": 2.2,
+        "chemical_shift_in_points": 2331
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2703.8069869577885,
+        "coupling_constants": [
+          11.733614440577446,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.035,
+        "coupling_constants": 8.3,
+        "chemical_shift_in_points": 2687
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3208.270704269409,
+        "coupling_constants": [
+          7.5064376703472355,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.865,
+        "coupling_constants": 8.1,
+        "chemical_shift_in_points": 3209
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3460.318663418293,
+        "coupling_constants": [
+          8.118848175938412,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 6.959,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 3468
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2761.2901831567287,
+        "coupling_constants": [
+          8.499642059656566,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "coupling_constants": 8,
+        "chemical_shift_in_points": 2760
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2805.7112967073917,
+        "coupling_constants": [
+          1.7086050960222972,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.385,
+        "coupling_constants": 2,
+        "chemical_shift_in_points": 2813
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2505.9172037541866,
+        "coupling_constants": [
+          9.031902839806152,
+          1.0806921790585222,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.4,
+        "chemical_shift_in_points": 2522
+      }
+    ],
+    [
+      {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2286.2172502577305,
+        "coupling_constants": [
+          8.569252433807478,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 2,
+        "chemical_shift": 7.557,
+        "chemical_shift_in_points": 2280
+      }
+    ],
+    [
+      {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2507.2624437510967,
+        "coupling_constants": [
+          8.294090442442878,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "proton_count": 1,
+        "chemical_shift": 7.42,
+        "chemical_shift_in_points": 2491
+      }
+    ]
+  ],
+  "unmatched_predictions_total": [
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3656.576510131359,
+      "coupling_constants": [
+        10.297574936782873,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 2163.4029532670975,
+      "coupling_constants": [
+        6.349371249322624,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3154.94515645504,
+      "coupling_constants": [
+        4.284900353267534,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3655.1521814465523,
+      "coupling_constants": [
+        12.353759763267956,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 2141.603035211563,
+      "coupling_constants": [
+        2.229323692346042,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 2294.6548415720463,
+      "coupling_constants": [
+        5.702451147169997,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3654.1273238658905,
+      "coupling_constants": [
+        11.755577530906349,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 2164.922115147114,
+      "coupling_constants": [
+        6.57448130419584,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3177.2858800292015,
+      "coupling_constants": [
+        14.013862836164389,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3660.866339147091,
+      "coupling_constants": [
+        11.090154416094803,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 2121.511945426464,
+      "coupling_constants": [
+        7.4066693164358055,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3149.7190784811974,
+      "coupling_constants": [
+        13.029041060101013,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3163.4827070832253,
+      "coupling_constants": [
+        13.837121162939688,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3657.7361114025116,
+      "coupling_constants": [
+        11.75653343248793,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 2138.4235601127148,
+      "coupling_constants": [
+        2.336558239517716,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 3169.282910346985,
+      "coupling_constants": [
+        13.49147215700865,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 5047.246367514133,
+      "coupling_constants": [
+        9.288903297069345,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 2582.117689937353,
+      "coupling_constants": [
+        8.90543837165004,
+        2.0402741903098787,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift_in_points": 2606.1601018309593,
+      "coupling_constants": [
+        8.607851429778407,
+        1.8532139647570784,
+        0.0
+      ]
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift_in_points": 5036.567563891411,
+      "coupling_constants": [
+        10.821355368113327,
+        5.871393044896117,
+        0.0
+      ]
+    }
+  ],
+  "unmatched_labels_total": [
+    {
+      "proton_count": 2,
+      "chemical_shift": 7.745,
+      "chemical_shift_in_points": 2589
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift": 7.745,
+      "chemical_shift_in_points": 2589
+    },
+    {
+      "proton_count": 1,
+      "chemical_shift": 7.745,
+      "chemical_shift_in_points": 2589
+    },
+    {
+      "proton_count": 2,
+      "chemical_shift": 3.164,
+      "coupling_constants": 7.65,
+      "chemical_shift_in_points": 4468
+    },
+    {
+      "proton_count": 3,
+      "chemical_shift": 1.754,
+      "coupling_constants": 7.65,
+      "chemical_shift_in_points": 5047
+    }
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "roi_id": "S12",
+  "base_sid": "S12",
+  "region_index": 1,
+  "compound": "Cocaine",
+  "solvent": "D2O",
+  "num_spin_systems": 3,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4049.222187280655,
+        "coupling_constants": [
+          8.514896556404514,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 4052.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.57
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2870.034382879734,
+        "coupling_constants": [
+          8.560467555245086,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2869.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.955
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3526.4174004793167,
+        "coupling_constants": [
+          7.288595208857668,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3530.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.74
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 10000,
+    "roi_end": null,
+    "roi_padding": 0,
+    "base_frequency_mhz": 600.1299,
+    "points_per_hz": 5.12
+  }
+}

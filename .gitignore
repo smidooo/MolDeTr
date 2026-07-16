@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+env/
+.env
+.ipynb_checkpoints/
+
+# Models / data / large artefacts
+*.ckpt
+*.pt
+*.pth
+*.onnx
+*.npz
+*.h5
+*.hdf5
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# uv (project is conda/pip managed)
+uv.lock
+
+# ship two small illustrative example spectra (rest of the data is on Zenodo)
+!examples/*.npz
+
+# local-only working files — must never ship in the public release
+CLAUDE.md
+docs/ZENODO_DEPOSIT.md
+deploy/EXTERNAL_STEPS.md
+design/
+
+# stray generated artifacts (regeneratable; not README assets)
+/prediction.png

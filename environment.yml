@@ -1,0 +1,39 @@
+# Minimal, human-readable conda environment for MolDeTr.
+#
+# This is the portable environment for running the model. For BIT-EXACT
+# reproduction of the training environment used for the released checkpoint
+# (CUDA 11.7, linux-64), use the explicit lockfile instead:
+#
+#     conda create --name moldetr --file requirements-lock-linux64.txt
+#
+# GPU (training + fast inference): keep the `pytorch-cuda` line below.
+# macOS (Apple Silicon) has no CUDA: remove `pytorch-cuda` (+ the `nvidia` channel); CPU/MPS only.
+# CPU-only (inference via the pure-PyTorch fallback): remove `pytorch-cuda`
+# and the `nvidia` channel; the deformable-attention op runs without CUDA.
+name: moldetr
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pytorch>=1.13
+  - pytorch-cuda=11.7        # remove this line for a CPU-only install
+  - fastai>=2.7
+  - hydra-core>=1.2
+  - omegaconf>=2.2
+  - numpy>=1.23
+  - scipy>=1.9
+  - matplotlib>=3.5
+  - pandas>=1.5
+  - scikit-learn>=1.1
+  - seaborn>=0.12
+  - multipledispatch>=0.6
+  - pip
+  - pip:
+      - cmcrameri>=1.5
+      # publication figure generators (moldetr.plotstyle + figure scripts):
+      - adjustText>=1.0
+      - rdkit>=2023.3
+      # editable install of this package (moldetr):
+      - -e .

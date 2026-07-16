@@ -1,0 +1,74 @@
+{
+  "roi_id": "S9",
+  "base_sid": "S9",
+  "region_index": 1,
+  "compound": "Cinnamic Acid",
+  "solvent": "CDCl3",
+  "num_spin_systems": 3,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2506.352008461952,
+        "coupling_constants": [
+          9.320026713589312,
+          1.0121834904196103,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2522.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.4
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2285.2390769720078,
+        "coupling_constants": [
+          7.8698971966443,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2280.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.557
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2498.3442788124084,
+        "coupling_constants": [
+          9.030314040793376,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2491.0,
+        "coupling_constants": [],
+        "chemical_shift_ppm": 7.42
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 13350,
+    "roi_end": 14050,
+    "roi_padding": 2000,
+    "base_frequency_mhz": 300.13,
+    "points_per_hz": 5.12
+  }
+}

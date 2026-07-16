@@ -1,0 +1,80 @@
+{
+  "roi_id": "S10",
+  "base_sid": "S10",
+  "region_index": 1,
+  "compound": "Guajazulene",
+  "solvent": "C6D6",
+  "num_spin_systems": 3,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3942.974956572056,
+        "coupling_constants": [
+          3.744402669308837,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 3944.0,
+        "coupling_constants": [
+          3.7
+        ],
+        "chemical_shift_ppm": 7.313
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1623.7519097924232,
+        "coupling_constants": [
+          1.6602975011327115,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 1619.0,
+        "coupling_constants": [
+          1.8
+        ],
+        "chemical_shift_ppm": 8.221
+      }
+    },
+    {
+      "match_id": 2,
+      "prediction": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2963.5789084732533,
+        "coupling_constants": [
+          3.8374540863586755,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 1,
+        "chemical_shift_in_points": 2969.0,
+        "coupling_constants": [
+          3.7
+        ],
+        "chemical_shift_ppm": 7.694
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 18000,
+    "roi_end": 22000,
+    "roi_padding": 0,
+    "base_frequency_mhz": 500.1301,
+    "points_per_hz": 5.12
+  }
+}

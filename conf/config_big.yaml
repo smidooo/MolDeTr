@@ -1,0 +1,114 @@
+defaults:
+  - files: spin_system_big
+#  - fixed_distortions: SNR_20
+  - _self_
+lognames:
+  best_model_file: model_spin_system_ABCDEFG_exp2 #  model_spin_system_ABCDEFG
+  extrema_file: extrema.txt
+paths:
+  data_folder: ./data
+  model_folder_save: ./moldetr/model
+  experimental_folder: experimental_rois  # your experimental-data folder under data/
+  experimental_file: 2/pdata/1             # Bruker processed-data subpath
+  specific_evaluation_set: ""  # optional synthetic eval subset under data/<data_filename>; empty = standard split
+device:
+  device_name: cuda
+model_params:
+  backbone:
+    input_length: 6144 #
+    kernel_size: 11 #
+    pyramid_layers: 9
+    channel_dim_up: 256
+    pool_size: 128
+  transformer:
+    positional_encoding: "learned"
+    d_model: 256
+    nhead: 8
+    num_encoder_layers: 6
+    num_decoder_layers: 6
+    dim_feedforward: 1024
+    dropout: 0.1
+    deformable:
+      deformable_flag: true
+      n_levels: 4
+      n_points: 4
+      channel_size: 256
+      resnet: False
+  head:
+    dnn_width: 256
+    dnn_hidden: 3
+optim_params:
+  learning_rates:
+    lr: 5e-5
+    lr_backbone: 5e-5
+    lr_linear_proj_mult: 0.1
+  weight_decay: 0.0001
+  n_epochs_max: 1000
+  batch_size: 16
+  samples_per_epoch: 48000
+  num_workers: 1
+  lr_reduce_epochs: 15
+  early_stopping_epochs: 35
+  n_groups: 8
+reg_param_indices:
+  center_position_in_points: 0
+  line_width_in_points: 1
+  bounding_box_range_in_points: 2
+  coupling_constant_1_in_points: 3
+  coupling_constant_2_in_points: 4
+  coupling_constant_3_in_points: 5
+  coupling_constant_4_in_points: 6
+mult_class_indices:
+  1p: 0
+  2p: 1
+  3p: 2
+  4p: 3
+  6p: 4
+#mult_class_indices:
+#  s: 0
+#  d: 1
+#  t: 2
+#  q: 3
+#  _5: 4
+#  dd: 5
+#  dt: 6
+#  td: 7
+#  tt: 8
+weighting:
+  loss_weighting:
+    classification_loss_weighting: 1.0
+    parameter_loss_weighting: 1.0
+    giou_loss_weighting: 1.0
+    parameter_weighting:
+      - 32.0
+      - 1.0
+      - 2.0
+      - 2.0
+      - 2.0
+      - 2.0
+      - 0.0
+    focal_loss_gamma: 2.0
+    focal_loss_alpha: 0.25
+  cost_weighting:
+    parameter_cost_weighting: 1.0
+    giou_cost_weighting: 1.0
+    parameter_weighting:
+      - 32.0
+      - 1.0
+      - 2.0
+      - 2.0
+      - 2.0
+      - 2.0
+      - 0.0
+data_augmentation:
+  flag: true
+  meta_file_name: data_augmentation_meta
+  use_custom_values: False
+
+pretrained:
+  use_pretrained: false
+  model_folder: '{{files}}'
+plotting:
+  base_freq_in_MHz: 80.
+  max_ppm: 15.
+  min_ppm: 0.

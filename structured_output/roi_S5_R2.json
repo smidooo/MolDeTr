@@ -1,0 +1,59 @@
+{
+  "roi_id": "S5_R2",
+  "base_sid": "S5",
+  "region_index": 2,
+  "compound": "Ethyl Vanillin",
+  "solvent": "\u2014",
+  "num_spin_systems": 2,
+  "matches": [
+    {
+      "match_id": 0,
+      "prediction": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3525.0853419303894,
+        "coupling_constants": [
+          7.077879696878149,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 3,
+        "chemical_shift_in_points": 3527.0,
+        "coupling_constants": [
+          7.0
+        ],
+        "chemical_shift_ppm": 1.55
+      }
+    },
+    {
+      "match_id": 1,
+      "prediction": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2411.232849061489,
+        "coupling_constants": [
+          7.033097138057795,
+          0.0,
+          0.0
+        ],
+        "chemical_shift_ppm": null
+      },
+      "label": {
+        "proton_count": 2,
+        "chemical_shift_in_points": 2411.0,
+        "coupling_constants": [
+          6.96
+        ],
+        "chemical_shift_ppm": 4.27
+      }
+    }
+  ],
+  "metadata": {
+    "roi_start": 4500,
+    "roi_end": null,
+    "roi_padding": 2000,
+    "base_frequency_mhz": 80.147,
+    "points_per_hz": 5.12
+  }
+}

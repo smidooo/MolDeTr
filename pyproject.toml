@@ -1,0 +1,86 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moldetr"
+version = "1.0.0"
+description = "1D Deformable DETR for automated detection of NMR multiplets in 1H spectra (MolDeTr)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Nicolas Schmid" }]
+keywords = ["NMR", "multiplet detection", "deformable DETR", "deep learning", "spectroscopy"]
+classifiers = [
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering",
+]
+
+# Core runtime dependencies (imported by the moldetr package itself).
+# Loosely pinned for portability; see requirements-lock-linux64.txt for the
+# exact CUDA-11.7 conda environment used to train the released checkpoint.
+dependencies = [
+    "torch>=1.13",
+    "fastai>=2.7",
+    "hydra-core>=1.2",
+    "omegaconf>=2.2",
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "matplotlib>=3.5",
+    "multipledispatch>=0.6",
+    "adjustText>=1.0",  # moldetr.visualization de-conflicts multiplet labels on every detection
+]
+
+[project.optional-dependencies]
+# Extra deps used only by the evaluation / plotting scripts in scripts/.
+eval = [
+    "pandas>=1.5",
+    "scikit-learn>=1.1",
+    "seaborn>=0.12",
+    "cmcrameri>=1.5",
+]
+# Extra deps for the publication figure generators (the scripts/gen_*.py molecule renderers).
+# rdkit renders molecule structures; adjustText is a CORE dep (used by moldetr.visualization).
+figures = [
+    "rdkit>=2023.3",
+]
+app = [
+    "gradio>=6.0,<7",
+    "plotly>=5",  # interactive spectrum in the Gradio GUI (plotting.spectrum_figure)
+]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.1",
+    "mypy>=1.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/smidooo/MolDeTr"
+Paper = "https://doi.org/10.1021/acs.analchem.5c03465"
+Software = "https://doi.org/10.5281/zenodo.21214876"
+Data = "https://doi.org/10.5281/zenodo.21217102"
+
+[tool.setuptools.packages.find]
+include = ["moldetr*"]
+
+[tool.setuptools.package-data]
+# Ship the deformable-attention op sources so the CUDA extension can be built.
+"moldetr.model.ops" = [
+    "make.sh",
+    "src/*.h",
+    "src/*.cpp",
+    "src/cpu/*",
+    "src/cuda/*",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+# Research code: keep the gate light. Focus on real errors, not style churn.
+select = ["E", "F", "W"]
+ignore = ["E501", "E741", "W605", "E402", "F403", "F405", "E731", "E722", "F811", "F841"]
