@@ -65,7 +65,7 @@ browser = [
 Homepage = "https://github.com/smidooo/MolDeTr"
 Paper = "https://doi.org/10.1021/acs.analchem.5c03465"
 Software = "https://doi.org/10.5281/zenodo.21214876"
-Data = "https://doi.org/10.5281/zenodo.21217102"
+Data = "https://doi.org/10.5281/zenodo.21217101"
 
 [tool.setuptools.packages.find]
 include = ["moldetr*"]

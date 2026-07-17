@@ -385,17 +385,18 @@ Cite the **article** as the primary reference:
 ```
 
 For the **software**, use the Zenodo concept DOI `10.5281/zenodo.21214876` (it resolves to the latest
-release). Machine-readable metadata is in [`CITATION.cff`](CITATION.cff) — GitHub's "Cite this repository"
+release). For the **data**, use the Zenodo concept DOI `10.5281/zenodo.21217101` (it resolves to the latest
+dataset version). Machine-readable metadata is in [`CITATION.cff`](CITATION.cff) — GitHub's "Cite this repository"
 button uses it.
 
 ## Availability
 **Code.** Apache-2.0, at <https://github.com/smidooo/MolDeTr>, archived at Zenodo
 (DOI [10.5281/zenodo.21214876](https://doi.org/10.5281/zenodo.21214876)). The trained weights are deposited
-with the data (DOI [10.5281/zenodo.21217102](https://doi.org/10.5281/zenodo.21217102)).
+with the data (concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zenodo.21217101), all versions).
 
 **Data.** A selection of the simulated and experimental spectral regions analysed in this work, with their
 ground-truth spin-system annotations and metadata, is at Zenodo
-(DOI [10.5281/zenodo.21217102](https://doi.org/10.5281/zenodo.21217102)). The metadata follow the format
+(concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zenodo.21217101), all versions). The metadata follow the format
 used in the Supporting Information; full curation details are in Supporting Information Section 4.4.
 
 ## License
