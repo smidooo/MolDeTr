@@ -6,12 +6,13 @@ Examples
     python scripts/predict.py --input path/to/roi.npz --base-freq-mhz 80.15
 
 Weights (``model_spin_system_ABCDEFG_exp2.pth``) are on Zenodo (10.5281/zenodo.21217102);
-place the file in ``moldetr/model/`` or pass ``--checkpoint``.
+place the file in ``moldetr/model/``, pass ``--checkpoint``, or set ``$MOLDETR_CHECKPOINT``.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
 
 import numpy as np
@@ -69,7 +70,8 @@ def main() -> None:
     source.add_argument("--demo", action="store_true", help="run on a synthetic spectrum")
     ap.add_argument(
         "--checkpoint",
-        default=str(ROOT / "moldetr" / "model" / "model_spin_system_ABCDEFG_exp2.pth"),
+        default=os.environ.get("MOLDETR_CHECKPOINT")
+        or str(ROOT / "moldetr" / "model" / "model_spin_system_ABCDEFG_exp2.pth"),
     )
     ap.add_argument("--extrema", default=str(ROOT / "moldetr" / "assets" / "extrema.txt"))
     ap.add_argument("--points-per-hz", type=float, default=5.12)

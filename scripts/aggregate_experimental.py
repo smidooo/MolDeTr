@@ -63,11 +63,19 @@ def main() -> None:
         default=ROOT / "structured_output" / "experimental_matched_pairs.json",
     )
     ap.add_argument(
-        "--total-queries", type=int, default=13 * 10 * 5,
+        "--total-queries",
+        type=int,
+        default=13 * 10 * 5,
         help="total model queries across the test set (for the DETR-style overall accuracy)",
     )
     ap.add_argument("--json", type=Path, default=None, help="also write metrics as JSON")
     args = ap.parse_args()
+    if not args.matched_pairs.exists():
+        raise SystemExit(
+            f"Matched-pairs file not found: {args.matched_pairs}\n"
+            "Pass --matched-pairs <path>, or run from the repo root where "
+            "structured_output/experimental_matched_pairs.json is committed."
+        )
     data = json.loads(args.matched_pairs.read_text(encoding="utf-8"))
     pairs = data["matched_pairs_total"] if isinstance(data, dict) else data
     result = aggregate(pairs)
@@ -75,7 +83,9 @@ def main() -> None:
     # Overall (DETR-style) accuracy: matched-correct + correctly-predicted empty ("no spin")
     # queries, over all queries -- the article's headline proton-count accuracy.
     matched_correct = round(result["proton_count_accuracy"] * result["n_pairs"])
-    n_unmatched_pred = len(data.get("unmatched_predictions_total", [])) if isinstance(data, dict) else 0
+    n_unmatched_pred = (
+        len(data.get("unmatched_predictions_total", [])) if isinstance(data, dict) else 0
+    )
     n_unmatched_label = len(data.get("unmatched_labels_total", [])) if isinstance(data, dict) else 0
     no_spin_correct = args.total_queries - result["n_pairs"] - n_unmatched_pred - n_unmatched_label
     overall_acc = (matched_correct + no_spin_correct) / args.total_queries
@@ -86,12 +96,18 @@ def main() -> None:
     print(f"  proton-count accuracy (overall) = {100 * overall_acc:.1f} %   (paper 93.5 %)")
     print(f"  proton-count accuracy (matched) = {100 * result['proton_count_accuracy']:.1f} %")
     if args.json:
-        args.json.write_text(json.dumps({
-            "median_abs_dshift_hz": result["median_abs_dshift_hz"],
-            "median_abs_dJ_hz": result["median_abs_dJ_hz"],
-            "proton_count_overall": overall_acc,
-            "proton_count_matched": result["proton_count_accuracy"],
-        }, indent=2), encoding="utf-8")
+        args.json.write_text(
+            json.dumps(
+                {
+                    "median_abs_dshift_hz": result["median_abs_dshift_hz"],
+                    "median_abs_dJ_hz": result["median_abs_dJ_hz"],
+                    "proton_count_overall": overall_acc,
+                    "proton_count_matched": result["proton_count_accuracy"],
+                },
+                indent=2,
+            ),
+            encoding="utf-8",
+        )
         print(f"  wrote metrics to {args.json}")
 
 

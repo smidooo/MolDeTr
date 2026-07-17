@@ -215,6 +215,10 @@ For **bit-exact** reproduction of the training environment (CUDA 11.7, linux-64)
 **CPU-only:** remove the `pytorch-cuda` line from `environment.yml` first (or install CPU PyTorch with pip).
 Inference then uses the pure-PyTorch fallback of the deformable-attention op — no CUDA, no compilation.
 
+**Supported versions:** Python 3.10–3.12 (newer versions may lack compatible PyTorch wheels). The
+`fastai>=2.7,<2.8` pin — required so `learner.load()` works — caps PyTorch at 2.6; this is a downgrade
+from the latest release but is benign for CPU inference.
+
 ### 2. (GPU only) Build the deformable-attention op
 ```bash
 cd moldetr/model/ops
@@ -246,6 +250,7 @@ python scripts/train.py optim_params.batch_size=8   # example override
 python scripts/evaluate_experimental.py        # the 13 experimental ROIs (S1..S13); needs checkpoint + ROI npz
 pip install -e ".[eval]"                       # evaluate_synthetic needs pandas/seaborn/scikit-learn/cmcrameri
 python scripts/evaluate_synthetic.py           # synthetic test set; needs checkpoint + synthetic npz
+python scripts/evaluate_synthetic.py device.device_name=cpu   # force CPU on a box without CUDA
 ```
 
 ### Predict on a single spectrum

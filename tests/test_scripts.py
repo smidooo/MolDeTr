@@ -79,6 +79,38 @@ def test_predict_demo_without_checkpoint_fails_cleanly():
 
 
 @pytest.mark.unit
+def test_predict_reads_moldetr_checkpoint_env():
+    """With no --checkpoint, predict.py falls back to $MOLDETR_CHECKPOINT (the documented convention)."""
+    env = {
+        **os.environ,
+        "MPLBACKEND": "Agg",
+        "GRADIO_ANALYTICS_ENABLED": "False",
+        "MOLDETR_CHECKPOINT": "env_no_such.pth",
+    }
+    r = subprocess.run(
+        [sys.executable, "scripts/predict.py", "--demo"],
+        cwd=str(REPO),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    assert r.returncode != 0
+    combined = r.stdout + r.stderr
+    assert "env_no_such.pth" in combined  # the env var was used as the checkpoint default
+
+
+@pytest.mark.unit
+def test_aggregate_missing_matched_pairs_fails_cleanly():
+    """A bad --matched-pairs path gives a friendly message, not a raw traceback."""
+    r = _run("scripts/aggregate_experimental.py", "--matched-pairs", "no_such.json")
+    assert r.returncode != 0
+    combined = r.stdout + r.stderr
+    assert "not found" in combined.lower()
+    assert "Traceback" not in combined
+
+
+@pytest.mark.unit
 def test_evaluate_experimental_clean_clone_fails_cleanly():
     r = _run("scripts/evaluate_experimental.py")
     assert r.returncode != 0
