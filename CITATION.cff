@@ -34,7 +34,7 @@ identifiers:
     description: Journal article
   - type: doi
     value: 10.5281/zenodo.21214876
-    description: Archived materials (Zenodo, all versions)
+    description: Software (Zenodo, all versions)
   - type: doi
     value: 10.5281/zenodo.21217101
     description: Dataset (Zenodo, all versions)
