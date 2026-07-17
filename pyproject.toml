@@ -56,6 +56,10 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
 ]
+# Opt-in Playwright browser e2e (tests/e2e/, run with `-m browser`; needs `playwright install chromium`).
+browser = [
+    "pytest-playwright>=0.5",
+]
 
 [project.urls]
 Homepage = "https://github.com/smidooo/MolDeTr"
@@ -84,3 +88,16 @@ target-version = "py310"
 # Research code: keep the gate light. Focus on real errors, not style churn.
 select = ["E", "F", "W"]
 ignore = ["E501", "E741", "W605", "E402", "F403", "F405", "E731", "E722", "F811", "F841"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Markers keep the heavy/opt-in suites out of the default run. `model` needs the 974 MB checkpoint
+# (local only); `browser` needs `playwright install` (opt-in); `e2e` launches an in-process Gradio app.
+markers = [
+    "unit: fast, weight-free unit test (CI default)",
+    "e2e: in-process gradio_client end-to-end test (needs the .[app] extra)",
+    "browser: Playwright browser test (opt-in; needs `playwright install`)",
+    "model: requires the real 974 MB checkpoint (local only)",
+    "data: requires Zenodo spectra not in a clean clone (local only)",
+    "slow: slow test",
+]
