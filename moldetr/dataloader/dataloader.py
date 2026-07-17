@@ -1,6 +1,7 @@
 """
 This module contains the dataloader for the data.
 """
+
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -19,15 +20,16 @@ def scale_spectrum(spectrum: np.ndarray) -> np.ndarray:
     # Ensure the spectrum is not entirely zero
     assert np.any(spectrum != 0), "Spectrum contains only zero values. Check your data."
 
-    return (spectrum)  / (np.max(spectrum)+1e-6)
+    return (spectrum) / (np.max(spectrum) + 1e-6)
+
+
 @dataclass()
 class DataReader(Dataset):
     """
     This class is used to read the data from the npz files. It is used by the dataloader. The data is normalized by the normalization parameters.
 
     Attributes:
-        _data_dir (Path): Path to the data directory.
-        _len (int): Number of samples.
+        _files (list[Path]): The sample .npz files, sorted by integer stem.
         _max_num_multipelts (int): Maximum number of multiplets.
         _num_classes (int): Number of classes.
         transformation (Transform): Transformation object.
@@ -35,27 +37,25 @@ class DataReader(Dataset):
 
     """
 
-    _data_dir: Path
-    _len: int
+    _files: list[Path]
     _num_classes: int
     data_augmentation: Optional[DataAugmentationPartial]
     transformation: Transform
     reg_param_indices: RegParamIndices = field(default_factory=RegParamIndices)
 
-
     def __len__(self) -> int:
         """Returns the number of samples in the data set."""
-        return self._len
+        return len(self._files)
 
     def __getitem__(self, idx) -> tuple[torch.Tensor, torch.Tensor]:
         """Returns the sample at index idx. The sample is a tuple of the features and the targets. The features are normalized to maximum amplitude=1. The targets are normalized by the extrema of the regression parameters."""
         try:
-            with np.load(self._data_dir / (str(idx) + ".npz"), allow_pickle=True) as sample:
+            with np.load(self._files[idx], allow_pickle=True) as sample:
                 features = sample["spec"]
                 # complex conjugate
                 # features=np.conj(features)
 
-                labels = sample['labels']
+                labels = sample["labels"]
 
                 # print(labels)
                 # plot_spectrum(sample)
@@ -69,10 +69,8 @@ class DataReader(Dataset):
                 crop_spectrum = True
                 # features = scale_spectrum(features)
                 if self.data_augmentation is not None:
-                        # features = self.data_augmentation(features,labels) # for plotting distortions
-                        features = self.data_augmentation(features)
-
-
+                    # features = self.data_augmentation(features,labels) # for plotting distortions
+                    features = self.data_augmentation(features)
 
                 features = scale_spectrum(features)
                 features = np.real(features[None, :])
@@ -80,25 +78,18 @@ class DataReader(Dataset):
                 multiplet_list = []
                 for label in labels:
                     multiplet = []
-                    if label["proton_number"] !=6:
+                    if label["proton_number"] != 6:
                         multiplet.append(label["proton_number"] - 1)
                     else:
-                        multiplet.append(label["proton_number"]-2)
+                        multiplet.append(label["proton_number"] - 2)
 
-
-
-                    multiplet.append(
-
-                            label["center_position_in_points"]/(len(features[0])-1)
-
-                    )
+                    multiplet.append(label["center_position_in_points"] / (len(features[0]) - 1))
                     multiplet.append(
                         self.transformation.transform(
                             label["line_width_in_points"],
                             self.reg_param_indices["line_width_in_points"],
                         )
                     )
-
 
                     multiplet.append(
                         self.transformation.transform(
@@ -108,16 +99,17 @@ class DataReader(Dataset):
                     )
 
                     # Apply various permutation invariant functions
-                    for i,embedded_cc in enumerate(permutation_invariant_coupling_constant_embedding(label["coupling_constants_in_points"])):  # Assuming a maximum of 4 coupling constants
+                    for i, embedded_cc in enumerate(
+                        permutation_invariant_coupling_constant_embedding(
+                            label["coupling_constants_in_points"]
+                        )
+                    ):  # Assuming a maximum of 4 coupling constants
                         multiplet.append(
                             self.transformation.transform(
                                 embedded_cc,
                                 self.reg_param_indices[f"coupling_constant_{i + 1}_in_points"],
                             )
                         )
-
-
-
 
                     multiplet_list.append(multiplet)
 
@@ -141,13 +133,14 @@ class DataReader(Dataset):
                 with open(error_file_path, "a") as error_file:
                     error_file.write(f"{idx}\n")
 
-            return self.__getitem__(idx + 1)  # Proceed to the next item
+            return self.__getitem__((idx + 1) % len(self._files))  # Proceed to the next item
+
 
 def plot_spectrum(sample):
     features = sample["spec"]
     labels = sample["labels"]
 
-    real_features=np.real(features)
+    real_features = np.real(features)
     # Scaling the spectrum
     max_intensity = max(real_features)
     scaled_features = real_features / max_intensity
@@ -157,11 +150,13 @@ def plot_spectrum(sample):
 
     # Identify the range that contains signals
     min_signal_hz = 1200  # Start with the highest possible frequency
-    max_signal_hz = 0     # Start with the lowest possible frequency
+    max_signal_hz = 0  # Start with the lowest possible frequency
 
     for label in labels:
         center_position_hz = label["center_position_in_points"] / (len(features) - 1) * 1200
-        range_hz = label["bounding_box_range_in_points"] / (len(features) - 1) * 1200  # Adjusted to Hz
+        range_hz = (
+            label["bounding_box_range_in_points"] / (len(features) - 1) * 1200
+        )  # Adjusted to Hz
         signal_start_hz = center_position_hz - range_hz / 2
         signal_end_hz = center_position_hz + range_hz / 2
 
@@ -170,7 +165,7 @@ def plot_spectrum(sample):
         max_signal_hz = max(max_signal_hz, signal_end_hz)
 
     # Add a margin of 50 Hz to both sides
-    margin_hz =(max_signal_hz - min_signal_hz) * 0.1  # 10% of the signal range
+    margin_hz = (max_signal_hz - min_signal_hz) * 0.1  # 10% of the signal range
     min_signal_hz = max(min_signal_hz - margin_hz, 0)  # Ensure we don't go below 0 Hz
     max_signal_hz = min(max_signal_hz + margin_hz, 1200)  # Ensure we don't exceed 1200 Hz
 
@@ -178,7 +173,7 @@ def plot_spectrum(sample):
     fig, ax = plt.subplots(figsize=(12, 4), dpi=300)  # Width is 12 inches and height is 4 inches
 
     # Plot the spectrum within the signal bounds
-    ax.plot(frequency_hz, scaled_features, label='Spectrum', color='blue')
+    ax.plot(frequency_hz, scaled_features, label="Spectrum", color="blue")
 
     # LaTeX caption variables
     caption_details = []
@@ -188,29 +183,43 @@ def plot_spectrum(sample):
     for label in labels:
         center_position_hz = label["center_position_in_points"] / (len(features) - 1) * 1200
         line_width_hz = label["line_width_in_points"] / (len(features) - 1) * 1200  # Adjusted to Hz
-        range_hz = label["bounding_box_range_in_points"] / (len(features) - 1) * 1200  # Adjusted to Hz
-        coupling_constants = label["coupling_constants_in_points"] * (1/(len(features) - 1) * 1200) # Assuming already in Hz
+        range_hz = (
+            label["bounding_box_range_in_points"] / (len(features) - 1) * 1200
+        )  # Adjusted to Hz
+        coupling_constants = label["coupling_constants_in_points"] * (
+            1 / (len(features) - 1) * 1200
+        )  # Assuming already in Hz
 
         # Plotting signal details
-        ax.axvline(x=center_position_hz, color='red', linestyle='--', label='Chemical Shift' if signal_count == 1 else "")
-        ax.axvspan(center_position_hz - range_hz / 2, center_position_hz + range_hz / 2, color='gray', alpha=0.3, label='Signal Region' if signal_count == 1 else "")
+        ax.axvline(
+            x=center_position_hz,
+            color="red",
+            linestyle="--",
+            label="Chemical Shift" if signal_count == 1 else "",
+        )
+        ax.axvspan(
+            center_position_hz - range_hz / 2,
+            center_position_hz + range_hz / 2,
+            color="gray",
+            alpha=0.3,
+            label="Signal Region" if signal_count == 1 else "",
+        )
 
         # Construct LaTeX caption part for this signal
-        coupling_str = ', '.join([f'{cc:.2f} Hz' for cc in coupling_constants])
+        coupling_str = ", ".join([f"{cc:.2f} Hz" for cc in coupling_constants])
         caption_details.append(
-            f"Signal {signal_count}: Protons {label['proton_number']}, Chemical Shift {center_position_hz:.2f} Hz, Line Width {line_width_hz:.2f} Hz, Signal Region {range_hz:.2f} Hz, Couplings [{coupling_str}].")
+            f"Signal {signal_count}: Protons {label['proton_number']}, Chemical Shift {center_position_hz:.2f} Hz, Line Width {line_width_hz:.2f} Hz, Signal Region {range_hz:.2f} Hz, Couplings [{coupling_str}]."
+        )
         signal_count += 1
 
     # Set labels and title
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('Intensity (a.u.)')
-    ax.set_title('Simulated Spectrum with Added Distortions')
+    ax.set_xlabel("Frequency (Hz)")
+    ax.set_ylabel("Intensity (a.u.)")
+    ax.set_title("Simulated Spectrum with Added Distortions")
 
     # Set x-axis limits to focus on the signal region only, with margin
     ax.set_xlim(min_signal_hz, max_signal_hz)
     ax.invert_xaxis()  # Invert x-axis to display increasing frequency from left to right
-
-
 
     ax.legend()  # Display the legend
 
@@ -223,14 +232,18 @@ def plot_spectrum(sample):
     print("Caption:")
     print(caption)
 
-def process_spectrum_with_peak_based_cropping(features, labels, safety_margin=300, target_length=None, flip_spectrum=False):
-    peak_positions = [int(label['center_position_in_points']) for label in labels]
+
+def process_spectrum_with_peak_based_cropping(
+    features, labels, safety_margin=300, target_length=None, flip_spectrum=False
+):
+    peak_positions = [int(label["center_position_in_points"]) for label in labels]
 
     # Assuming peak_positions, safety_margin, and features are predefined
     # Calculate initial safe crop boundaries based on peak positions and safety margin
     safe_min_peak = max(min(peak_positions) - safety_margin, 0)  # Ensure it's not negative
-    safe_max_peak = min(max(peak_positions) + safety_margin,
-                        len(features) - 1)  # Ensure it doesn't exceed the spectrum length
+    safe_max_peak = min(
+        max(peak_positions) + safety_margin, len(features) - 1
+    )  # Ensure it doesn't exceed the spectrum length
 
     # Introduce variability within safe boundaries
     # For min_peak: Randomly choose between 0 and safe_min_peak, if there's room for variability
@@ -238,19 +251,22 @@ def process_spectrum_with_peak_based_cropping(features, labels, safety_margin=30
 
     # For max_peak: Randomly choose between safe_max_peak and len(features) - 1, if there's room for variability
     # Adjusting the range to ensure it doesn't exceed the last valid index
-    max_peak = np.random.randint(safe_max_peak, len(features)) if safe_max_peak < len(features) - 1 else len(
-        features) - 1
+    max_peak = (
+        np.random.randint(safe_max_peak, len(features))
+        if safe_max_peak < len(features) - 1
+        else len(features) - 1
+    )
 
     # Additional check to ensure we don't unnecessarily cut the spectrum
     # If max_peak is the last possible index, we keep it to avoid unnecessary cutting
     max_peak = min(max_peak, len(features) - 1)
 
     # Crop the spectrum
-    features= features[min_peak:max_peak]
+    features = features[min_peak:max_peak]
 
     # Adjust label positions for cropping
     for label in labels:
-        label['center_position_in_points'] -= min_peak
+        label["center_position_in_points"] -= min_peak
 
     # Calculate total padding needed to achieve target length
     if target_length is not None:
@@ -258,18 +274,22 @@ def process_spectrum_with_peak_based_cropping(features, labels, safety_margin=30
         if padding_needed > 0:
             padding_left = np.random.randint(0, padding_needed + 1)
             padding_right = padding_needed - padding_left
-            features = np.pad(features, (padding_left, padding_right), 'constant')
+            features = np.pad(features, (padding_left, padding_right), "constant")
 
             # Adjust label positions for left padding
             for label in labels:
-                label['center_position_in_points'] += padding_left
+                label["center_position_in_points"] += padding_left
 
-    assert len(features) == target_length, f"Length of features is {len(features)}, but should be {target_length}."
+    assert len(features) == target_length, (
+        f"Length of features is {len(features)}, but should be {target_length}."
+    )
     # Optionally flip the spectrum and adjust label positions accordingly
     if flip_spectrum:
         features = np.flip(features).copy()
         for label in labels:
-            label['center_position_in_points'] = len(features) - label['center_position_in_points'] - 1
+            label["center_position_in_points"] = (
+                len(features) - label["center_position_in_points"] - 1
+            )
 
     features = np.real(features[None, :])
 
@@ -290,8 +310,6 @@ class CustomDataLoader(DataLoader):
                 break
 
 
-
-
 def get_num_samples(data_dir) -> int:
     """Returns the number of samples in the data directory."""
     initial_count = 0
@@ -299,6 +317,32 @@ def get_num_samples(data_dir) -> int:
         if path.is_file():
             initial_count += 1
     return initial_count
+
+
+def list_sample_files(data_dir) -> list[Path]:
+    """Return the sample ``.npz`` files present in ``data_dir``, sorted by their integer stem.
+
+    The released synthetic subset ships **sparse** ids (e.g. 3..4980, no ``0.npz``), so the dataset
+    must index the files that actually exist rather than assume contiguous ``0..N-1`` names. On
+    contiguous data this yields ``[0.npz, 1.npz, ...]`` in order, so positional indexing — and the
+    seeded train/val/test split over positions — is unchanged.
+    """
+    files = [p for p in Path(data_dir).glob("*.npz") if p.is_file() and p.stem.isdigit()]
+    return sorted(files, key=lambda p: int(p.stem))
+
+
+def _split_lengths(n: int) -> tuple[int, int, int]:
+    """Train/val/test lengths that always sum to exactly ``n``.
+
+    ``torch.utils.data.random_split`` requires the integer lengths to sum to the dataset size, but the
+    historical ``int(0.92n) + int(0.06n) + int(0.02n)`` is short by 1-2 unless ``n`` is a multiple of
+    50 (it would raise ``ValueError`` on the released sparse subset for many sizes). The train split
+    absorbs the rounding remainder, so the 92/6/2 % partition is preserved exactly wherever it already
+    summed correctly (e.g. n=100 -> (92, 6, 2); n=5_000_000 -> (4_600_000, 300_000, 100_000)).
+    """
+    n_val = int(0.06 * n)
+    n_test = int(0.02 * n)
+    return n - n_val - n_test, n_val, n_test
 
 
 def custom_collate(batch) -> tuple[torch.Tensor, dict]:
@@ -318,19 +362,18 @@ def get_train_test_set(
     transformation: Transform,
     samples_per_epoch: Optional[int],
     data_augmentation: Optional[DataAugmentationPartial],
-    specific_evaluation_set: Optional[Path]=None,
+    specific_evaluation_set: Optional[Path] = None,
     test: bool = False,
 ) -> tuple[DataLoaders, DataLoaders]:
     """Returns the train, validation and test set."""
 
-
     if specific_evaluation_set and test:
-        data_dir=Path(specific_evaluation_set)
+        data_dir = Path(specific_evaluation_set)
 
-    number_of_samples = get_num_samples(data_dir)
+    files = list_sample_files(data_dir)
+    number_of_samples = len(files)
     dataset = DataReader(
-        _data_dir=data_dir,
-        _len=number_of_samples,
+        _files=files,
         _num_classes=num_classes,
         data_augmentation=data_augmentation,
         transformation=transformation,
@@ -348,15 +391,10 @@ def get_train_test_set(
             generator=torch.Generator().manual_seed(42),
         )
 
-
     else:
         train_set, val_set, test_set = torch.utils.data.random_split(
             dataset,
-            [
-                int(0.92 * number_of_samples),
-                int(0.06 * number_of_samples),
-                int(0.02 * number_of_samples),
-            ],
+            list(_split_lengths(number_of_samples)),
             generator=torch.Generator().manual_seed(42),
         )
     dls_train = DataLoader(
@@ -367,11 +405,9 @@ def get_train_test_set(
         num_workers=num_workers,
         create_batch=custom_collate,
         drop_last=True,
-
     )  # .cuda()
 
-
-    dls_train=CustomDataLoader(dls_train,batches_per_epoch=samples_per_epoch//batch_size)
+    dls_train = CustomDataLoader(dls_train, batches_per_epoch=samples_per_epoch // batch_size)
     dls_val = DataLoader(
         val_set,
         reg_param_indices,
@@ -381,10 +417,9 @@ def get_train_test_set(
         create_batch=custom_collate,
         drop_last=True,
     )
-    dls_val=CustomDataLoader(dls_val, batches_per_epoch=samples_per_epoch//(batch_size))
+    dls_val = CustomDataLoader(dls_val, batches_per_epoch=samples_per_epoch // (batch_size))
 
     dls_train_val = DataLoaders(dls_train, dls_val)
-
 
     dls_test = DataLoaders(
         DataLoader(
