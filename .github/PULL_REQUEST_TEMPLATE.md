@@ -10,8 +10,8 @@
 - [ ] Refactor or cleanup (no behaviour change)
 
 ## Checks
-- [ ] `pytest -m unit` passes (the CI default tier)
-- [ ] `ruff check .` is clean
+- [ ] `pytest -m "not e2e and not browser"` passes (the CI default suite)
+- [ ] `ruff check moldetr scripts tests` is clean
 - [ ] No weights, `.npz` spectra, or other Zenodo-hosted data are committed
 - [ ] Behaviour changes touching the model / loss / matcher come with a test
 
