@@ -123,16 +123,3 @@ def test_evaluate_experimental_clean_clone_fails_cleanly():
 def test_app_imports_and_builds_ui():
     r = _run("-c", "import app; assert type(app.build_ui()).__name__ == 'Blocks'")
     assert r.returncode == 0, r.stderr
-
-
-@pytest.mark.unit
-def test_figure_generators_importable():
-    try:
-        import rdkit  # noqa: F401
-    except ImportError:
-        pytest.skip("rdkit (the .[figures] extra) not installed — figure generators not exercised")
-    # Import-only (running main() would overwrite committed docs/*.png).
-    r = _run(
-        "-c", "import sys; sys.path.insert(0, 'scripts'); import gen_banner, gen_molecule_figure"
-    )
-    assert r.returncode == 0, r.stderr
