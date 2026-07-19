@@ -15,8 +15,8 @@ All notable changes to this project are documented here. The format is based on
   guajazulene 500 MHz prediction, the vanillin molecule↔spectrum figure, and the GUI. The redundant
   standalone vanillin prediction was removed; its worked-example detail (proton counts, δ, `max J`
   8.2/2.0/8.7 vs 8.0/2.0/8.0 Hz) is folded into the molecule↔spectrum caption.
-- **Shared plotting style.** Prediction and figure scripts now render through one shared matplotlib
-  style, so the banner, worked examples, and GUI are visually consistent.
+- **Shared plotting style.** Prediction figures render through one shared matplotlib style, so generated
+  prediction plots stay visually consistent. The README banner and diagrams ship as design-tool assets.
 - **Label de-confliction with adjustText.** Multiplet annotations are placed with `adjustText` so labels
   no longer overlap peaks or one another on congested windows.
 - **Documentation single-source-of-truth.** De-duplicated caveats that had spread across ~13 files.
@@ -32,8 +32,14 @@ All notable changes to this project are documented here. The format is based on
   DOI (`10.5281/zenodo.21214876`) is unchanged.
 
 ### Added
-- **Reproducible banner and molecule figure.** The banner and the vanillin molecule↔spin-system figure
-  are now regenerable from source — molecule rendering via `rdkit` plus the shared plotting style.
+- **Animated demo + docs site.** An animated Gradio demo GIF in the README, a GitHub Pages landing page
+  (`docs/index.md`), and a `.github/` PR template + CODEOWNERS.
+
+### Removed
+- **Matplotlib banner + molecule-figure generators.** Dropped `scripts/gen_banner.py`,
+  `scripts/gen_molecule_figure.py`, and the `[figures]` / `rdkit` extra. The README banner and diagrams now
+  ship as design-tool assets, so the generators — which produced an off-brand matplotlib banner and would
+  overwrite the shipped assets if run — are no longer needed.
 
 ## [1.0.0] - 2026-07-15
 
