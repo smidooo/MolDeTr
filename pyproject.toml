@@ -42,11 +42,6 @@ eval = [
     "seaborn>=0.12",
     "cmcrameri>=1.5",
 ]
-# Extra deps for the publication figure generators (the scripts/gen_*.py molecule renderers).
-# rdkit renders molecule structures; adjustText is a CORE dep (used by moldetr.visualization).
-figures = [
-    "rdkit>=2023.3",
-]
 app = [
     "gradio>=6.0,<7",
     "plotly>=5",  # interactive spectrum in the Gradio GUI (plotting.spectrum_figure)
