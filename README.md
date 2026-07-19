@@ -39,10 +39,10 @@
 </p>
 <p align="center"><b>Guajazulene, 500 MHz</b> — a clean high-field case: three aromatic protons, resolved in one forward pass.</p>
 
-Reading a ¹H NMR spectrum by hand — picking peaks, grouping them into multiplets, counting protons, and
-measuring coupling constants — is slow, subjective, and hard to reproduce, and it gets worse exactly where
-it matters most: overlapping signals and strong (higher-order) coupling. MolDeTr does it in **one forward
-pass**, with no prior structure, no reference standards, and no iterative fitting.
+Reading a ¹H NMR spectrum by hand means picking peaks, grouping them into multiplets, counting protons,
+and measuring coupling constants. It is slow and hard to reproduce, and least reliable on the hardest
+cases: overlapping signals and strong (higher-order) coupling. MolDeTr produces all four in a single
+forward pass.
 
 MolDeTr reads a 1D ¹H NMR spectrum and returns the spin systems in it directly: for each group of
 equivalent protons it gives the chemical shift (δ), the coupling (J), the proton count, and the line
