@@ -32,8 +32,7 @@ dependencies:
   - pip
   - pip:
       - cmcrameri>=1.5
-      # publication figure generators (moldetr.plotstyle + figure scripts):
+      # label de-confliction in moldetr.visualization (core dep):
       - adjustText>=1.0
-      - rdkit>=2023.3
       # editable install of this package (moldetr):
       - -e .
