@@ -33,7 +33,6 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/example_prediction-dark.png">
     <img src="docs/img/example_prediction.png" alt="MolDeTr detects three aromatic 1H multiplets of guajazulene at 500 MHz; the assignment table lists proton count, chemical shift in ppm, largest coupling max J in Hz, and line width for each" width="760">
   </picture>
 </p>
@@ -263,13 +262,13 @@ Add `--input your_window.npz` for your own data. The `--plot` flag writes the an
 ### Graphical interface
 A [Gradio](https://gradio.app) app: load a spectrum, get the assignment table and the annotated plot.
 
-![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, research-prototype chip, Paper/GitHub/Scope links) over a two-pane layout — an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, line width and per-detection confidence, a max-J/full-set toggle, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
+![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, research-prototype chip, Paper/GitHub/Scope links) over a two-pane layout — an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
 
 ```bash
 pip install -e ".[app]"
 python app.py
 ```
-Runs locally and deploys unchanged as a Hugging Face Space (set the checkpoint via `MOLDETR_CHECKPOINT`).
+Runs locally, and can be deployed unchanged as a Hugging Face Space (set the checkpoint via `MOLDETR_CHECKPOINT`).
 Ready-to-try inputs are in [`examples/`](examples/).
 
 ## Reproducing the paper
