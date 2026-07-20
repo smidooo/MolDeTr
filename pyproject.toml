@@ -56,6 +56,11 @@ dev = [
 browser = [
     "pytest-playwright>=0.5",
 ]
+# Execute the released Colab notebooks end-to-end: `pytest --nbmake notebooks/*.ipynb`. Opt-in — the
+# notebooks download the ~974 MB checkpoint, so this runs locally / nightly, never in the fast CI lane.
+notebooks = [
+    "nbmake>=1.5",
+]
 
 [project.urls]
 Homepage = "https://github.com/smidooo/MolDeTr"
@@ -99,4 +104,5 @@ markers = [
     "model: requires the real 974 MB checkpoint (local only)",
     "data: requires Zenodo spectra not in a clean clone (local only)",
     "slow: slow test",
+    "network: needs network access (e.g. downloads weights/data); skipped in the default CI lane",
 ]
