@@ -202,6 +202,17 @@ def _crop_x(ax: Axes, xs: list[float], x: np.ndarray) -> None:
         ax.set_xlim(xlo, xhi)
 
 
+WINDOW_HZ = 1200.0  # the input window is a fixed 1200 Hz span (6144 pts at 5.12 pts/Hz)
+
+
+def _ppm_to_hz_factor(ppm_left: float, ppm_right: float, window_hz: float = WINDOW_HZ) -> float:
+    """Hz per ppm for the window. Because the window is a fixed ``window_hz`` span, the spectrometer
+    frequency is ``window_hz / |ppm span|`` — so a Hz axis needs no extra metadata. 0 on a zero span.
+    """
+    span = abs(ppm_left - ppm_right)
+    return window_hz / span if span else 0.0
+
+
 def plot_spectrum(
     amplitudes: Any,
     predictions: list[dict[str, Any]],
@@ -259,8 +270,15 @@ def plot_spectrum(
         ax.spines[side].set_color(SPINE)
     ax.tick_params(colors=MUTE)  # BRAND
     _crop_x(ax, xs, x)  # kill dead x-margins before the invert below
-    if ppm:
+    if ppm and ppm_left is not None and ppm_right is not None:
         ax.invert_xaxis()  # NMR convention: ppm decreases left to right
+        hz_per_ppm = _ppm_to_hz_factor(ppm_left, ppm_right)
+        if hz_per_ppm:  # add a secondary Hz axis (model works in Hz; chemists read ppm)
+            secax = ax.secondary_xaxis(
+                "top", functions=(lambda p: p * hz_per_ppm, lambda h: h / hz_per_ppm)
+            )
+            secax.set_xlabel("δ (Hz)", fontsize=11, color=MUTE)
+            secax.tick_params(colors=MUTE)
     if ground_truth:
         ax.plot([], [], "o", color=ACCENT, label="Detected (numbered)")
         ax.legend(loc="upper left", fontsize=9, frameon=False)
