@@ -50,6 +50,7 @@ dev = [
     "pytest>=7.0",
     "ruff>=0.1",
     "mypy>=1.0",
+    "hypothesis>=6.0",  # property-based tests (tests/test_properties.py)
 ]
 # Opt-in Playwright browser e2e (tests/e2e/, run with `-m browser`; needs `playwright install chromium`).
 browser = [
