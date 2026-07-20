@@ -76,6 +76,45 @@ def per_class_accuracy(matched_pairs: list, unmatched_labels: list | None = None
     return {c: (correct[c], total[c]) for c in sorted(total)}
 
 
+def regression_stats(matched_pairs: list) -> dict:
+    """MAE (Hz) and R² for chemical shift and coupling from the matched pairs — the paper's Table 4.
+    R² is scale-invariant, so shift is evaluated in Hz (points / POINTS_PER_HZ)."""
+    ds_p: list[float] = []
+    ds_l: list[float] = []
+    j_p: list[float] = []
+    j_l: list[float] = []
+    for pred, label in matched_pairs:
+        if "chemical_shift_in_points" in pred and "chemical_shift_in_points" in label:
+            ds_p.append(pred["chemical_shift_in_points"] / POINTS_PER_HZ)
+            ds_l.append(label["chemical_shift_in_points"] / POINTS_PER_HZ)
+        lc = label.get("coupling_constants")
+        if lc is not None:
+            pc = pred.get("coupling_constants", [])
+            lc = lc if isinstance(lc, list) else [lc]
+            pc = pc if isinstance(pc, list) else [pc]
+            for p, t in zip(pc[: len(lc)], lc):
+                j_p.append(p)
+                j_l.append(t)
+
+    def _mae(pred: list[float], lab: list[float]) -> float:
+        return statistics.fmean(abs(p - t) for p, t in zip(pred, lab)) if pred else float("nan")
+
+    def _r2(pred: list[float], lab: list[float]) -> float:
+        if len(lab) < 2:
+            return float("nan")
+        mean_l = statistics.fmean(lab)
+        ss_res = sum((t - p) ** 2 for p, t in zip(pred, lab))
+        ss_tot = sum((t - mean_l) ** 2 for t in lab)
+        return 1 - ss_res / ss_tot if ss_tot else float("nan")
+
+    return {
+        "mae_dshift_hz": _mae(ds_p, ds_l),
+        "r2_dshift": _r2(ds_p, ds_l),
+        "mae_dJ_hz": _mae(j_p, j_l),
+        "r2_dJ": _r2(j_p, j_l),
+    }
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Reproduce the experimental error medians from committed matched pairs."
@@ -121,6 +160,13 @@ def main() -> None:
     unmatched_labels = data.get("unmatched_labels_total") if isinstance(data, dict) else None
     for cls, (cor, tot) in per_class_accuracy(pairs, unmatched_labels).items():
         print(f"    {cls}H proton-count accuracy = {100 * cor / tot:.1f} %  ({cor}/{tot})")
+    reg = regression_stats(pairs)
+    print(
+        f"  MAE |dd| = {reg['mae_dshift_hz']:.3f} Hz, R^2 = {reg['r2_dshift']:.3f}   (paper 1.368 Hz, 0.999)"
+    )
+    print(
+        f"  MAE |dJ| = {reg['mae_dJ_hz']:.3f} Hz, R^2 = {reg['r2_dJ']:.3f}   (paper 0.470 Hz, 0.936)"
+    )
     if args.json:
         args.json.write_text(
             json.dumps(
