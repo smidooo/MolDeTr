@@ -287,11 +287,12 @@ Ready-to-try inputs are in [`examples/`](examples/).
 </p>
 
 The article's headline experimental medians are **0.89 Hz** (|Δδ|), **0.20 Hz** (|ΔJ|), and **93.5 %**
-proton-count accuracy.
+proton-count accuracy. The evaluation set is **13 ROIs across 12 spectra** (the ethyl vanillin spectrum
+contributes two regions, S5 and S5_R2), spanning 10 compounds at 80–600 MHz.
 
 | Command | What it does | Needs |
 |---|---|---|
-| `python scripts/aggregate_experimental.py` | recompute medians from committed match data | nothing (CPU, in-repo) |
+| `python scripts/aggregate_experimental.py` | recompute the medians + per-class accuracy from committed match data | nothing (CPU, in-repo) |
 | `python scripts/evaluate_experimental.py`  | regenerate predictions from the weights | checkpoint + ROI npz (Zenodo) |
 | `python scripts/evaluate_synthetic.py`     | synthetic test-set metrics | checkpoint + synthetic npz (Zenodo), `.[eval]` |
 

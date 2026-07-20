@@ -82,3 +82,21 @@ def test_decode_drops_max_coupling_below_min():
     preds = decode_predictions(q[None, :], EXTREMA, points_per_hz=5.12, threshold=0.3)
     assert len(preds) == 1
     assert preds[0]["coupling_constants_hz"] == []
+
+
+def test_per_class_accuracy_counts_unmatched_labels_as_miss():
+    """An unmatched label is a miss for its class (model predicted 'no spin' there) — this is what
+    makes the per-class denominator match the confusion matrix / the paper's per-class numbers."""
+    from scripts.aggregate_experimental import per_class_accuracy
+
+    matched = [
+        ({"proton_count": 1}, {"proton_count": 1}),  # 1H correct
+        ({"proton_count": 2}, {"proton_count": 1}),  # 1H label, predicted 2H -> miss
+        ({"proton_count": 2}, {"proton_count": 2}),  # 2H correct
+    ]
+    unmatched_labels = [{"proton_count": 1}]  # a 1H label the model missed entirely
+    acc = per_class_accuracy(matched, unmatched_labels)
+    assert acc[1] == (1, 3)  # 1 correct of 3 total 1H (2 matched + 1 unmatched)
+    assert acc[2] == (1, 1)
+    # Without the unmatched labels the 1H denominator drops to the 2 matched.
+    assert per_class_accuracy(matched)[1] == (1, 2)
