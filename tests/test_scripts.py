@@ -123,3 +123,18 @@ def test_evaluate_experimental_clean_clone_fails_cleanly():
 def test_app_imports_and_builds_ui():
     r = _run("-c", "import app; assert type(app.build_ui()).__name__ == 'Blocks'")
     assert r.returncode == 0, r.stderr
+
+
+@pytest.mark.unit
+def test_download_weights_verifies_and_pins_the_version_doi(tmp_path):
+    """The download helper checksums correctly and points at the immutable v1.0.0 record (not the
+    concept DOI), so a fresh clone always fetches the exact published checkpoint."""
+    import hashlib
+
+    from scripts.download_weights import EXPECTED_MD5, ZENODO_URL, _md5
+
+    p = tmp_path / "blob.bin"
+    p.write_bytes(b"molde-tr")
+    assert _md5(p) == hashlib.md5(b"molde-tr").hexdigest()
+    assert "21217102" in ZENODO_URL  # pinned to the immutable v1.0.0 version record
+    assert len(EXPECTED_MD5) == 32
