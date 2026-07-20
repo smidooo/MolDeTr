@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://zenodo.org/badge/latestdoi/1289888357"><img src="https://zenodo.org/badge/1289888357.svg" alt="DOI"></a>
   <a href="https://doi.org/10.1021/acs.analchem.5c03465"><img src="https://img.shields.io/badge/Paper-Anal.%20Chem.%202026-1e2d4d" alt="Paper"></a>
+  <a href="https://huggingface.co/smidooo/moldetr"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model-smidooo%2Fmoldetr-ffce1c" alt="Hugging Face model"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-3776ab.svg" alt="Python"></a>
   <a href="https://github.com/smidooo/MolDeTr/actions/workflows/ci.yml"><img src="https://github.com/smidooo/MolDeTr/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
@@ -240,7 +241,9 @@ checkpoint straight into `moldetr/model/` (where `conf/config_big.yaml` expects 
 python scripts/download_weights.py   # downloads + MD5-verifies model_spin_system_ABCDEFG_exp2.pth (~974 MB)
 ```
 
-Or download `model_spin_system_ABCDEFG_exp2.pth` from the Zenodo record by hand and place it there
+Or fetch it from **[Hugging Face](https://huggingface.co/smidooo/moldetr)** — a byte-identical mirror
+(`huggingface-cli download smidooo/moldetr model_spin_system_ABCDEFG_exp2.pth --local-dir moldetr/model`) —
+or download it from the Zenodo record by hand and place it in `moldetr/model/`
 (`paths.model_folder_save`, `lognames.best_model_file`).
 
 ## Train and evaluate
