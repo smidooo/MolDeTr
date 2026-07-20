@@ -301,7 +301,7 @@ contributes two regions, S5 and S5_R2), spanning 10 compounds at 80–600 MHz.
 
 | Command | What it does | Needs |
 |---|---|---|
-| `python scripts/aggregate_experimental.py` | recompute the medians + per-class accuracy from committed match data | nothing (CPU, in-repo) |
+| `python scripts/aggregate_experimental.py` | reproduce Table 4 (medians, per-class accuracy, MAE, R²) from committed match data | nothing (CPU, in-repo) |
 | `python scripts/evaluate_experimental.py`  | regenerate predictions from the weights | checkpoint + ROI npz (Zenodo) |
 | `python scripts/evaluate_synthetic.py`     | synthetic test-set metrics | checkpoint + synthetic npz (Zenodo), `.[eval]` |
 

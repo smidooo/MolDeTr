@@ -100,3 +100,23 @@ def test_per_class_accuracy_counts_unmatched_labels_as_miss():
     assert acc[2] == (1, 1)
     # Without the unmatched labels the 1H denominator drops to the 2 matched.
     assert per_class_accuracy(matched)[1] == (1, 2)
+
+
+def test_regression_stats_mae_and_r2():
+    """MAE and R² (Table 4) on a hand-checkable case: exact shifts, a known coupling error."""
+    from scripts.aggregate_experimental import regression_stats
+
+    pairs = [
+        (
+            {"chemical_shift_in_points": 512.0, "coupling_constants": [7.0]},
+            {"chemical_shift_in_points": 512.0, "coupling_constants": [7.0]},
+        ),
+        (
+            {"chemical_shift_in_points": 1024.0, "coupling_constants": [8.0]},
+            {"chemical_shift_in_points": 1024.0, "coupling_constants": [10.0]},
+        ),
+    ]
+    r = regression_stats(pairs)
+    assert r["mae_dshift_hz"] == 0.0 and r["r2_dshift"] == 1.0  # shifts exact
+    assert r["mae_dJ_hz"] == 1.0  # coupling errors |0|, |2| -> mean 1.0
+    assert abs(r["r2_dJ"] - (1 - 4 / 4.5)) < 1e-9  # ss_res=4, ss_tot=4.5
