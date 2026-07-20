@@ -74,3 +74,22 @@ def test_example_reproduces_ground_truth(example, protons):
         assert abs(p["chemical_shift_ppm"] - g["chemical_shift_ppm"]) < 0.1
         if g["coupling_constants"]:
             assert abs(p["coupling_constants_hz"][0] - max(g["coupling_constants"])) < 1.5
+
+
+def test_set_seed_makes_numpy_torch_and_stdlib_deterministic():
+    """set_seed(n) fixes numpy, torch, and the stdlib RNG so two runs draw identically; a new seed diverges."""
+    import random
+
+    import torch
+
+    from moldetr.reproducibility import set_seed
+
+    def _draw():
+        return (np.random.rand(3).tolist(), torch.randn(3).tolist(), random.random())
+
+    set_seed(123)
+    first = _draw()
+    set_seed(123)
+    assert _draw() == first
+    set_seed(456)
+    assert _draw() != first

@@ -1,5 +1,6 @@
-""" This file contains the metrics for the multiple object detection task. """
-import fastai
+"""This file contains the metrics for the multiple object detection task."""
+
+import fastai.metrics  # noqa: F401 — accessed as fastai.metrics.accuracy_multi / .accuracy below
 import torch
 from typing import Callable, Optional
 
@@ -35,9 +36,7 @@ def accuracy_with_empty_object(
         indices = matching_partial(output, targets)
         output_index = get_src_permutation_idx(indices)
 
-        targets_permuted = torch.cat(
-            [t[J] for t, (_, J) in zip(targets["targets"], indices)]
-        )
+        targets_permuted = torch.cat([t[J] for t, (_, J) in zip(targets["targets"], indices)])
         output_class = output[..., :number_of_classes]
         target_class_o = targets_permuted[..., 0].to(dtype=torch.int64)
 
@@ -86,9 +85,7 @@ def accuracy_without_empty_object(
         indices = matching_partial(output, targets)
         output_index = get_src_permutation_idx(indices)
 
-        targets_permuted = torch.cat(
-            [t[J] for t, (_, J) in zip(targets["targets"], indices)]
-        )
+        targets_permuted = torch.cat([t[J] for t, (_, J) in zip(targets["targets"], indices)])
         target_class_o = targets_permuted[..., 0].to(dtype=torch.int64)
 
         output = output[output_index]  # .transpose(1, 2)
@@ -116,7 +113,7 @@ def parameter_loss_metric(
     **kwargs: keyword arguments for the callable function
     Returns:
     Metric: parameter loss of the model"""
-    loss=0.
+    loss = 0.0
     outputs = [group.squeeze(1) for group in outputs.chunk(n_groups, dim=1)]
 
     num_multiplets_in_batch = sum(targets["num_targets"])
@@ -130,16 +127,12 @@ def parameter_loss_metric(
             targets,
         )
 
-
-        loss+=parameter_loss_callable(
-                output,
-                targets,
-                indices=indices,
-            )
-    return parameter_loss_weighting * (
-        loss
-        / (num_multiplets_in_batch*n_groups)
-    )
+        loss += parameter_loss_callable(
+            output,
+            targets,
+            indices=indices,
+        )
+    return parameter_loss_weighting * (loss / (num_multiplets_in_batch * n_groups))
 
 
 def single_parameter_loss_metric(
@@ -157,7 +150,7 @@ def single_parameter_loss_metric(
     **kwargs: keyword arguments for the callable function
     Returns:
     Metric: parameter loss of the model"""
-    loss=0.
+    loss = 0.0
     outputs = [group.squeeze(1) for group in outputs.chunk(n_groups, dim=1)]
 
     num_multiplets_in_batch = sum(targets["num_targets"])
@@ -170,19 +163,13 @@ def single_parameter_loss_metric(
             targets,
         )
 
+        loss += single_parameter_loss_callable(
+            output,
+            targets,
+            indices=indices,
+        )
 
-
-        loss+=single_parameter_loss_callable(
-                output,
-                targets,
-                indices=indices,
-            )
-
-    return parameter_loss_weighting * (
-        loss
-        / (num_multiplets_in_batch*n_groups)
-    )
-
+    return parameter_loss_weighting * (loss / (num_multiplets_in_batch * n_groups))
 
 
 def classification_loss_metric(
@@ -200,7 +187,7 @@ def classification_loss_metric(
     **kwargs: keyword arguments for the callable function
     Returns:
     Metric: classification loss of the model"""
-    loss=0.
+    loss = 0.0
     outputs = [group.squeeze(1) for group in outputs.chunk(n_groups, dim=1)]
 
     num_multiplets_in_batch = sum(targets["num_targets"])
@@ -208,23 +195,18 @@ def classification_loss_metric(
         classification_loss_weighting = 1
 
     for output in outputs:
-
         indices = matching_partial(
             output,
             targets,
         )
 
+        loss += classification_loss_callable(
+            output,
+            targets,
+            indices=indices,
+        )
 
-        loss+=classification_loss_callable(
-                output,
-                targets,
-                indices=indices,
-            )
-
-    return classification_loss_weighting * (
-        loss
-        / (num_multiplets_in_batch*n_groups)
-    )
+    return classification_loss_weighting * (loss / (num_multiplets_in_batch * n_groups))
 
 
 def giou_loss_metric(
@@ -242,7 +224,7 @@ def giou_loss_metric(
     **kwargs: keyword arguments for the callable function
     Returns:
     Metric: giou loss of the model"""
-    loss=0.
+    loss = 0.0
     outputs = [group.squeeze(1) for group in outputs.chunk(n_groups, dim=1)]
 
     num_multiplets_in_batch = sum(targets["num_targets"])
@@ -254,20 +236,13 @@ def giou_loss_metric(
             targets,
         )
 
+        loss += giou_loss_callable(
+            output,
+            targets,
+            indices=indices,
+        )
 
-
-        loss+=giou_loss_callable(
-                output,
-                targets,
-                indices=indices,
-            )
-
-    return giou_loss_weighting * (
-        loss
-        / (num_multiplets_in_batch*n_groups)
-    )
-
-
+    return giou_loss_weighting * (loss / (num_multiplets_in_batch * n_groups))
 
 
 # precision=fastai.metrics.PrecisionMulti(sigmoid=False)
