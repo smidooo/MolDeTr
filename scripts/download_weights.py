@@ -33,11 +33,11 @@ def _md5(path: Path) -> str:
     return h.hexdigest()
 
 
-def _download(url: str, dest: Path) -> None:
-    """Stream to a .part file with a progress line, then atomically move into place."""
+def _download(url: str, dest: Path) -> Path:
+    """Stream to a .part file with a progress line; return it (caller verifies before replacing)."""
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp = dest.with_suffix(dest.suffix + ".part")
-    with urllib.request.urlopen(url) as resp:
+    with urllib.request.urlopen(url, timeout=60) as resp:
         total = int(resp.headers.get("Content-Length", 0))
         done = 0
         with open(tmp, "wb") as out:
@@ -51,7 +51,7 @@ def _download(url: str, dest: Path) -> None:
                         flush=True,
                     )
     print()
-    tmp.replace(dest)
+    return tmp
 
 
 def main() -> None:
@@ -74,14 +74,17 @@ def main() -> None:
 
     print("Downloading the MolDeTr checkpoint (~974 MB) from Zenodo 10.5281/zenodo.21217102 ...")
     try:
-        _download(ZENODO_URL, args.output)
+        tmp = _download(ZENODO_URL, args.output)
     except Exception as e:
         raise SystemExit(f"Download failed: {e}\nURL: {ZENODO_URL}")
 
-    got = _md5(args.output)
+    got = _md5(tmp)
     if got != EXPECTED_MD5:
-        args.output.unlink(missing_ok=True)
-        raise SystemExit(f"MD5 mismatch: got {got}, expected {EXPECTED_MD5}. Removed the bad file.")
+        tmp.unlink(missing_ok=True)
+        raise SystemExit(
+            f"MD5 mismatch: got {got}, expected {EXPECTED_MD5}. Left the existing file untouched."
+        )
+    tmp.replace(args.output)
     print(f"Verified (md5 {got[:12]}...) -> {args.output}")
 
 
