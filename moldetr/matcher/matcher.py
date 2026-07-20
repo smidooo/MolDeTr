@@ -103,20 +103,13 @@ def matching(
         alpha = 0.25
         gamma = 2.0
         neg_cost_class = (
-            (1 - alpha)
-            * (out_class_prob * gamma)
-            * (-(1 - out_class_prob + 1e-8).log())
+            (1 - alpha) * (out_class_prob * gamma) * (-(1 - out_class_prob + 1e-8).log())
         )
-        pos_cost_class = (
-            alpha * ((1 - out_class_prob) ** gamma) * (-(out_class_prob + 1e-8).log())
-        )
+        pos_cost_class = alpha * ((1 - out_class_prob) ** gamma) * (-(out_class_prob + 1e-8).log())
         cost_class = pos_cost_class[:, tgt_class] - neg_cost_class[:, tgt_class]
-
 
         # Compute the GIoU cost between boxes
         cost_giou = giou_cost(out_param, tgt_param, calculate_giou)
-
-
 
         # Compute the L1 cost between boxes
         if parameter_cost_weights is not None:
@@ -128,39 +121,19 @@ def matching(
         else:
             cost_param = torch.cdist(out_param, tgt_param, p=1) / tgt_param.size(1)
 
-
-
-
-
     # Final cost matrix
     if cost_weighting is not None:
         cost_param = cost_param * cost_weighting.parameter_cost_weighting
         cost_giou = cost_giou * cost_weighting.giou_cost_weighting
 
-    with open("cost.txt", "w") as f:
-        f.write(
-            "%s = %.2f, %s = %.2f, %s = %.2f \n"
-            % (
-                "cost_class",
-                float(cost_class.mean()),
-                "cost_param",
-                float(cost_param.mean()),
-                "cost_giou",
-                float(cost_giou.mean()),
-            ),
-        )
-
     # Compute the final cost matrix
     C = cost_class + cost_param + cost_giou
-
 
     C = C.view(bs, num_queries, -1).cpu()
 
     # Proceed with the matching as usual
     sizes = targets["num_targets"]
-    indices = [
-        linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))
-    ]
+    indices = [linear_sum_assignment(c[i]) for i, c in enumerate(C.split(sizes, -1))]
     indices = [
         (
             torch.as_tensor(i, dtype=torch.int64),
@@ -170,6 +143,11 @@ def matching(
     ]
 
     if return_cost:
-        return indices, {"cost": C, "cost_class": cost_class, "cost_param": cost_param, "cost_giou": cost_giou}
+        return indices, {
+            "cost": C,
+            "cost_class": cost_class,
+            "cost_param": cost_param,
+            "cost_giou": cost_giou,
+        }
     else:
         return indices
