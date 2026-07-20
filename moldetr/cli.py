@@ -57,8 +57,12 @@ def main(argv: list[str] | None = None) -> None:
         print(f"moldetr: unknown command '{cmd}'\n\n{_usage()}", file=sys.stderr)
         raise SystemExit(2)
     module = importlib.import_module(COMMANDS[cmd])
-    sys.argv = [f"moldetr {cmd}", *rest]  # let the sub-main's argparse see only its own args
-    module.main()
+    saved_argv = sys.argv
+    try:
+        sys.argv = [f"moldetr {cmd}", *rest]  # let the sub-main's argparse see only its own args
+        module.main()
+    finally:
+        sys.argv = saved_argv
 
 
 if __name__ == "__main__":
