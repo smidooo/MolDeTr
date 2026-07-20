@@ -30,8 +30,24 @@ def test_random_model_output_decodes_to_structurally_valid_detections(extrema):
     model = build_model()
     model.eval()
     out = run(model, np.zeros(6144, dtype=np.float32))
-    preds = decode_predictions(out, extrema, points_per_hz=5.12, threshold=0.3)
-    assert isinstance(preds, list)
-    for p in preds:  # random weights may yield none; whatever survives must be well-formed
+    preds = decode_predictions(
+        out, extrema, points_per_hz=5.12, threshold=0.0
+    )  # thr 0 -> non-empty
+    assert preds, "decode produced no detections even at threshold 0"
+    expected_keys = {
+        "proton_count",
+        "chemical_shift_in_points",
+        "chemical_shift_ppm",
+        "chemical_shift_hz",
+        "coupling_constants_hz",
+        "linewidth_hz",
+        "confidence",
+    }
+    for p in preds:
+        assert expected_keys <= set(p)  # full decode contract
         assert p["proton_count"] in PROTON_COUNTS
-        assert all(j >= 0 for j in p.get("coupling_constants_hz", []))
+        assert (
+            0.0 <= p["chemical_shift_in_points"] <= 6144
+        )  # centre in-window (decode ppm/point map)
+        assert 0.0 < p["confidence"] <= 1.0  # a probability
+        assert all(j >= 0 for j in p["coupling_constants_hz"])
