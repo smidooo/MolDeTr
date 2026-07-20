@@ -268,6 +268,9 @@ python scripts/predict.py --input examples/roi_S8_example.npz --plot   # a real 
 ```
 Add `--input your_window.npz` for your own data. The `--plot` flag writes the annotated figure shown above.
 
+After `pip install -e .` these are also available as one command: `moldetr predict …`, `moldetr app`,
+`moldetr reproduce`, `moldetr download-weights` (run `moldetr --help` for the full list).
+
 ### Graphical interface
 A [Gradio](https://gradio.app) app: load a spectrum, get the assignment table and the annotated plot.
 
