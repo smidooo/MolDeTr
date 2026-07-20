@@ -17,7 +17,7 @@ pip install -e ".[dev]"
 - **Format & lint:** `ruff check moldetr scripts` (and `ruff format` if you use it).
 - **Smoke test:** `python scripts/quick_validation.py` must pass (3/3 gating checks).
 - **Tests:** `pytest -q` must pass; add a test for any new behavior. The suite is tiered by marker:
-  - **CI lane (fast, weight-free):** `pytest -m "not e2e and not browser"` — exactly what CI runs; keep it green.
+  - **CI lane (fast, weight-free):** `pytest -m "not e2e and not browser and not network"` — exactly what CI runs; keep it green.
   - **App e2e:** `pytest -m e2e` (needs `.[app]`) · **Browser:** `pytest -m browser` (needs `playwright install`).
   - **Real checkpoint:** `MOLDETR_CHECKPOINT=/path/to/model_spin_system_ABCDEFG_exp2.pth pytest -m model`
     (fetch the weights first: `python scripts/download_weights.py`).
