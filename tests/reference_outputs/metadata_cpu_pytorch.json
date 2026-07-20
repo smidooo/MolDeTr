@@ -1,0 +1,20 @@
+{
+  "backend": "cpu_pytorch",
+  "output_shape": [
+    2,
+    128,
+    256
+  ],
+  "output_mean": -0.013559895567595959,
+  "output_std": 0.1660003960132599,
+  "output_min": -0.6388047933578491,
+  "output_max": 0.5412095189094543,
+  "params": {
+    "batch_size": 2,
+    "seq_len": 128,
+    "d_model": 256,
+    "n_heads": 8,
+    "n_levels": 4,
+    "n_points": 4
+  }
+}
