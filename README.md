@@ -233,9 +233,15 @@ python scripts/quick_validation.py     # confirms imports + ROI metadata load; n
 
 ### 4. Get the weights and data (Zenodo)
 The trained weights and the spectral regions are archived on Zenodo
-(**DOI [10.5281/zenodo.21217102](https://doi.org/10.5281/zenodo.21217102)**), not in git. Download the
-checkpoint `model_spin_system_ABCDEFG_exp2.pth` into `moldetr/model/` — where `conf/config_big.yaml`
-expects it (`paths.model_folder_save`, `lognames.best_model_file`).
+(**DOI [10.5281/zenodo.21217102](https://doi.org/10.5281/zenodo.21217102)**), not in git. Fetch the
+checkpoint straight into `moldetr/model/` (where `conf/config_big.yaml` expects it) with:
+
+```bash
+python scripts/download_weights.py   # downloads + MD5-verifies model_spin_system_ABCDEFG_exp2.pth (~974 MB)
+```
+
+Or download `model_spin_system_ABCDEFG_exp2.pth` from the Zenodo record by hand and place it there
+(`paths.model_folder_save`, `lognames.best_model_file`).
 
 ## Train and evaluate
 
