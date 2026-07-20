@@ -98,7 +98,7 @@ testpaths = ["tests"]
 # Markers keep the heavy/opt-in suites out of the default run. `model` needs the 974 MB checkpoint
 # (local only); `browser` needs `playwright install` (opt-in); `e2e` launches an in-process Gradio app.
 markers = [
-    "unit: fast, weight-free unit test (a subset; CI runs `-m 'not e2e and not browser'`)",
+    "unit: fast, weight-free unit test (a subset; CI runs `-m 'not e2e and not browser and not network'`)",
     "e2e: in-process gradio_client end-to-end test (needs the .[app] extra)",
     "browser: Playwright browser test (opt-in; needs `playwright install`)",
     "model: requires the real 974 MB checkpoint (local only)",

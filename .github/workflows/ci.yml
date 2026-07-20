@@ -32,7 +32,7 @@ jobs:
       - name: Unit + scripts tests (no in-process server)
         env:
           MPLBACKEND: Agg
-        run: pytest -q -rs -m "not e2e and not browser"
+        run: pytest -q -rs -m "not e2e and not browser and not network"
       - name: Reproduce headline numbers (committed data, no weights)
         run: python scripts/aggregate_experimental.py
 
