@@ -53,6 +53,29 @@ def aggregate(matched_pairs: list) -> dict:
     }
 
 
+def per_class_accuracy(matched_pairs: list, unmatched_labels: list | None = None) -> dict:
+    """Per label proton-count class: {class: (n_correct, n_total)}.
+
+    A label that was not matched counts as a miss for its class (the model predicted "no spin"
+    there), mirroring the confusion-matrix methodology behind the paper's per-class numbers.
+    """
+    from collections import defaultdict
+
+    total: dict = defaultdict(int)
+    correct: dict = defaultdict(int)
+    for pred, label in matched_pairs:
+        c = label.get("proton_count")
+        if c is None:
+            continue
+        total[c] += 1
+        correct[c] += int(pred.get("proton_count") == c)
+    for label in unmatched_labels or []:
+        c = label.get("proton_count")
+        if c is not None:
+            total[c] += 1
+    return {c: (correct[c], total[c]) for c in sorted(total)}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(
         description="Reproduce the experimental error medians from committed matched pairs."
@@ -95,6 +118,9 @@ def main() -> None:
     print(f"  median |dJ| = {result['median_abs_dJ_hz']:.2f} Hz   (paper 0.20 Hz)")
     print(f"  proton-count accuracy (overall) = {100 * overall_acc:.1f} %   (paper 93.5 %)")
     print(f"  proton-count accuracy (matched) = {100 * result['proton_count_accuracy']:.1f} %")
+    unmatched_labels = data.get("unmatched_labels_total") if isinstance(data, dict) else None
+    for cls, (cor, tot) in per_class_accuracy(pairs, unmatched_labels).items():
+        print(f"    {cls}H proton-count accuracy = {100 * cor / tot:.1f} %  ({cor}/{tot})")
     if args.json:
         args.json.write_text(
             json.dumps(
