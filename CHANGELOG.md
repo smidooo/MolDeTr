@@ -27,19 +27,42 @@ All notable changes to this project are documented here. The format is based on
   complex-vs-real input wording (`DATA_SCHEMA.md` ↔ `INPUT_FORMAT.md`: arrays may be stored complex, the
   model consumes the real part) and standardised the |Δδ| median on **0.90 Hz** (aggregate/reproduced),
   with the paper-vs-aggregate 0.89/0.90 note stated exactly once (README *Reproducing the paper*).
-- **Link-rot soft-gating.** The not-yet-published HF Space, Colab notebook, and Zenodo **data** DOI
-  (`10.5281/zenodo.21217102`) are marked *coming soon* instead of presented as live; the live software
-  DOI (`10.5281/zenodo.21214876`) is unchanged.
+- **External resources now live (soft-gating removed).** The earlier *coming soon* placeholders are gone:
+  the Zenodo **data** deposit is published (concept DOI `10.5281/zenodo.21217101`, always resolving to the
+  latest version — currently v1.1.1; the initial version DOI is `10.5281/zenodo.21217102`), the Hugging Face
+  **model** repo (`huggingface.co/smidooo/moldetr`) is live, and the interactive demo runs on Colab. The
+  software DOI (`10.5281/zenodo.21214876`) is unchanged.
 
 ### Added
 - **Animated demo + docs site.** An animated Gradio demo GIF in the README, a GitHub Pages landing page
   (`docs/index.md`), and a `.github/` PR template + CODEOWNERS.
+- **Comprehensive test & validation suite (~65 tests, ~11 perspectives).** A weight-free CI lane now
+  exercises the full DETR build + forward pass on CPU, a one-step training update (finite gradients), the
+  metrics, transforms/normalization (order-invariant coupling embedding + `Normalize` round-trip), config
+  parsing, and seeded reproducibility — plus property-based (Hypothesis) and robustness fuzzing,
+  schema/data-contract guards for the 13-ROI test set, and matcher/loss integration checks. CPU/GPU-parity
+  goldens (`tests/reference_outputs/*.npy`) put the deformable-attention op under CI (no GPU needed to
+  compare). Heavy/opt-in tiers are gated by pytest markers
+  (`unit`/`e2e`/`browser`/`model`/`data`/`network`), a `[notebooks]` extra (nbmake) executes the Colab
+  notebooks end-to-end, and `CONTRIBUTING.md` documents how to run each tier.
 
 ### Removed
 - **Matplotlib banner + molecule-figure generators.** Dropped `scripts/gen_banner.py`,
   `scripts/gen_molecule_figure.py`, and the `[figures]` / `rdkit` extra. The README banner and diagrams now
   ship as design-tool assets, so the generators — which produced an off-brand matplotlib banner and would
   overwrite the shipped assets if run — are no longer needed.
+
+### Fixed
+- **Four latent bugs the new suite surfaced.** (1) `metrics/multiplet_metrics.py` referenced
+  `fastai.metrics.accuracy_multi`/`.accuracy` with only `import fastai`, which raises `AttributeError` at
+  call time on current fastai — a training-time crash; it now imports `fastai.metrics` explicitly. (2) The
+  Hungarian matcher wrote a stray `cost.txt` into the working directory on every call — removed. (3) The
+  `moldetr` CLI leaked its rewritten `sys.argv` back to the caller — now restored in a `finally`. (4)
+  `scripts/download_weights.py` could overwrite a good checkpoint with a truncated download on `--force`;
+  it now verifies the temp file's SHA-256 before replacing.
+- **CI lane honours the `network` marker.** The fast selector is
+  `-m "not e2e and not browser and not network"`, matching the marker's documented "skipped in the default
+  CI lane" contract (previously a future `network`-marked test would have run in CI against its own contract).
 
 ## [1.0.0] - 2026-07-15
 
