@@ -42,12 +42,12 @@ from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
 from moldetr.simulate import simulate
 from moldetr.validation import INPUT_LENGTH, POINTS_PER_HZ, validate_spectrum
-from plotting import (  # BRAND: interactive Plotly plots
+from app_ui.plotting import (  # BRAND: interactive Plotly plots
     assignment_rows,
     comparison_figure,
     spectrum_figure,
 )
-from theme import (
+from app_ui.theme import (
     CUSTOM_CSS,
     HEADER_HTML,
     MOLDETR_THEME,

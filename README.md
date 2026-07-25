@@ -160,6 +160,29 @@ queries, and per-query heads matched to ground truth by the Hungarian algorithm 
   </picture>
 </p>
 
+## Repository layout
+
+```
+moldetr/            the installable package — model + inference stack
+├── model/          Deformable-DETR + FPN backbone + the deformable-attention op (CPU + CUDA)
+├── dataloader/     dataset, normalization, and the training-time distortions
+├── loss/ matcher/ metrics/ learner/   Hungarian matching · combined loss · FastAI wrapper
+├── simulate.py     exact spin-Hamiltonian spectrum simulator (powers the Simulate tab)
+├── distort.py      deterministic per-effect wrapper over the training-time augmentations
+├── inference.py    run() — the forward pass;  postprocess.py — decode_predictions()
+└── visualization.py  static matplotlib renderer (predict.py --plot / figure exports)
+app.py              Gradio GUI entry point (kept at repo root for Hugging Face Spaces)
+app_ui/             GUI-support imported by app.py — plotting.py (interactive Plotly) · theme.py (branding/CSS)
+scripts/            CLIs — predict · evaluate_experimental · evaluate_synthetic · aggregate_experimental
+                    · simulate_and_predict · quick_validation
+conf/               Hydra YAML configs (training)
+structured_output/  committed experimental ground-truth metadata (the paper's headline numbers)
+examples/           example spectra for the Detect tab
+notebooks/          Colab / quickstart demos
+deploy/             Hugging Face Space packaging notes
+tests/              pytest suite (unit · e2e · browser tiers)
+```
+
 ## Test it on YOUR data
 
 There are three ways in, from zero-effort to full control:
