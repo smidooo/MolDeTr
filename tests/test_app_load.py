@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -25,10 +27,34 @@ def test_npz_prefers_ppm_axis_padded(app_module, tmp_npz, valid_spectrum):
 
 @pytest.mark.unit
 def test_npz_falls_back_to_metadata_ppm(app_module, tmp_npz, valid_spectrum):
+    """`metadata` is a pickled object array, so this branch is now reachable only for a trusted
+    file. The fallback itself is unchanged — `trusted=True` is what the `examples/` path supplies.
+    """
     path = tmp_npz(spec=valid_spectrum, metadata=_obj0d({"left_ppm": 8.0, "right_ppm": 2.0}))
-    arr, cal = app_module._load(path)
+    arr, cal = app_module._load(path, trusted=True)
     assert arr.shape == (6144,)
     assert (cal["ppm_left"], cal["ppm_right"]) == (8.0, 2.0)
+
+
+@pytest.mark.unit
+def test_untrusted_npz_refuses_to_unpickle_metadata(app_module, tmp_npz, valid_spectrum):
+    """The trust boundary, stated as a test: byte-identical file, opposite outcome.
+
+    Unpickling runs `__reduce__` from the archive, so provenance — not content — decides. An
+    upload takes the default (`trusted=False`) and is refused before any object array is touched.
+    """
+    path = tmp_npz(spec=valid_spectrum, metadata=_obj0d({"left_ppm": 8.0, "right_ppm": 2.0}))
+    with pytest.raises(ValueError, match="Object arrays cannot be loaded"):
+        app_module._load(path)
+
+
+@pytest.mark.unit
+def test_only_paths_inside_examples_are_trusted(app_module, tmp_path, example_paths):
+    """`_is_bundled_example` is the whole gate, so pin both of its answers."""
+    assert app_module._is_bundled_example(Path(example_paths["roi_S8"]))
+    assert not app_module._is_bundled_example(tmp_path / "uploaded.npz")
+    # A path that merely *mentions* examples/ elsewhere must not qualify.
+    assert not app_module._is_bundled_example(tmp_path / "examples" / "spoof.npz")
 
 
 @pytest.mark.unit

@@ -49,9 +49,9 @@ def main(argv: list[str] | None = None) -> None:
         print(_usage())
         return
     cmd, rest = argv[0], argv[1:]
-    if cmd == "app":  # the Gradio app has no main(); it launches build_ui()
+    if cmd == "app":  # the Gradio app has no main(); it launches via launch_app()
         app = importlib.import_module("app")
-        app.build_ui().launch(theme=app.MOLDETR_THEME, css=app.CUSTOM_CSS)
+        app.launch_app()  # single launch path -> same theme/CSS as `python app.py`
         return
     if cmd not in COMMANDS:
         print(f"moldetr: unknown command '{cmd}'\n\n{_usage()}", file=sys.stderr)
