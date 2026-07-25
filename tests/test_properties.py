@@ -22,7 +22,10 @@ _FINITE32 = st.floats(
 # ---------------------------------------------------------------- validate_spectrum robustness (fuzz)
 
 
-@settings(max_examples=60)
+# deadline=None: each example allocates a 6144-element array and runs the full validation, which can
+# exceed Hypothesis's default 200 ms-per-example deadline on a loaded machine. That produced an
+# intermittent DeadlineExceeded which read as a flaky test -- it is timing, never a logic failure.
+@settings(max_examples=60, deadline=None)
 @given(arrays(np.float32, INPUT_LENGTH, elements=_FINITE32))
 def test_validate_accepts_any_finite_full_length_spectrum(a):
     """Any finite (6144,) array is accepted and returned as a finite real float64 array — never raises."""

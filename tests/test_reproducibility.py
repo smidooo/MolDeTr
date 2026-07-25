@@ -40,6 +40,7 @@ def test_noise_injection_present_by_default():
     )
 
 
+@pytest.mark.model  # so `pytest -m model` selects it; a bare skipif left it invisible to that lane
 @pytest.mark.skipif(not Path(CKPT).exists(), reason="checkpoint absent (download from Zenodo)")
 @pytest.mark.parametrize(
     "example,protons",

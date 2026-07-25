@@ -7,6 +7,17 @@ env/
 .env
 .ipynb_checkpoints/
 
+# test / coverage artefacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+test-results/
+tests/e2e/__snapshots__/*-actual.png
+
+# Hydra writes an `outputs/` run dir next to whatever invokes it
+outputs/
+
 # Models / data / large artefacts
 *.ckpt
 *.pt
@@ -30,6 +41,7 @@ uv.lock
 
 # local-only working files — must never ship in the public release
 CLAUDE.md
+docs/requirements/
 docs/ZENODO_DEPOSIT.md
 deploy/EXTERNAL_STEPS.md
 design/

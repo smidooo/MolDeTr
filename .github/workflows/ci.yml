@@ -20,13 +20,15 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+          cache: pip
       - name: Install (CPU-only PyTorch)
         run: |
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev,app]"
       - name: Lint
-        run: ruff check moldetr scripts tests
+        # app.py + app_ui/ are the GUI hub and were previously unlinted in CI entirely.
+        run: ruff check moldetr scripts tests app.py app_ui
       - name: Smoke test
         run: python scripts/quick_validation.py
       - name: Unit + scripts tests (no in-process server)
@@ -44,6 +46,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Install (CPU PyTorch + app)
         run: |
           python -m pip install --upgrade pip
@@ -62,6 +65,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
       - name: Install (CPU PyTorch + app + browser)
         run: |
           python -m pip install --upgrade pip
@@ -71,4 +75,17 @@ jobs:
       - name: Browser e2e
         env:
           MPLBACKEND: Agg
-        run: pytest tests/e2e -m browser -q
+        # Without traces/video a red leg gives only a stack trace, which is near-useless for a
+        # DOM failure you cannot reproduce locally.
+        run: >-
+          pytest tests/e2e -m browser -q
+          --tracing retain-on-failure
+          --video retain-on-failure
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
