@@ -58,8 +58,17 @@ jobs:
         run: pytest -q -rs -m e2e
 
   browser-e2e:
-    name: browser e2e (chromium)
+    name: browser e2e (${{ matrix.browser }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Chromium alone would not have caught: WebKit applying the stylesheet ~300 ms after the
+      # element exists (which exposed a latent race in the branding assertions), Plotly's modebar
+      # logo having no accessible name, or WebKit raising the benign ResizeObserver notice as an
+      # uncaught pageerror. Engine differences in style timing and a11y-name computation are
+      # exactly what a single-engine matrix cannot see.
+      matrix:
+        browser: [chromium, firefox, webkit]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -71,7 +80,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev,app,browser]"
-          python -m playwright install --with-deps chromium
+          python -m playwright install --with-deps ${{ matrix.browser }}
       - name: Browser e2e
         env:
           MPLBACKEND: Agg
@@ -79,13 +88,14 @@ jobs:
         # DOM failure you cannot reproduce locally.
         run: >-
           pytest tests/e2e -m browser -q
+          --browser ${{ matrix.browser }}
           --tracing retain-on-failure
           --video retain-on-failure
       - name: Upload Playwright artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.browser }}
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
