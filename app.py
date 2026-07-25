@@ -478,8 +478,10 @@ CONTRACT = (
     "[`docs/INPUT_FORMAT.md`](docs/INPUT_FORMAT.md)."
 )
 
-# Field-agnostic scope disclaimer (matches docs/SCOPE.md and the README research-code callout).
-PROTOTYPE = (
+# Field-agnostic scope note (matches docs/SCOPE.md and the README callout). Named SCOPE_NOTE, not
+# PROTOTYPE: the body stopped hedging about "research prototypes" and "well-resolved spectra" some
+# time ago, but the name, the accordion title, and the header chip kept the old framing alive.
+SCOPE_NOTE = (
     "MolDeTr handles congested, strongly-coupled ¹H NMR spectra and is largely field-agnostic "
     "(it works in Hz; tested on 80–600 MHz). Predictions can deviate for inputs outside its trained "
     "regime — unusual distortions, non-standard pulse sequences or processing, mixtures, or windows "
@@ -502,7 +504,7 @@ def build_ui() -> gr.Blocks:
     with gr.Blocks(
         title="MolDeTr"
     ) as demo:  # BRAND: theme + css applied at launch() (gradio 6.x moved them off Blocks)
-        gr.HTML(HEADER_HTML)  # BRAND: wordmark · eyebrow · prototype chip · links
+        gr.HTML(HEADER_HTML)  # BRAND: wordmark · eyebrow · links
         with gr.Tabs():
             with gr.Tab("Detect"):
                 with gr.Row(equal_height=False):
@@ -550,8 +552,8 @@ def build_ui() -> gr.Blocks:
                             ],
                             elem_id="md-examples",
                         )
-                        with gr.Accordion("Research prototype — scope", open=False):  # BRAND
-                            gr.Markdown(PROTOTYPE)
+                        with gr.Accordion("Scope & limits", open=False):  # BRAND
+                            gr.Markdown(SCOPE_NOTE)
                     with gr.Column(scale=1):
                         status = gr.Markdown()
                         table = gr.Dataframe(

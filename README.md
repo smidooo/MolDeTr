@@ -308,7 +308,7 @@ Ready-to-try inputs are in [`examples/`](examples/).
 
 <details><summary>Static screenshot (full detail)</summary>
 
-![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, research-prototype chip, Paper/GitHub/Scope links) over a two-pane layout — an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
+![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, Paper/GitHub/Scope links) over a two-pane layout — an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
 
 </details>
 
