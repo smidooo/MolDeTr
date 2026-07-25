@@ -82,6 +82,12 @@ def populated_page(page: Page, served_app_url: str) -> Page:
     page.goto(served_app_url)
     page.locator("#md-file").wait_for()
     page.locator("#md-examples").get_by_role("button", name="guajazulene").click()
+    # Wait for the file to actually land before pressing Detect. `load_example` sets the File
+    # component and `spectrum.change` then repopulates the input-check panel; clicking Detect
+    # before that propagates makes `predict` receive None and answer "Load a .npz/.npy spectrum",
+    # so the wait below times out. Chromium usually wins that race and Firefox/WebKit do not —
+    # which is how it stayed invisible until the cross-browser matrix.
+    expect(page.locator("#md-check")).to_contain_text("Input check")
     page.get_by_role("button", name="Detect multiplets").click()
     # Wait on the status text, not on a row: Gradio's Dataframe keeps hidden <tr> elements in the
     # DOM before any data arrives, so a visibility wait on `tbody tr` times out against rows that
