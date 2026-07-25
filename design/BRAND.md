@@ -17,7 +17,7 @@ docs all cite.
 | **navy** | `#1f3a5f` | display text (Space Grotesk) |
 | ink | `#20242b` | body text · spectrum trace |
 | mute | `#5b6675` | secondary text |
-| eyebrow | `#74808f` | small uppercase labels |
+| eyebrow | `#666f7d` | small uppercase labels (v2: was `#74808f`, which failed WCAG AA — see below) |
 | latent | `#7d92b0` | NN hidden-layer nodes (diagrams) |
 | panel | `#f1f5fa` | panel fill |
 | border | `#d5dfeb` | hairline borders |
@@ -46,6 +46,14 @@ Okabe–Ito / Wong palette (the Nature-recommended colourblind-safe set: `#0072B
 tables repeat the value — so the figure survives greyscale printing and all CVD types
 (verified: see `handoff/img/cvd_check.png`). Never encode a distinction by hue alone.
 Cap categorical colours at ≤ 3 here (well under the 6–8 safe maximum).
+
+**Rule: text tokens must clear WCAG AA (4.5:1) on their own background.** The old
+`eyebrow #74808f` did not — it measured **4.01:1 on white**, and it was defined for *small
+uppercase labels*, which is precisely where the 4.5 threshold applies rather than the 3.0
+large-text one. It therefore failed at its stated purpose. `#666f7d` measures **5.08:1**.
+Caught by an axe-core scan in the browser tier, which now enforces this
+(`tests/e2e/test_browser_a11y.py`) — CVD-safety and contrast are separate properties, and the
+tricolor being CVD-robust never implied the greys were legible.
 
 ## Type
 

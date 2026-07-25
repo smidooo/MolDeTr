@@ -24,7 +24,7 @@ TEAL = "#1f9e8c"  # accent 3 / success
 NAVY = "#1f3a5f"  # display text
 INK = "#20242b"  # body text
 MUTE = "#5b6675"  # secondary text
-EYEBROW = "#74808f"  # small labels
+EYEBROW = "#666f7d"  # small labels — darkened from #74808f, which failed WCAG AA (see BRAND.md v2)
 PANEL = "#f1f5fa"  # panel fill
 PANEL_BD = "#d5dfeb"  # borders
 PAGE_BG = "#eef2f7"  # page background
@@ -115,7 +115,7 @@ footer { display: none !important; }
 label > span[data-testid="block-info"] {
   font-family: 'Space Grotesk', sans-serif !important;
   font-size: 12px !important; font-weight: 600 !important;
-  letter-spacing: .16em; text-transform: uppercase; color: #74808f !important; }
+  letter-spacing: .16em; text-transform: uppercase; color: #666f7d !important; }
 
 button.primary { font-family: 'Space Grotesk', sans-serif !important;
   font-weight: 600 !important; box-shadow: 0 8px 20px rgba(37,102,176,.28) !important; }
@@ -139,9 +139,9 @@ button.primary { font-family: 'Space Grotesk', sans-serif !important;
 /* assignment table */
 #md-table table { font-variant-numeric: tabular-nums; }
 #md-table thead th { font-family: 'Space Grotesk', sans-serif !important;
-  font-size: 12px !important; letter-spacing: .06em; color: #74808f !important; }
+  font-size: 12px !important; letter-spacing: .06em; color: #666f7d !important; }
 
-.md-footnote { font-size: 12px; color: #74808f; }
+.md-footnote { font-size: 12px; color: #666f7d; }
 """
 
 HEADER_HTML = """
@@ -156,7 +156,7 @@ HEADER_HTML = """
       <span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:23px;color:#1f3a5f;letter-spacing:-.02em;line-height:1;">MolDeTr</span>
     </div>
     <span style="width:1px;height:30px;background:#d5dfeb;"></span>
-    <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#74808f;">&#185;H NMR multiplet detection</span>
+    <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#666f7d;">&#185;H NMR multiplet detection</span>
   </div>
   <div style="display:flex;align-items:center;gap:22px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;">
     <a href="https://doi.org/10.1021/acs.analchem.5c03465" target="_blank" style="color:#2566b0;text-decoration:none;">Paper</a>
