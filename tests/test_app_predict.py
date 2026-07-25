@@ -126,6 +126,99 @@ def test_threshold_one_detects_nothing(patch_model, tmp_npz, valid_spectrum):
     assert msg == "No multiplets passed the detection threshold — try lowering it."
 
 
+# --- unreadable input: `predict` must degrade to a message, never a traceback --------------------
+#
+# `_spec_report` already wraps `_load` in try/except (app.py:106) and shows "⚠ Could not read the
+# file". `predict` calls the same `_load` unguarded, so the identical bad file produces a rendered
+# Python traceback in the GUI. These pin the parity.
+
+
+@pytest.mark.unit
+def test_corrupt_npz_returns_a_message_not_a_traceback(patch_model, tmp_path):
+    app = patch_model
+    bad = tmp_path / "corrupt.npz"
+    bad.write_bytes(b"PK\x03\x04 truncated, not a real archive")
+
+    table, fig, msg = app.predict(str(bad), 0.3, app.AUTO, None, None, 5.12)
+
+    assert table is None and fig is None
+    assert msg.startswith("⚠ Could not read the file:")
+
+
+@pytest.mark.unit
+def test_unsupported_extension_returns_a_message(patch_model, tmp_path):
+    """`gr.File(file_types=...)` filters the browser picker, not the callback — the API path and a
+    drag-drop that slips through both arrive here as an arbitrary file.
+    """
+    txt = tmp_path / "spectrum.txt"
+    txt.write_text("1.0 2.0 3.0", encoding="utf-8")
+
+    app = patch_model
+    _t, _f, msg = app.predict(str(txt), 0.3, app.AUTO, None, None, 5.12)
+
+    assert msg.startswith("⚠ Could not read the file:")
+
+
+@pytest.mark.unit
+def test_uploaded_npz_may_not_execute_a_pickled_payload(patch_model, tmp_path, valid_spectrum):
+    """`np.load(..., allow_pickle=True)` on a *user-supplied* file is arbitrary code execution:
+    unpickling runs `__reduce__` from the archive.
+
+    The `metadata` branch that needs pickle is only reached when `ppm_axis_padded` is absent, and
+    no bundled example takes that path — so refusing pickle for uploads costs nothing today and
+    closes the hole. Trusted `examples/` files keep it (see the companion test below).
+    """
+    hostile = tmp_path / "uploaded.npz"
+    np.savez(
+        hostile,
+        spectrum_padded=valid_spectrum,
+        metadata=np.array({"left_ppm": 10.0, "right_ppm": 0.0}, dtype=object),
+    )
+
+    _t, _f, msg = patch_model.predict(str(hostile), 0.3, patch_model.AUTO, None, None, 5.12)
+
+    assert msg.startswith("⚠ Could not read the file:")
+    assert "pickle" in msg.lower() or "object array" in msg.lower()
+
+
+@pytest.mark.unit
+def test_bundled_examples_still_load(patch_model, example_paths):
+    """The other half of the gate: shipping files stay readable, including the object-array keys."""
+    for path in example_paths.values():
+        _t, _f, msg = patch_model.predict(path, 0.3, patch_model.AUTO, None, None, 5.12)
+        assert not msg.startswith("⚠ Could not read the file:"), f"{path} stopped loading: {msg}"
+
+
+# --- points_per_hz: a non-positive resolution must be refused, not silently replaced --------------
+
+
+@pytest.mark.unit
+def test_zero_points_per_hz_is_refused_not_silently_defaulted(patch_model, tmp_npz, valid_spectrum):
+    """`float(pph) if pph else POINTS_PER_HZ` treats 0 as "unset" and quietly substitutes 5.12.
+
+    A user who clears the field and gets confident-looking results has been told nothing was wrong.
+    """
+    path = _valid_npz_with_ppm(tmp_npz, valid_spectrum)
+
+    table, fig, msg = patch_model.predict(path, 0.3, patch_model.AUTO, None, None, 0)
+
+    assert table is None and fig is None
+    assert "points/Hz" in msg and "positive" in msg
+
+
+@pytest.mark.unit
+def test_negative_points_per_hz_is_refused(patch_model, tmp_npz, valid_spectrum):
+    """A negative resolution is truthy, so it sails past the guard and yields a negative Hz window
+    and a mirrored axis — wrong numbers rather than an error.
+    """
+    path = _valid_npz_with_ppm(tmp_npz, valid_spectrum)
+
+    table, fig, msg = patch_model.predict(path, 0.3, patch_model.AUTO, None, None, -5.12)
+
+    assert table is None and fig is None
+    assert "points/Hz" in msg and "positive" in msg
+
+
 # --- predict_ui downloads ------------------------------------------------------------------------
 
 
@@ -139,6 +232,22 @@ def test_downloads_enabled_and_parse(patch_model, tmp_npz, valid_spectrum):
     assert csv_path and csv_path.endswith(".csv") and Path(csv_path).exists()
     back = pd.read_csv(csv_path)
     assert list(back.columns) == list(table.columns) and len(back) == len(table)
+
+
+@pytest.mark.unit
+def test_repeated_detections_reuse_one_export_directory(patch_model, tmp_npz, valid_spectrum):
+    """`mkdtemp` *per click* leaked a directory on every detection — unbounded on a Space that
+    stays up for weeks, and invisible locally where you click twice and quit.
+    """
+    app = patch_model
+    path = _valid_npz_with_ppm(tmp_npz, valid_spectrum)
+
+    parents = set()
+    for _ in range(3):
+        _t, _f, _m, csv_btn, _json_btn = app.predict_ui(path, 0.3, app.AUTO, None, None, 5.12)
+        parents.add(Path(_download_path(csv_btn)).parent)
+
+    assert len(parents) == 1, f"one export dir per process expected, got {len(parents)}"
 
 
 @pytest.mark.unit

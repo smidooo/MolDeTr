@@ -2,11 +2,13 @@
 
 Usage in app.py:
 
-    from theme import MOLDETR_THEME, CUSTOM_CSS, HEADER_HTML
+    from app_ui.theme import MOLDETR_THEME, CUSTOM_CSS, HEADER_HTML
     with gr.Blocks(title="MolDeTr") as demo:
         gr.HTML(HEADER_HTML)
         ...
-    demo.launch(theme=MOLDETR_THEME, css=CUSTOM_CSS)  # gradio 6.x: theme + css at launch()
+
+Do not call ``demo.launch(theme=..., css=...)`` directly — go through ``app.launch_app()``, which
+holds the launch kwargs in one place so tests serve the same styled app that users get.
 
 Targets the Gradio 6.x theme API (6.20, pinned in deploy/hf_space + pyproject).
 If a `.set(...)` key errors on another version, delete that line — every key is cosmetic.
