@@ -103,10 +103,23 @@ def test_simulate_checkpoint_absent(app_module, monkeypatch):
 def test_simulate_ethyl_roundtrip(patch_model):
     app = patch_model
     table, fig, msg = app.simulate_and_detect("ethyl", "", 7.0, 1.0, False, 3.0, 0.0, 0.0, 0.0, 0.3)
-    assert "Simulated `ethyl` (2 GT group(s)); detected 3 multiplet(s)" in msg
+    assert "Simulated `ethyl`" in msg and "2 ground-truth multiplet(s)" in msg and "detected" in msg
     assert fig is not None
-    assert len(table) == 2  # one row per GT group
-    assert {"GT δ (ppm)", "GT H", "GT J (Hz)", "pred δ (ppm)"} <= set(table.columns)
+    # new comparison table: match status + explicit error columns; one non-spurious row per GT group,
+    # plus any spurious (+ extra) detection rows.
+    expected = {
+        "status",
+        "GT δ (ppm)",
+        "GT H",
+        "GT J (Hz)",
+        "pred δ (ppm)",
+        "pred H",
+        "Δδ (Hz)",
+        "ΔH",
+        "conf",
+    }
+    assert expected <= set(table.columns)
+    assert len(table[table["status"] != "+ extra"]) == 2  # one per GT group
 
 
 @pytest.mark.unit
@@ -140,5 +153,7 @@ def test_simulate_singlet_gt_j_dashed(patch_model):
     table, _f, msg = app.simulate_and_detect(
         "methoxy_singlet", "", 0.0, 1.0, False, 3.0, 0.0, 0.0, 0.0, 0.3
     )
-    assert "Simulated `methoxy_singlet` (1 GT group(s))" in msg
-    assert list(table["GT J (Hz)"]) == ["–"]
+    assert "Simulated `methoxy_singlet`" in msg and "1 ground-truth multiplet(s)" in msg
+    # the singlet's one GT group has no coupling -> its GT J renders as a dash
+    gt_rows = table[table["status"] != "+ extra"]
+    assert list(gt_rows["GT J (Hz)"]) == ["–"]
