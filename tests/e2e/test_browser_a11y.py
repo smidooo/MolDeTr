@@ -48,14 +48,34 @@ EXCLUDED_RULES = {
 }
 
 
+# Node-level exclusions for third-party widgets we embed but do not author. Filtering by NODE
+# rather than by rule keeps the rule itself enforced everywhere else — excluding `link-name`
+# wholesale would also have hidden our own header links losing their accessible names.
+#
+# `.modebar-btn`: Plotly's toolbar. Its logo is
+#   <a href="https://plotly.com/" data-title="Produced with Plotly.js" class="modebar-btn ...">
+# with no text and no aria-label, so WebKit derives no accessible name (Chromium does — this only
+# surfaces on the cross-browser matrix). Plotly exposes `displaylogo:false` as a *config* option,
+# which Gradio's gr.Plot does not pass through, so it cannot be removed from here.
+THIRD_PARTY_NODE_MARKERS = ("modebar-btn",)
+
+
+def _is_third_party(node: dict) -> bool:
+    targets = " ".join(str(t) for t in node.get("target", []))
+    return any(m in targets or m in node.get("html", "") for m in THIRD_PARTY_NODE_MARKERS)
+
+
 def _violations(page: Page) -> list[dict]:
-    """Blocking axe violations, minus the documented framework exclusions."""
+    """Blocking axe violations, minus documented framework rules and third-party nodes."""
     results = Axe().run(page)
-    return [
-        v
-        for v in results.response["violations"]
-        if v["impact"] in BLOCKING_IMPACTS and v["id"] not in EXCLUDED_RULES
-    ]
+    out = []
+    for v in results.response["violations"]:
+        if v["impact"] not in BLOCKING_IMPACTS or v["id"] in EXCLUDED_RULES:
+            continue
+        ours = [n for n in v["nodes"] if not _is_third_party(n)]
+        if ours:
+            out.append({**v, "nodes": ours})
+    return out
 
 
 def _format(violations: list[dict]) -> str:
@@ -103,10 +123,20 @@ def test_a_full_detect_journey_logs_no_console_errors(page: Page, served_app_url
     Listeners are attached before `goto` so nothing thrown during initial load is missed.
     """
     errors: list[str] = []
-    page.on(
-        "console", lambda m: errors.append(f"{m.type}: {m.text}") if m.type == "error" else None
-    )
-    page.on("pageerror", lambda e: errors.append(f"pageerror: {e}"))
+
+    def _record(entry: str) -> None:
+        # "ResizeObserver loop completed with undelivered notifications" fires when a resize
+        # callback triggers another resize in the same frame. It is benign by construction — the
+        # browser defers the remaining notifications to the next frame — and it originates in
+        # Plotly/Gradio's responsive layout, not in this repo. WebKit surfaces it as an uncaught
+        # pageerror where Chromium and Firefox do not, so it only appears on the cross-browser
+        # matrix. Matched on the exact message so any *other* uncaught error still fails.
+        if "ResizeObserver loop" in entry:
+            return
+        errors.append(entry)
+
+    page.on("console", lambda m: _record(f"{m.type}: {m.text}") if m.type == "error" else None)
+    page.on("pageerror", lambda e: _record(f"pageerror: {e}"))
 
     page.goto(served_app_url)
     page.locator("#md-file").wait_for()
