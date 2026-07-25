@@ -101,6 +101,9 @@ def test_results_state_has_no_serious_axe_violations(page: Page, served_app_url:
     page.goto(served_app_url)
     page.locator("#md-file").wait_for()
     page.locator("#md-examples").get_by_role("button", name="guajazulene").click()
+    # The input-check panel is the signal that the example file has actually landed; pressing
+    # Detect before it does gives `predict` a None file (race, only lost on Firefox/WebKit).
+    expect(page.locator("#md-check")).to_contain_text("Input check")
     page.get_by_role("button", name="Detect multiplets").click()
     expect(page.get_by_text("Detected", exact=False)).to_be_visible(timeout=30_000)
 
@@ -141,6 +144,9 @@ def test_a_full_detect_journey_logs_no_console_errors(page: Page, served_app_url
     page.goto(served_app_url)
     page.locator("#md-file").wait_for()
     page.locator("#md-examples").get_by_role("button", name="guajazulene").click()
+    # The input-check panel is the signal that the example file has actually landed; pressing
+    # Detect before it does gives `predict` a None file (race, only lost on Firefox/WebKit).
+    expect(page.locator("#md-check")).to_contain_text("Input check")
     page.get_by_role("button", name="Detect multiplets").click()
     expect(page.get_by_text("Detected", exact=False)).to_be_visible(timeout=30_000)
 
