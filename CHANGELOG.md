@@ -6,11 +6,59 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **Simulate tab.** Pick a built-in spin-system phenotype, edit its per-spin shifts, coupling and line
+  width, optionally apply training-range distortions (noise / phase / broadening / baseline), then detect
+  and compare against ground truth in one round trip.
+- **Ground-truth-vs-prediction comparison view.** An intuitive overlay — ground truth as teal markers on a
+  lane above the spectrum, predictions as clay markers with opacity ∝ confidence, connectors coloured green
+  within tolerance and amber outside it, missed ground truth and spurious detections called out in red —
+  plus a matching table with explicit `Δδ` / `ΔH` error columns and a `✓ match` / `~ off` / `✗ missed` /
+  `+ extra` status per row.
+- **Frontend verification layers.** The GUI had almost no automated coverage. Added: unit tests for the
+  coordinate helpers that position every marker; a brand-contract suite (tricolor parity across the two
+  renderers, the δ≠Δ rule, the "colour is never the only channel" numbering rule, `max J` wording,
+  `BRAND.md`↔code token sync); a Blocks-graph contract (component/event counts, event-vs-callback arity,
+  elem_id presence and uniqueness, no orphaned components); browser-level branding assertions; and a
+  selector-liveness meta-test that parses `CUSTOM_CSS` and fails when a rule stops matching the DOM.
+- **`design/` brand docs are now committed.** `BRAND.md` was declared the source of truth while being
+  gitignored, so nothing could check it. It ships with the repo (images excepted) and the sync test reads it.
+
 ### Changed
 - **Scope framing aligned with the paper.** Removed the "research prototype" / "well-resolved spectra"
   language that understated the peer-reviewed method; clarified that deviations come from
   out-of-distribution acquisition/processing (unusual distortions, non-standard pulse sequences,
   mixtures, non-1200 Hz windows), not from spectral resolution.
+  **Completed 2026-07-25:** this entry previously overstated itself. The framing had been removed from the
+  disclaimer *body* only — the header chip still read "Research prototype", the GUI accordion was still
+  titled "Research prototype — scope", the constant was still named `PROTOTYPE`, and the README screenshot
+  alt-text still described the chip. The chip is now gone, the accordion is **Scope & limits**, and
+  `BRAND.md` is bumped v1 → v2 so the brand source of truth moved first, per its own contract.
+- **One launch path for the app.** `launch_app()` is the single way MolDeTr is served — `python app.py`,
+  `moldetr app`, and every test fixture route through it. Gradio 6 moved `theme=`/`css=` from `Blocks(...)`
+  onto `.launch()` and raises nothing when they are omitted, so the app had been served *unstyled* in every
+  automated test: a dead selector or a lost font could not have been detected.
+- **Distortion phase parity.** The analytic signal is conjugated (`np.conj(hilbert(...))`) to match the
+  convention the shipped model was trained under.
+- **GUI modules moved into `app_ui/`** (`plotting.py`, `theme.py`); `app.py` stays at the repo root as the
+  Gradio entry point. README documents the layout.
+- **Every event has an explicit `api_name`.** Gradio otherwise derives endpoint ids from callback names,
+  which published `/_spec_report` and `/_spec_report_1` — a public API surface named after private helpers,
+  with the suffix decided by registration order.
+
+### Fixed
+- **Unreadable files no longer produce a traceback.** `predict` called `_load` unguarded while the input
+  check had always wrapped it, so the same corrupt file gave a tidy message above the button and a Python
+  traceback below it.
+- **Uploaded `.npz` files are no longer unpickled.** `np.load(..., allow_pickle=True)` ran on user uploads,
+  which executes code carried in the archive. Pickle is now gated on provenance — only files shipped under
+  `examples/` get it, and no bundled example needed it on the paths actually walked.
+- **A stated `points/Hz` of 0 is refused instead of silently replaced** with 5.12, and negatives — which are
+  truthy and previously sailed through entirely — no longer yield a mirrored axis and negative line widths.
+  A blank field still means "unset" and uses the default.
+- **The export directory no longer leaks.** `tempfile.mkdtemp()` ran per Detect click, creating a directory
+  on every detection; one per process is now reused.
+- **Dead CSS removed.** `.block-title` matched nothing in Gradio 6 while appearing to style block labels.
 - **Figures consolidated to four.** The README now embeds exactly four images — the banner, the
   guajazulene 500 MHz prediction, the vanillin molecule↔spectrum figure, and the GUI. The redundant
   standalone vanillin prediction was removed; its worked-example detail (proton counts, δ, `max J`
@@ -36,7 +84,7 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - **Animated demo + docs site.** An animated Gradio demo GIF in the README, a GitHub Pages landing page
   (`docs/index.md`), and a `.github/` PR template + CODEOWNERS.
-- **Comprehensive test & validation suite (~65 tests, ~11 perspectives).** A weight-free CI lane now
+- **Comprehensive test & validation suite (313 tests, ~11 perspectives).** A weight-free CI lane now
   exercises the full DETR build + forward pass on CPU, a one-step training update (finite gradients), the
   metrics, transforms/normalization (order-invariant coupling embedding + `Normalize` round-trip), config
   parsing, and seeded reproducibility — plus property-based (Hypothesis) and robustness fuzzing,

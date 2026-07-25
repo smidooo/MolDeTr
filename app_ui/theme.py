@@ -157,7 +157,6 @@ HEADER_HTML = """
     </div>
     <span style="width:1px;height:30px;background:#d5dfeb;"></span>
     <span style="font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#74808f;">&#185;H NMR multiplet detection</span>
-    <span style="display:inline-flex;align-items:center;gap:6px;background:#fbf1e2;border:1.5px solid #ecc78f;border-radius:999px;padding:4px 11px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#9a6410;"><span style="width:6px;height:6px;border-radius:50%;background:#e08a1f;"></span>Research prototype</span>
   </div>
   <div style="display:flex;align-items:center;gap:22px;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:13.5px;">
     <a href="https://doi.org/10.1021/acs.analchem.5c03465" target="_blank" style="color:#2566b0;text-decoration:none;">Paper</a>

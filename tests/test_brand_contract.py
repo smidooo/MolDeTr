@@ -99,7 +99,7 @@ def test_every_marker_carries_its_number_not_just_a_colour(n_detections):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("blob", ["PROTOTYPE", "FOOTNOTE", "OUTPUT_CAPTION"])
+@pytest.mark.parametrize("blob", ["SCOPE_NOTE", "FOOTNOTE", "OUTPUT_CAPTION"])
 def test_every_max_j_mention_names_the_full_coupling_path(app_module, blob):
     """`max J` is the *largest* coupling, not the coupling set — a caption that says "coupling
     constants" without the caveat overstates what the live decode returns.
