@@ -108,8 +108,11 @@ footer { display: none !important; }
   padding: 4px 2px 12px; border-bottom: 1.5px solid #d5dfeb; margin-bottom: 6px; }
 
 /* block labels as eyebrows.
-   NEVER add text-transform:uppercase to table headers — it would turn δ into Δ. */
-label > span[data-testid="block-info"], .block-title {
+   NEVER add text-transform:uppercase to table headers — it would turn δ into Δ.
+   `.block-title` was dropped: it matches nothing in Gradio 6 (0 elements on either tab, and no
+   class in the DOM contains "title"), so it styled nothing while looking like it did. The
+   data-testid half is what actually applies. See tests/e2e/test_browser_selectors.py. */
+label > span[data-testid="block-info"] {
   font-family: 'Space Grotesk', sans-serif !important;
   font-size: 12px !important; font-weight: 600 !important;
   letter-spacing: .16em; text-transform: uppercase; color: #74808f !important; }
