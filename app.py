@@ -42,8 +42,11 @@ from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
 from moldetr.simulate import simulate
 from moldetr.validation import INPUT_LENGTH, POINTS_PER_HZ, validate_spectrum
-from moldetr.visualization import plot_spectrum  # Simulate tab keeps the matplotlib renderer
-from plotting import assignment_rows, spectrum_figure  # BRAND: interactive Plotly plot (Detect)
+from plotting import (  # BRAND: interactive Plotly plots
+    assignment_rows,
+    comparison_figure,
+    spectrum_figure,
+)
 from theme import (
     CUSTOM_CSS,
     HEADER_HTML,
@@ -254,30 +257,68 @@ def _build_gt_groups(
     return gt
 
 
-def _comparison_dataframe(gt_groups: list[dict], preds: list[dict]) -> pd.DataFrame:
-    """GT-vs-detected table: each GT group paired with its nearest-δ prediction."""
-    rows = []
-    for i, (gt, pred) in enumerate(sp.match_to_gt(gt_groups, preds), 1):
+def _comparison_dataframe(
+    gt_groups: list[dict], preds: list[dict], tol_hz: float = 2.0
+) -> pd.DataFrame:
+    """GT-vs-detected table with a match status and explicit error columns.
+
+    Each GT group is paired with its nearest-δ prediction (``match_to_gt``); predictions matched to
+    no GT are appended as spurious rows. ``status``: ``✓ match`` (within ``tol_hz`` and right H) ·
+    ``~ off`` · ``✗ missed`` (GT with no prediction) · ``+ extra`` (spurious prediction). These
+    mirror the connector / marker colours in :func:`plotting.comparison_figure`.
+    """
+    matched = sp.match_to_gt(gt_groups, preds)
+    matched_ids = {id(p) for _g, p in matched if p is not None}
+    rows: list[dict] = []
+    for i, (gt, pred) in enumerate(matched, 1):
         gt_j = "–" if gt["max_j_hz"] is None else f"{gt['max_j_hz']:.1f}"
         row = {
             "#": i,
+            "status": "",
             "GT δ (ppm)": f"{gt['shift_ppm']:.2f}",
             "GT H": gt["proton_count"],
             "GT J (Hz)": gt_j,
         }
         if pred is None:
-            row.update({"pred δ (ppm)": "–", "pred H": "–", "pred J (Hz)": "–", "conf": "–"})
-        else:
-            js = pred["coupling_constants_hz"]
             row.update(
                 {
+                    "status": "✗ missed",
+                    "pred δ (ppm)": "–",
+                    "pred H": "–",
+                    "Δδ (Hz)": "–",
+                    "ΔH": "–",
+                    "conf": "–",
+                }
+            )
+        else:
+            dd_hz = abs(float(pred["chemical_shift_ppm"]) - gt["shift_ppm"]) * sp.BASE_FREQ_MHZ
+            dh = int(pred["proton_count"]) - gt["proton_count"]
+            row.update(
+                {
+                    "status": "✓ match" if (dd_hz <= tol_hz and dh == 0) else "~ off",
                     "pred δ (ppm)": f"{float(pred['chemical_shift_ppm']):.3f}",
                     "pred H": int(pred["proton_count"]),
-                    "pred J (Hz)": f"{float(js[0]):.1f}" if js else "–",
+                    "Δδ (Hz)": f"{dd_hz:.2f}",
+                    "ΔH": f"{dh:+d}",
                     "conf": f"{float(pred['confidence']):.2f}",
                 }
             )
         rows.append(row)
+    for k, pred in enumerate((p for p in preds if id(p) not in matched_ids), len(rows) + 1):
+        rows.append(
+            {
+                "#": k,
+                "status": "+ extra",
+                "GT δ (ppm)": "–",
+                "GT H": "–",
+                "GT J (Hz)": "–",
+                "pred δ (ppm)": f"{float(pred['chemical_shift_ppm']):.3f}",
+                "pred H": int(pred["proton_count"]),
+                "Δδ (Hz)": "–",
+                "ΔH": "–",
+                "conf": f"{float(pred['confidence']):.2f}",
+            }
+        )
     return pd.DataFrame(rows)
 
 
@@ -350,21 +391,25 @@ def simulate_and_detect(
         threshold=threshold,
     )
     gt_groups = _build_gt_groups(shifts, pheno["couplings"], j_hz)
-    gt_overlay = [{"chemical_shift_in_points": _ppm_to_pts(g["shift_ppm"])} for g in gt_groups]
-    fig, _rows = plot_spectrum(
+    matched = sp.match_to_gt(gt_groups, preds)
+    matched_ids = {id(p) for _g, p in matched if p is not None}
+    spurious = [p for p in preds if id(p) not in matched_ids]
+    fig = comparison_figure(
         amplitudes,
-        preds,
+        matched,
+        spurious,
         ppm_left=sp.LEFT_PPM,
         ppm_right=sp.RIGHT_PPM,
-        ground_truth=gt_overlay,
-        show_table=False,
-        title=f"Simulated {phenotype} — ground truth vs detected",
+        base_freq_mhz=sp.BASE_FREQ_MHZ,
+        tol_hz=2.0,
     )
     table = _comparison_dataframe(gt_groups, preds)
+    n_match = sum(1 for _g, p in matched if p is not None)
     msg = (
-        f"**Simulated `{phenotype}` ({len(gt_groups)} GT group(s)); detected {len(preds)} "
-        "multiplet(s).** Ground truth is overlaid as dashed lines; the table pairs each GT group "
-        "with its nearest detection."
+        f"**Simulated `{phenotype}`** — {len(gt_groups)} ground-truth multiplet(s); the model "
+        f"**detected** {len(preds)} ({n_match} matched, {len(spurious)} spurious). "
+        "Teal ▽ = ground truth · clay ● = model detection; a connector turns **green** within "
+        "tolerance and **amber** when off. Missed GT and spurious peaks are outlined in red."
     )
     return table, fig, msg
 
