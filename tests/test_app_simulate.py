@@ -147,6 +147,71 @@ def test_simulate_nonpositive_width(patch_model):
     assert msg.startswith("Invalid parameters:") and "line width must be positive" in msg
 
 
+# --- _comparison_dataframe: the status branches the round-trip test never reaches ----------------
+#
+# `simulate_and_detect` with the 3-detection fake always lands on ✓/~ rows, so `✗ missed` and
+# `+ extra` — the two statuses a user reads as "the model got this wrong" — were never constructed.
+# Calling the helper directly is the only way to drive them deterministically.
+
+_GT_AROMATIC = {"shift_ppm": 7.5, "proton_count": 1, "max_j_hz": 8.0}
+_GT_METHYL = {"shift_ppm": 1.2, "proton_count": 3, "max_j_hz": 7.0}
+
+
+def _pred(shift_ppm: float, protons: int = 1, confidence: float = 0.9) -> dict:
+    return {
+        "chemical_shift_ppm": shift_ppm,
+        "proton_count": protons,
+        "confidence": confidence,
+    }
+
+
+@pytest.mark.unit
+def test_comparison_dataframe_marks_unmatched_gt_as_missed(app_module):
+    """More GT groups than predictions → the leftover GT row is `✗ missed` with a dashed pred side."""
+    df = app_module._comparison_dataframe([_GT_AROMATIC, _GT_METHYL], [_pred(7.5)])
+
+    assert list(df["status"]) == ["✓ match", "✗ missed"]
+    missed = df.iloc[1]
+    assert list(missed[["pred δ (ppm)", "pred H", "Δδ (Hz)", "ΔH", "conf"]]) == ["–"] * 5
+    assert missed["GT δ (ppm)"] == "1.20" and missed["GT H"] == 3  # GT side stays populated
+
+
+@pytest.mark.unit
+def test_comparison_dataframe_appends_spurious_predictions_as_extra(app_module):
+    """More predictions than GT groups → the leftover prediction is `+ extra`, numbering unbroken."""
+    df = app_module._comparison_dataframe(
+        [_GT_AROMATIC], [_pred(7.5), _pred(2.0, protons=2, confidence=0.42)]
+    )
+
+    assert list(df["status"]) == ["✓ match", "+ extra"]
+    extra = df.iloc[1]
+    assert list(extra[["GT δ (ppm)", "GT H", "GT J (Hz)"]]) == ["–", "–", "–"]
+    assert (extra["pred δ (ppm)"], extra["pred H"], extra["conf"]) == ("2.000", 2, "0.42")
+    assert list(df["#"]) == [1, 2]  # spurious rows continue the GT numbering, not restart it
+
+
+@pytest.mark.unit
+def test_comparison_dataframe_right_shift_wrong_proton_count_is_off_not_match(app_module):
+    """`✓ match` needs BOTH |Δδ| ≤ tol and ΔH == 0 — an exact shift with the wrong H is `~ off`."""
+    row = app_module._comparison_dataframe([_GT_AROMATIC], [_pred(7.5, protons=2)]).iloc[0]
+    assert (row["status"], row["Δδ (Hz)"], row["ΔH"]) == ("~ off", "0.00", "+1")
+
+
+@pytest.mark.unit
+def test_comparison_dataframe_never_reports_missed_and_extra_together(app_module):
+    """`match_to_gt` is a greedy *full* assignment with no distance cutoff, so a GT is paired with
+    the nearest remaining prediction however far away it sits.
+
+    Consequence, pinned here because the status vocabulary implies otherwise: a GT whose real
+    detection is missing, alongside a spurious detection elsewhere, renders as a single `~ off`
+    row — never `✗ missed` + `+ extra`. If the matcher ever grows a cutoff, this is the test that
+    should be changed deliberately rather than discovered by surprise.
+    """
+    df = app_module._comparison_dataframe([_GT_AROMATIC], [_pred(1.0)])  # 520 Hz away, same H
+    assert list(df["status"]) == ["~ off"]
+    assert df.iloc[0]["Δδ (Hz)"] == "520.00"
+
+
 @pytest.mark.unit
 def test_simulate_singlet_gt_j_dashed(patch_model):
     app = patch_model
