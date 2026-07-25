@@ -10,7 +10,7 @@ from __future__ import annotations
 import numpy as np
 import plotly.graph_objects as go
 
-from plotting import MATCH_OFF, MATCH_OK, MISS_INK, comparison_figure
+from app_ui.plotting import MATCH_OFF, MATCH_OK, MISS_INK, comparison_figure
 
 N = 6144
 

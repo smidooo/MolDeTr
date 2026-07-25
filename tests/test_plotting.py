@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from plotting import assignment_rows, spectrum_figure
+from app_ui.plotting import assignment_rows, spectrum_figure
 
 
 def _pred(**over):
