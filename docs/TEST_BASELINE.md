@@ -3,6 +3,9 @@
 Captured before the frontend-verification workstream (W1) begins, so that every later change has a
 known-good reference. Branch `feat/gt-vs-pred-viz` @ `816becb`. Windows 11, Python 3.12, `.venv`.
 
+> **Superseded by the outcome below** — see *After the frontend workstream* at the foot of this
+> file for the post-W1 numbers. This section is kept as the "before" half of the comparison.
+
 ```
 MOLDETR_CHECKPOINT=C:\Users\nicol\Documents\NewCode\MolDeTr_zenodo_staging_v3\model_spin_system_ABCDEFG_exp2.pth
 md5 faf842d1a1d8beae67e0544e28f226b5  (973,617,196 bytes) — matches scripts/download_weights.py:24
@@ -94,3 +97,52 @@ unaffected (its selector loops support subprocesses). The browser lane now passe
 - `pytest-cov` is installed but absent from the `dev` extra in `pyproject.toml` — declare it.
 - Only **2 of 8** CI legs are required on `main` (`ubuntu-latest / py3.10`, `py3.11`); `e2e` and
   `browser-e2e` are advisory, contradicting `docs/requirements/REQUIREMENTS.md:64`.
+
+---
+
+# After the frontend workstream — 2026-07-26
+
+| Lane | Before | After |
+|---|---|---|
+| CI lane | 249 passed / 1 skipped | **299 passed / 1 skipped** |
+| in-process e2e | 2 | **5** |
+| browser | 3 (chromium only) | **24 × chromium/firefox/webkit = 72** |
+| real-weights (`-m model`) | 3 (the selector reached 4 of 10 gated tests) | **11 / 1 skipped** |
+| lint | `moldetr scripts tests` | **+ `app.py app_ui`**, clean |
+| smoke | 3/3 | 3/3 |
+| headline medians | 0.90 / 0.20 / 93.5 | **unchanged** |
+
+The single remaining skip is still `tests/test_scripts_local.py:57` (Zenodo ROI npz absent).
+
+## Layers built
+
+L0 lint wiring · L1 coordinate helpers · L2 `test_brand_contract.py` · L3 `test_ui_graph.py` ·
+L4 callback error states · L5 named `gradio_client` endpoints · L6 `test_browser_journeys.py` ·
+L7 `test_browser_selectors.py` · L8 `test_browser_a11y.py` · L10 cross-browser matrix ·
+L11 the vanillin oracle.
+
+## L9 (visual baselines) — deliberately not built
+
+Screenshot goldens were scoped but dropped. The ground they would cover is already held, and held
+better, by layers that fail with a readable reason instead of a pixel diff:
+
+| What L9 would catch | Already caught by |
+|---|---|
+| stylesheet not applied | L7 computed-style assertions (and the selector-liveness meta-test) |
+| a rule stops matching after a Gradio bump | L7 — it found `.block-title` dead on its first run |
+| brand colours drift | L2 tricolor parity + `BRAND.md` token sync |
+| contrast / a11y regressions | L8 axe scan — it found `eyebrow` at 4.01:1 |
+| layout or control breakage | L6 journeys, across three engines |
+
+Against that, screenshot goldens cost binary churn in a public repo on every intentional UI edit,
+and flake on font rendering and engine-specific antialiasing — the cross-browser matrix would
+multiply that by three. Revisit only if a visual regression ever ships that the layers above
+missed; that would be the evidence this trade-off was wrong.
+
+## `docs/requirements/` stays gitignored
+
+Unlike `design/`, which was un-ignored so `tests/test_brand_contract.py` could enforce the brand
+source of truth in CI, `REQUIREMENTS.md` is grouped with `CLAUDE.md` as local project-management
+guidance and is not read by any test. Publishing it is a call about what belongs in a public
+paper companion, not a correctness fix — so it stays local, and this note records that the
+gitignore is deliberate rather than an oversight.
