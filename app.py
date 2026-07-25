@@ -499,7 +499,16 @@ def build_ui() -> gr.Blocks:
                             label="Zeroth-order phase (deg; 0 = off)",
                         )
                         sim_broaden = gr.Slider(
-                            0.0, 3.0, value=0.0, step=0.1, label="Broadening FWHM (Hz; 0 = off)"
+                            0.0,
+                            3.0,
+                            value=0.0,
+                            step=0.1,
+                            label="Broadening FWHM (Hz; 0 = off)",
+                            info=(
+                                "⚠ Outside the model's training distribution: the shipped model was "
+                                "trained without line broadening, so enabling this feeds it an effect "
+                                "it never saw and detection may degrade."
+                            ),
                         )
                         sim_baseline = gr.Slider(
                             0.0, 0.1, value=0.0, step=0.01, label="Baseline tilt (0 = off)"
