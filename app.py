@@ -76,13 +76,31 @@ def _get_model():
     return _MODEL
 
 
-def _load(path: str):
+EXAMPLES_DIR = ROOT / "examples"
+
+
+def _is_bundled_example(path: Path) -> bool:
+    """True only for a file that ships inside this repo's ``examples/`` directory."""
+    try:
+        return path.resolve().is_relative_to(EXAMPLES_DIR)
+    except (OSError, ValueError):  # unresolvable path (broken link, bad drive) → not ours
+        return False
+
+
+def _load(path: str, *, trusted: bool = False):
     """Load a spectrum (+ ppm calibration if present) from .npz/.npy. Array is returned as-is
-    (possibly complex) so the caller can surface the dtype; validation takes the real part."""
+    (possibly complex) so the caller can surface the dtype; validation takes the real part.
+
+    ``trusted`` is what enables pickle, and only files we ship get it. Unpickling executes code
+    carried in the archive, so an uploaded ``.npz`` must never take that path. The gate costs
+    nothing: the one branch that touches an object array is the ``metadata`` fallback below, which
+    is reached only when ``ppm_axis_padded`` is absent — and every bundled example has that axis.
+    """
     p = Path(path)
     cal: dict = {}
     if p.suffix == ".npz":
-        data = np.load(p, allow_pickle=True)  # trusted example/Zenodo file
+        # allow_pickle is gated on provenance, never on the caller's convenience.
+        data = np.load(p, allow_pickle=trusted)
         # Prefer the per-point ppm axis (correct for the ROI); metadata left/right_ppm span the full
         # spectrum and would mis-place peaks, so only fall back to them if the axis is absent.
         if "ppm_axis_padded" in data:
@@ -98,19 +116,38 @@ def _load(path: str):
     return np.asarray(np.load(p)), cal
 
 
+def _resolve_points_per_hz(points_per_hz) -> float:
+    """Digital resolution in points/Hz, or ``ValueError`` naming what is wrong with it.
+
+    A blank field means "unset" and falls back to the default. Zero and negatives are *stated*
+    values that cannot be right, and the old ``float(x) if x else DEFAULT`` silently replaced 0
+    with 5.12 — so clearing the box produced confident, wrongly-scaled results. A negative value
+    is truthy and sailed through entirely, mirroring the axis and yielding negative line widths.
+    """
+    if points_per_hz is None or points_per_hz == "":
+        return POINTS_PER_HZ
+    pph = float(points_per_hz)
+    if pph <= 0:
+        raise ValueError("digital resolution must be positive (points/Hz)")
+    return pph
+
+
 def _spec_report(file, points_per_hz) -> str:
     """Post-upload input check — same logic, glyphs instead of emoji."""  # BRAND
     if file is None:
         return ""
     path = file if isinstance(file, str) else file.name
     try:
-        raw, cal = _load(path)
+        raw, cal = _load(path, trusted=_is_bundled_example(Path(path)))
     except Exception as exc:  # noqa: BLE001
         return f"⚠ Could not read the file: {exc}"
+    try:
+        pph = _resolve_points_per_hz(points_per_hz)
+    except ValueError as exc:
+        return f"⚠ Invalid input: {exc}"
     arr = np.asarray(raw).ravel()
     n = arr.shape[0]
-    pph = float(points_per_hz) if points_per_hz else POINTS_PER_HZ
-    window = INPUT_LENGTH / pph if pph else float("nan")
+    window = INPUT_LENGTH / pph
     ok_len = "✓" if n == INPUT_LENGTH else f"✗ needs exactly {INPUT_LENGTH}"
     ok_res = (
         "✓" if abs(pph - POINTS_PER_HZ) <= 0.01 else "⚠ not 1200 Hz — predictions may be unreliable"
@@ -142,8 +179,16 @@ def predict(file, threshold, ppm_mode, manual_left, manual_right, points_per_hz)
             ),
         )
     path = file if isinstance(file, str) else file.name
-    raw, cal = _load(path)
-    pph = float(points_per_hz) if points_per_hz else POINTS_PER_HZ
+    # `_spec_report` has always guarded this; `predict` did not, so the same bad file that produced
+    # a tidy "⚠ Could not read" above the button rendered a Python traceback below it.
+    try:
+        raw, cal = _load(path, trusted=_is_bundled_example(Path(path)))
+    except Exception as exc:  # noqa: BLE001 - any unreadable file must surface as a message
+        return None, None, f"⚠ Could not read the file: {exc}"
+    try:
+        pph = _resolve_points_per_hz(points_per_hz)
+    except ValueError as exc:
+        return None, None, f"Invalid input: {exc}"
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         try:
@@ -181,12 +226,28 @@ def predict(file, threshold, ppm_mode, manual_left, manual_right, points_per_hz)
     return table, fig, msg
 
 
+_EXPORT_DIR: str | None = None
+
+
+def _export_dir() -> str:
+    """One temp directory per process, reused by every Detect click.
+
+    `mkdtemp` *per click* leaked a directory on every detection — unbounded on a Space that stays
+    up for weeks. The two export files are overwritten in place instead, which also means a stale
+    download link can never serve a previous run's numbers.
+    """
+    global _EXPORT_DIR
+    if _EXPORT_DIR is None or not os.path.isdir(_EXPORT_DIR):
+        _EXPORT_DIR = tempfile.mkdtemp(prefix="moldetr_")
+    return _EXPORT_DIR
+
+
 def predict_ui(file, threshold, ppm_mode, manual_left, manual_right, points_per_hz):
     """predict() + CSV/JSON export files for the download buttons."""  # NEW
     table, fig, msg = predict(file, threshold, ppm_mode, manual_left, manual_right, points_per_hz)
     csv_path = json_path = None
     if table is not None and not table.empty:
-        out = tempfile.mkdtemp(prefix="moldetr_")
+        out = _export_dir()
         csv_path = os.path.join(out, "moldetr_prediction.csv")
         json_path = os.path.join(out, "moldetr_prediction.json")
         table.to_csv(csv_path, index=False)
@@ -211,11 +272,6 @@ SIMULATE_INTRO = (
 )
 
 PHENOTYPE_CHOICES = sorted(sp.PHENOTYPES)
-
-
-def _ppm_to_pts(shift_ppm: float) -> float:
-    """Point index of a ppm value on the simulation grid (index 0 = the high-ppm edge)."""
-    return (shift_ppm - sp.LEFT_PPM) / (sp.RIGHT_PPM - sp.LEFT_PPM) * (sp.N_POINTS - 1)
 
 
 def _phenotype_defaults(name: str) -> tuple[str, float, float]:
@@ -573,15 +629,33 @@ def build_ui() -> gr.Blocks:
                         )
                         gr.Markdown(OUTPUT_CAPTION, elem_classes="md-footnote")
 
-        spectrum.change(_spec_report, inputs=[spectrum, points_per_hz], outputs=spec_md)
-        points_per_hz.change(_spec_report, inputs=[spectrum, points_per_hz], outputs=spec_md)
+        # Explicit api_names: without them Gradio derives endpoint ids from the callback names, so
+        # the two `_spec_report` wirings became `/_spec_report` and `/_spec_report_1` — a public API
+        # surface named after private functions, positional in a way that shifts if either moves.
+        # The e2e tier addresses these by name; keep them stable.
+        spectrum.change(
+            _spec_report,
+            inputs=[spectrum, points_per_hz],
+            outputs=spec_md,
+            api_name="check_input_on_upload",
+        )
+        points_per_hz.change(
+            _spec_report,
+            inputs=[spectrum, points_per_hz],
+            outputs=spec_md,
+            api_name="check_input_on_resolution_change",
+        )
         run_btn.click(
             predict_ui,  # NEW: wraps predict with the export files
             inputs=[spectrum, threshold, ppm_mode, manual_left, manual_right, points_per_hz],
             outputs=[table, plot, status, csv_btn, json_btn],
+            api_name="detect",
         )
         sim_phenotype.change(
-            _phenotype_defaults, inputs=sim_phenotype, outputs=[sim_shifts, sim_j, sim_width]
+            _phenotype_defaults,
+            inputs=sim_phenotype,
+            outputs=[sim_shifts, sim_j, sim_width],
+            api_name="phenotype_defaults",
         )
         sim_btn.click(
             simulate_and_detect,
@@ -598,9 +672,27 @@ def build_ui() -> gr.Blocks:
                 sim_threshold,
             ],
             outputs=[sim_table, sim_plot, sim_status],
+            api_name="simulate_and_detect",
         )
     return demo
 
 
+# --- the single way this app is served -----------------------------------------------------------
+# Gradio 6 moved `theme=`/`css=` from Blocks(...) onto .launch(), and omitting them raises nothing —
+# the app just serves unstyled. Keeping the kwargs here, and routing every entry point (this module,
+# `moldetr app`, and the browser/e2e fixtures) through launch_app(), makes "what ships" and "what is
+# tested" the same object by construction. See tests/e2e/test_browser_branding.py.
+LAUNCH_KWARGS = {"theme": MOLDETR_THEME, "css": CUSTOM_CSS}  # BRAND: gradio 6.x theming
+
+
+def launch_app(demo: gr.Blocks | None = None, **overrides):
+    """Launch the app exactly as production does. Returns ``(demo, launch_result)``.
+
+    The Blocks handle comes back so callers can ``demo.close()`` — the test fixtures rely on it.
+    """
+    demo = build_ui() if demo is None else demo
+    return demo, demo.launch(**{**LAUNCH_KWARGS, **overrides})
+
+
 if __name__ == "__main__":
-    build_ui().launch(theme=MOLDETR_THEME, css=CUSTOM_CSS)  # BRAND: gradio 6.x theming
+    launch_app()

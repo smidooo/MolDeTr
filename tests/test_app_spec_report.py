@@ -58,10 +58,24 @@ def test_wrong_resolution_warns(app_module, tmp_npz, valid_spectrum):
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("pph", [None, 0])
-def test_falsy_resolution_falls_back_to_default(app_module, tmp_npz, valid_spectrum, pph):
-    r = app_module._spec_report(tmp_npz(spec=valid_spectrum), pph)
+def test_blank_resolution_falls_back_to_default(app_module, tmp_npz, valid_spectrum):
+    """An empty `gr.Number` arrives as ``None`` and genuinely means "unset" → use the default."""
+    r = app_module._spec_report(tmp_npz(spec=valid_spectrum), None)
     assert "**5.12** points/Hz → **1200 Hz** window ✓" in r
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("pph", [0, -5.12])
+def test_non_positive_resolution_is_reported_not_replaced(app_module, tmp_npz, valid_spectrum, pph):
+    """Changed deliberately: this used to assert 0 fell back to 5.12 alongside ``None``.
+
+    Lumping them together was the bug. ``None`` is "the user told us nothing"; ``0`` is "the user
+    told us zero", and answering that with a ✓ input check computed from 5.12 reports a resolution
+    nobody entered. Negatives never even hit the old guard — they are truthy — so the panel showed
+    a negative Hz window as though it were fine.
+    """
+    r = app_module._spec_report(tmp_npz(spec=valid_spectrum), pph)
+    assert r.startswith("⚠ Invalid input:") and "positive" in r
 
 
 @pytest.mark.unit

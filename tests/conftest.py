@@ -103,7 +103,9 @@ def app_module():
 def patch_model(app_module, fake_model, tmp_path, monkeypatch):
     """Make ``predict`` / ``simulate_and_detect`` run weight-free: existing CHECKPOINT + fake _MODEL.
 
-    Returns the patched ``app`` module. Use ``app.set_fake(model)`` in-test to swap detections.
+    Returns the patched ``app`` module. To swap detections in a test, build another stub with the
+    ``make_fake_model`` factory and ``monkeypatch.setattr(app, "_MODEL", other)`` — there is no
+    ``app.set_fake`` (an earlier draft of this docstring named one that was never written).
     """
     ckpt = tmp_path / "fake_checkpoint.pth"
     ckpt.write_bytes(b"not-a-real-checkpoint")  # only needs to exist so the gate passes

@@ -2,12 +2,11 @@
 
 Opt-in (``-m browser``; needs ``pytest-playwright`` + ``playwright install chromium``). Weight-free:
 the in-process app runs the stubbed model, so Detect returns real detections without the checkpoint.
-Inherits the ``patch_model`` / data fixtures from ``tests/conftest.py``.
+Inherits the ``patch_model`` / data fixtures from ``tests/conftest.py`` and the ``served_app_url``
+launch fixture from ``tests/e2e/conftest.py``.
 """
 
 from __future__ import annotations
-
-import time
 
 import pytest
 
@@ -15,33 +14,6 @@ pytest.importorskip("playwright")
 from playwright.sync_api import Page, expect  # noqa: E402
 
 pytestmark = pytest.mark.browser
-
-
-def _wait_reachable(url: str, tries: int = 80) -> None:
-    import httpx
-
-    for _ in range(tries):
-        try:
-            httpx.get(url, timeout=1.0)
-            return
-        except Exception:
-            time.sleep(0.25)
-    raise AssertionError(f"gradio server never became reachable at {url}")
-
-
-@pytest.fixture
-def served_app_url(patch_model):
-    """Launch the stubbed app in-process; yield its URL; close after."""
-    app = patch_model
-    demo = app.build_ui()
-    _f, url, _s = demo.launch(
-        prevent_thread_lock=True, server_name="127.0.0.1", show_error=True, quiet=True
-    )
-    try:
-        _wait_reachable(url)
-        yield url
-    finally:
-        demo.close()
 
 
 def test_header_and_tab_strip_render(page: Page, served_app_url):
