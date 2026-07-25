@@ -119,10 +119,13 @@ def _apply_phase(
     """
     # A simulated spectrum is purely real (absorption only); multiplying a real signal by exp(iθ)
     # and keeping the real part collapses to a flat cos(θ) scaling with no dispersive line-shape
-    # change. Forming the analytic signal (absorption + i·dispersion, via the Hilbert transform)
-    # first makes exp(iθ) mix absorption and dispersion the way a real phasing error does. For an
-    # already-analytic input the real part is unchanged, so this is a no-op there.
-    analytic = hilbert(np.real(out))
+    # change. Forming the analytic signal first makes exp(iθ) mix absorption and dispersion the way
+    # a real phasing error does. Use the CONJUGATED analytic signal (absorption − i·dispersion) to
+    # match the training data: the simulator stored every spectrum as np.conj(hilbert(absorption))
+    # (spin_system_sim/forward_spec.py), so a phased spectrum the model learned from has real part
+    # abs·cosθ + disp·sinθ. The non-conjugated hilbert inverts the dispersive twist, drifting peaks
+    # the wrong way under phasing. Pinned by test_phase_uses_training_conjugated_analytic_convention.
+    analytic = np.conj(hilbert(np.real(out)))
     result = add_phase_distortion(
         analytic,
         ppm,
