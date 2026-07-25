@@ -14,9 +14,11 @@ pip install -e ".[dev]"
 ```
 
 ## Before opening a pull request
-- **Format & lint:** `ruff check moldetr scripts` (and `ruff format` if you use it).
+- **Format & lint:** `ruff check moldetr scripts tests app.py app_ui` (and `ruff format` if you use it)
+  — the same scope CI lints.
 - **Smoke test:** `python scripts/quick_validation.py` must pass (3/3 gating checks).
-- **Tests:** `pytest -q` must pass; add a test for any new behavior. The suite is tiered by marker:
+- **Tests:** add a test for any new behavior. The suite is tiered by marker — run the CI lane, not a
+  bare `pytest`, which would also collect the opt-in `browser` tier and fail without `playwright install`:
   - **CI lane (fast, weight-free):** `pytest -m "not e2e and not browser and not network"` — exactly what CI runs; keep it green.
   - **App e2e:** `pytest -m e2e` (needs `.[app]`) · **Browser:** `pytest -m browser` (needs `playwright install`).
   - **Real checkpoint:** `MOLDETR_CHECKPOINT=/path/to/model_spin_system_ABCDEFG_exp2.pth pytest -m model`

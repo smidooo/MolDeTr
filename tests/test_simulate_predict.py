@@ -40,10 +40,20 @@ sys.path.insert(0, str(REPO / "scripts"))
 import simulate_and_predict as sp  # noqa: E402  (scripts/ was just placed on sys.path above)
 
 CHECKPOINT = sp.DEFAULT_CHECKPOINT
-checkpoint_required = pytest.mark.skipif(
+_needs_checkpoint = pytest.mark.skipif(
     not Path(CHECKPOINT).exists(),
     reason=f"checkpoint not found at {CHECKPOINT!r}; set MOLDETR_CHECKPOINT to run recovery tests",
 )
+
+
+def checkpoint_required(fn):
+    """Gate on the checkpoint *and* tag ``model``.
+
+    A bare ``skipif`` made these invisible to ``pytest -m model``, so the real-weights lane silently
+    ran a subset. Both marks travel together now.
+    """
+    return pytest.mark.model(_needs_checkpoint(fn))
+
 
 # Calibrated to observed recovery on ethyl + aromatic_ax (see module docstring).
 TOL_PPM = 0.05
