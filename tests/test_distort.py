@@ -144,3 +144,40 @@ def test_noise_std_scales_inversely_with_snr() -> None:
     std_high = np.std(np.real(distort(spec, ppm, noise_snr_log10=4.0, seed=0)) - np.real(spec))
     assert std_low > std_high
     assert 50.0 < std_low / std_high < 200.0
+
+
+def test_phase_uses_training_conjugated_analytic_convention() -> None:
+    """Phase distortion must reproduce the training data's analytic-signal convention.
+
+    The simulator stored every training spectrum as ``np.conj(hilbert(absorption))``
+    (spin_system_sim/forward_spec.py) = absorption - i*dispersion, so a phased spectrum the
+    model actually learned from has real part ``abs*cos(theta) + disp*sin(theta)``. The app must
+    form the SAME (conjugated) analytic signal; the non-conjugated ``hilbert`` inverts the
+    dispersive twist, so peaks drift the wrong way under phasing (the reported bug).
+
+    Reference = the identical phase op applied to the conjugated analytic signal (black-boxing
+    ``add_phase_distortion`` so the assertion pins only the conjugation convention).
+    """
+    from scipy.signal import hilbert
+
+    from moldetr.dataloader.data_augmentation import add_phase_distortion
+
+    idx = np.arange(N)
+    absorption = np.exp(-((idx - 3000) ** 2) / (2 * 10.0**2))  # one clean real peak
+    spec = absorption.astype(np.complex128)
+    ppm = _ppm()
+    theta = 6.0  # zeroth-order phase in degrees, within |.| <= 8
+
+    out = distort(spec, ppm, phase0_deg=theta, seed=0)
+
+    analytic_train = np.conj(hilbert(absorption))  # training convention: abs - i*disp
+    ref = add_phase_distortion(
+        analytic_train,
+        ppm,
+        float(ppm[0]),
+        float(ppm[-1]),
+        phase_0_custom=theta,
+        phase_1_custom=0.0,
+        use_custom_values=True,
+    )
+    assert np.allclose(np.real(out), np.real(ref), atol=1e-6)
