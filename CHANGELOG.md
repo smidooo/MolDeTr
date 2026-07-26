@@ -47,6 +47,11 @@ All notable changes to this project are documented here. The format is based on
   with the suffix decided by registration order.
 
 ### Fixed
+- **Colab demo launch cell.** `notebooks/MolDeTr_colab_demo.ipynb` still ran `from theme import ...`
+  after that module moved to `app_ui/theme.py`, so Runtime → Run all crashed at the last cell for
+  every Colab user. The cell now calls `launch_app(share=True)`, the same entry point every other
+  frontend uses. A weight-free import guard (`tests/test_notebooks_static.py`) now runs in the fast
+  CI lane and fails when a shipped notebook references a module or symbol that no longer exists.
 - **Unreadable files no longer produce a traceback.** `predict` called `_load` unguarded while the input
   check had always wrapped it, so the same corrupt file gave a tidy message above the button and a Python
   traceback below it.
