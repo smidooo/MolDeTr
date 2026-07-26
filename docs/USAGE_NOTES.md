@@ -13,7 +13,7 @@ to avoid each one.
 | Output | What it is | How much to trust it |
 |---|---|---|
 | **δ (chemical shift)** | multiplet centre, in ppm (if calibrated) or Hz | **Most reliable.** Median error 0.90 Hz. |
-| **proton count** | number of equivalent protons for the multiplet | Reliable for 1H/2H/3H (97 / 89 / 75 %). 4H/6H untested on real data. |
+| **proton count** | number of equivalent protons for the multiplet | Reliable for 1H/2H/3H (97 / 88.75 / 75 %, see [`SCOPE.md`](SCOPE.md)). 4H/6H untested on real data. |
 | **max J** | the **largest** coupling constant, in Hz | Reports the **dominant** coupling per multiplet; the full set is in `structured_output` (see [`SCOPE.md`](SCOPE.md#about-the-coupling-constants)). Can deviate for inputs outside the trained regime. |
 | **line width** | peak width, in Hz (∝ 1/T₂) | Indicative; sensitive to shim and processing. |
 

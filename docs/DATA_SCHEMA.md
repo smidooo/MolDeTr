@@ -7,6 +7,12 @@
 Two datasets feed MolDeTr. They historically used different field names/units; `moldetr/labels.py`
 normalizes both into one canonical `Multiplet` (positions in points, **couplings always in Hz**).
 
+> [!NOTE]
+> The spectra below are stored **complex**, but the model consumes the **real (absorption) part**:
+> `moldetr/validation.py` takes it and warns when it does. That is why
+> [`INPUT_FORMAT.md`](INPUT_FORMAT.md) asks for real-valued input while these files are complex.
+> The two pages describe the same contract from opposite ends.
+
 ## Synthetic: `data/custom_spin_systems/*.npz` (clean spectra; on Zenodo)
 
 | npz key | meaning |
@@ -21,7 +27,7 @@ label dict: `proton_number`, `center_position_in_points`, `line_width_in_points`
 
 | npz key | meaning |
 |---|---|
-| `spectrum_padded` | complex spectrum, 6144 points (model input) |
+| `spectrum_padded` | complex spectrum, 6144 points (model input; the real part is what the model sees) |
 | `ppm_axis_*`, `hz_axis_*` | axes |
 | `ground_truth` | list of label dicts (below) |
 | `predictions` | the article's model predictions |

@@ -57,7 +57,17 @@ EXCLUDED_RULES = {
 # with no text and no aria-label, so WebKit derives no accessible name (Chromium does — this only
 # surfaces on the cross-browser matrix). Plotly exposes `displaylogo:false` as a *config* option,
 # which Gradio's gr.Plot does not pass through, so it cannot be removed from here.
-THIRD_PARTY_NODE_MARKERS = ("modebar-btn",)
+#
+# `data-tab-id`: Gradio's tab strip. Its selected tab carries a pseudo-element indicator, so axe
+# cannot resolve what sits behind the label and reports `color-contrast` with
+# `messageKey: "pseudoContent"` — an *inconclusive* result, not a measured failure. It normally
+# lands in `incomplete`, but axe promotes it to `violations` non-deterministically, which is what
+# turned up as a one-off WebKit red on an otherwise green commit (2026-07-26, the #7 merge run;
+# the same code passed WebKit on that PR's own run and on the next commit's). Nothing in this repo
+# styles `button[role="tab"]` — neither CUSTOM_CSS nor any theme token touches it — so there is no
+# contrast here for us to fix. Probed directly under WebKit with the DOM fully settled
+# (`.generating` = 0, plot SVG present), which ruled out a mid-render race.
+THIRD_PARTY_NODE_MARKERS = ("modebar-btn", "data-tab-id")
 
 
 def _is_third_party(node: dict) -> bool:
@@ -84,6 +94,30 @@ def _format(violations: list[dict]) -> str:
         f"\n    first: {v['nodes'][0]['html'][:160]}"
         for v in violations
     )
+
+
+def test_node_filter_matches_the_widgets_it_documents() -> None:
+    """Pin both third-party markers against the real node shapes they were added for.
+
+    Without this, a typo or a rename silently turns the filter into a no-op (every node becomes
+    "ours" again and the suite goes red for a reason no change here can fix), or a broadened marker
+    silently swallows our own nodes. Node HTML is copied from the axe output that motivated each.
+    """
+    gradio_tab = {
+        "target": ['button[data-tab-id="3"]'],
+        "html": '<button role="tab" aria-selected="true" data-tab-id="3" '
+        'class="svelte-11gaq1 selected">Detect</button>',
+    }
+    plotly_logo = {
+        "target": ["a.modebar-btn"],
+        "html": '<a href="https://plotly.com/" class="modebar-btn plotlyjsicon modebar-btn--logo">',
+    }
+    assert _is_third_party(gradio_tab)
+    assert _is_third_party(plotly_logo)
+
+    # Our own markup must still be scanned — the filter is node-level, not rule-level.
+    ours = {"target": ["#md-header a"], "html": '<a href="https://doi.org/10.1021/...">Paper</a>'}
+    assert not _is_third_party(ours)
 
 
 def test_landing_page_has_no_serious_axe_violations(page: Page, served_app_url: str) -> None:
