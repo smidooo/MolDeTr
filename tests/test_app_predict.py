@@ -123,7 +123,7 @@ def test_threshold_one_detects_nothing(patch_model, tmp_npz, valid_spectrum):
         _valid_npz_with_ppm(tmp_npz, valid_spectrum), 1.0, app.AUTO, None, None, 5.12
     )
     assert table.empty
-    assert msg == "No multiplets passed the detection threshold — try lowering it."
+    assert msg == "No multiplets passed the detection threshold. Try lowering it."
 
 
 # --- unreadable input: `predict` must degrade to a message, never a traceback --------------------

@@ -160,11 +160,11 @@ def _spec_report(file, points_per_hz) -> str:
     window = INPUT_LENGTH / pph
     ok_len = "✓" if n == INPUT_LENGTH else f"✗ needs exactly {INPUT_LENGTH}"
     ok_res = (
-        "✓" if abs(pph - POINTS_PER_HZ) <= 0.01 else "⚠ not 1200 Hz — predictions may be unreliable"
+        "✓" if abs(pph - POINTS_PER_HZ) <= 0.01 else "⚠ not 1200 Hz, so predictions may be unreliable"
     )
-    dtype = "complex — the real (absorption) part is used" if np.iscomplexobj(arr) else "real ✓"
+    dtype = "complex; the real (absorption) part is used" if np.iscomplexobj(arr) else "real ✓"
     finite = "✓" if np.all(np.isfinite(np.real(arr))) else "✗ contains NaN/Inf"
-    axis = "yes ✓ (Auto works)" if cal.get("ppm_left") is not None else "no — use Manual or None"
+    axis = "yes ✓ (Auto works)" if cal.get("ppm_left") is not None else "no; use Manual or None"
     return (
         "**Input check**\n"
         f"- Length: **{n}** points {ok_len}\n"
@@ -230,7 +230,7 @@ def predict(file, threshold, ppm_mode, manual_left, manual_right, points_per_hz)
     if preds:
         msg = f"Detected **{len(preds)}** multiplet(s). Numbers on the plot match the table rows."
     else:
-        msg = "No multiplets passed the detection threshold — try lowering it."
+        msg = "No multiplets passed the detection threshold. Try lowering it."
     if warn_msg:
         msg += f"\n\n⚠ {warn_msg}"
     return table, fig, msg
@@ -283,7 +283,7 @@ def predict_ui(file, threshold, ppm_mode, manual_left, manual_right, points_per_
 SIMULATE_INTRO = (
     "Simulate a known spin system on the model's grid (80 MHz, 15→0 ppm, 6144 pts), optionally add "
     "training-range distortions, then detect and compare against ground truth. Edit the per-spin "
-    "shifts, the coupling, and the line width, or add noise / phase / broadening / baseline — every "
+    "shifts, the coupling, and the line width, or add noise / phase / broadening / baseline. Every "
     "distortion slider is bounded to the range the model was trained on."
 )
 
@@ -478,7 +478,7 @@ def simulate_and_detect(
     table = _comparison_dataframe(gt_groups, preds)
     n_match = sum(1 for _g, p in matched if p is not None)
     msg = (
-        f"**Simulated `{phenotype}`** — {len(gt_groups)} ground-truth multiplet(s); the model "
+        f"**Simulated `{phenotype}`**: {len(gt_groups)} ground-truth multiplet(s); the model "
         f"**detected** {len(preds)} ({n_match} matched, {len(spurious)} spurious). "
         "Teal ▽ = ground truth · clay ● = model detection; a connector turns **green** within "
         "tolerance and **amber** when off. Missed GT and spurious peaks are outlined in red."
@@ -490,7 +490,7 @@ CONTRACT = (
     f"**Expected input.** A 1-D ¹H spectrum of **{INPUT_LENGTH} points** at **{POINTS_PER_HZ} "
     "points/Hz** (a 1200 Hz window), real-valued. Absolute intensity does not matter (each spectrum "
     "is min–max normalised), but relative intensities, SNR and line shape do. Every coupling partner "
-    "of an in-window peak must also sit inside the window — see "
+    "of an in-window peak must also sit inside the window; see "
     "[`docs/INPUT_FORMAT.md`](docs/INPUT_FORMAT.md)."
 )
 
@@ -500,13 +500,13 @@ CONTRACT = (
 SCOPE_NOTE = (
     "MolDeTr handles congested, strongly-coupled ¹H NMR spectra and is largely field-agnostic "
     "(it works in Hz; tested on 80–600 MHz). Predictions can deviate for inputs outside its trained "
-    "regime — unusual distortions, non-standard pulse sequences or processing, mixtures, or windows "
+    "regime: unusual distortions, non-standard pulse sequences or processing, mixtures, or windows "
     "wider than 1200 Hz. **max J** is the dominant coupling per multiplet (the full set is in the "
     "committed `structured_output` path). Sanity-check predictions against your own chemistry."
 )
 
 FOOTNOTE = (  # NEW
-    "max J = largest coupling per multiplet — the full coupling set comes from the committed "
+    "max J = largest coupling per multiplet; the full coupling set comes from the committed "
     "`structured_output` path. Sanity-check predictions against your own chemistry."
 )
 
@@ -587,7 +587,7 @@ def build_ui() -> gr.Blocks:
                             )
                         gr.Markdown(FOOTNOTE, elem_classes="md-footnote")  # NEW
                         plot = gr.Plot(
-                            label="Annotated spectrum — drag to zoom · double-click resets",
+                            label="Annotated spectrum (drag to zoom, double-click resets)",
                             elem_id="md-plot",
                         )
             with gr.Tab("Simulate"):
@@ -604,7 +604,7 @@ def build_ui() -> gr.Blocks:
                         with gr.Row():
                             sim_j = gr.Number(value=_defaults[1], label="Coupling J (Hz)")
                             sim_width = gr.Number(value=_defaults[2], label="Line width FWHM (Hz)")
-                        gr.Markdown("**Distortions** — each bounded to the model's trained range.")
+                        gr.Markdown("**Distortions**: each bounded to the model's trained range.")
                         with gr.Row():
                             sim_add_noise = gr.Checkbox(value=False, label="Add noise")
                             sim_snr = gr.Slider(
