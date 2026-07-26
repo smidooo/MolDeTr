@@ -25,6 +25,10 @@ All notable changes to this project are documented here. The format is based on
   gitignored, so nothing could check it. It ships with the repo (images excepted) and the sync test reads it.
 
 ### Changed
+- **Public copy reads plainer.** A language pass over the README, both notebook narratives, and the
+  GUI microcopy: em-dashes replaced with ordinary punctuation, rhetorical lead-ins dropped, captions
+  tightened. Facts, numbers, DOIs, links, and CSS selectors are unchanged; UI strings pinned by tests
+  were updated together with their assertions.
 - **Scope framing aligned with the paper.** Removed the "research prototype" / "well-resolved spectra"
   language that understated the peer-reviewed method; clarified that deviations come from
   out-of-distribution acquisition/processing (unusual distortions, non-standard pulse sequences,
