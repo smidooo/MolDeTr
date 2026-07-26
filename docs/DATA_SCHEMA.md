@@ -7,7 +7,7 @@
 Two datasets feed MolDeTr. They historically used different field names/units; `moldetr/labels.py`
 normalizes both into one canonical `Multiplet` (positions in points, **couplings always in Hz**).
 
-## Synthetic — `data/custom_spin_systems/*.npz` (clean spectra; on Zenodo)
+## Synthetic: `data/custom_spin_systems/*.npz` (clean spectra; on Zenodo)
 
 | npz key | meaning |
 |---|---|
@@ -17,7 +17,7 @@ normalizes both into one canonical `Multiplet` (positions in points, **couplings
 label dict: `proton_number`, `center_position_in_points`, `line_width_in_points`,
 `bounding_box_range_in_points`, `coupling_constants_in_points` (couplings in **points**).
 
-## Experimental — `roi_S*.npz` (preprocessed ROIs; on Zenodo, in `experimental_rois/`)
+## Experimental: `roi_S*.npz` (preprocessed ROIs; on Zenodo, in `experimental_rois/`)
 
 | npz key | meaning |
 |---|---|
@@ -35,7 +35,7 @@ label dict: `proton_count`, `chemical_shift_in_points`, `coupling_constants` (**
 `bounding_box_range_in_points`, `chemical_shift_ppm`.
 
 > [!NOTE]
-> Adapters: `from_synthetic` (÷5.12 on couplings — points → Hz), `from_experimental` (couplings
+> Adapters: `from_synthetic` (÷5.12 on couplings: points → Hz), `from_experimental` (couplings
 > already Hz). Committed JSON (`roi_S*.json`, `experimental_matched_pairs.json`) uses the
 > experimental field names.
 
