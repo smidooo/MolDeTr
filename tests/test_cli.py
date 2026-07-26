@@ -1,8 +1,19 @@
 """The ``moldetr`` console dispatcher: help lists commands, unknown errors, args forward to the sub-main."""
 
+import importlib.util
+import subprocess
 import sys
+from pathlib import Path
 
 import pytest
+
+REPO = Path(__file__).resolve().parent.parent
+
+_EVAL_DEPS = ("pandas", "seaborn", "sklearn", "cmcrameri")
+needs_eval_extra = pytest.mark.skipif(
+    not all(importlib.util.find_spec(m) for m in _EVAL_DEPS),
+    reason="evaluate_synthetic needs the [eval] extra (pandas/seaborn/scikit-learn/cmcrameri)",
+)
 
 
 @pytest.mark.unit
@@ -65,6 +76,47 @@ def test_cli_no_args_prints_usage(capsys):
 
     main([])
     assert "usage: moldetr" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_cli_app_help_prints_usage_instead_of_launching(capsys, monkeypatch):
+    """`moldetr app --help` must describe the command, not start a blocking server.
+
+    The dispatcher forwarded nothing to the app branch, so `--help` fell through to `launch_app()`
+    and the terminal hung on a running server, contradicting this module's own docstring ("so
+    ``moldetr <cmd> --help`` shows that command's own options").
+    """
+    import app as app_module
+
+    from moldetr.cli import main
+
+    launched: dict = {}
+    monkeypatch.setattr(app_module, "launch_app", lambda *a, **k: launched.setdefault("ran", True))
+    main(["app", "--help"])
+    assert not launched, "`moldetr app --help` launched the server instead of printing help"
+    assert "moldetr app" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+@needs_eval_extra
+def test_cli_hydra_subcommand_resolves_its_config():
+    """`moldetr evaluate-synthetic` must find `conf/`, exactly as running the script does.
+
+    `@hydra.main(config_path="../conf")` resolves relative to the *file* only when the task
+    function's module is `__main__`. Importing it as `scripts.evaluate_synthetic` sent Hydra down
+    its config-*module* path instead, so every `moldetr evaluate-synthetic ...` invocation died
+    with "Primary config module 'conf' not found" while `python scripts/evaluate_synthetic.py`
+    worked.
+    """
+    r = subprocess.run(
+        [sys.executable, "-m", "moldetr.cli", "evaluate-synthetic", "--help"],
+        cwd=str(REPO),
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    assert r.returncode == 0, (r.stdout + r.stderr)[-2000:]
+    assert "Powered by Hydra" in r.stdout
 
 
 @pytest.mark.unit
