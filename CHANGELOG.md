@@ -47,6 +47,15 @@ All notable changes to this project are documented here. The format is based on
   with the suffix decided by registration order.
 
 ### Fixed
+- **`moldetr evaluate-synthetic` works again.** The dispatcher imported the script as
+  `scripts.evaluate_synthetic`, and `@hydra.main(config_path="../conf")` only resolves that relative
+  path when the task function's module is `__main__`, so every invocation through the console script
+  failed with "Primary config module 'conf' not found" while `python scripts/evaluate_synthetic.py`
+  worked. Hydra-decorated scripts now run as `__main__`.
+- **`moldetr app --help` prints usage instead of starting a server.** The `app` branch ignored its
+  remaining arguments, so `--help` fell through to `launch_app()` and the terminal hung on a running
+  app, contradicting the dispatcher's documented "`moldetr <cmd> --help` shows that command's own
+  options".
 - **Colab demo launch cell.** `notebooks/MolDeTr_colab_demo.ipynb` still ran `from theme import ...`
   after that module moved to `app_ui/theme.py`, so Runtime → Run all crashed at the last cell for
   every Colab user. The cell now calls `launch_app(share=True)`, the same entry point every other
