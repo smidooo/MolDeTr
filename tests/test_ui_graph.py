@@ -20,10 +20,10 @@ import pytest
 #: arrived. `gr.State` holds the simulation cache but is not itself a Block.
 N_COMPONENTS = 56
 #: load_example · _spec_report ×2 · predict_ui · preset_grid · resize_spin_matrix ·
-#: simulate_to_state · redistort ×6. Gradio derives an endpoint id for *every* wiring, so the six
+#: simulate_to_state · redistort ×6 · invalidate_cache ×2. Gradio derives an endpoint id for every
 #: re-distort handlers are named one per control — `api_name=False` becomes the literal "false",
 #: "false_1", ..., which is the auto-derived surface these tests exist to prevent.
-N_EVENTS = 13
+N_EVENTS = 15
 
 # elem_ids the CSS and the browser tests address by name. `md-check`/`md-plot` carry no CSS rule of
 # their own (see the L7 exclusion list) but are still selector anchors for the e2e suite.

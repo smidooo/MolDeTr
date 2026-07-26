@@ -19,7 +19,12 @@ from __future__ import annotations
 import time
 
 import pytest
-from playwright.sync_api import Page, expect
+
+# Guard before the import, matching the other browser modules: pytest *collects* every file before
+# deselecting by marker, so a bare `from playwright...` breaks collection — and therefore every
+# lane — on the CI legs that do not install it.
+pytest.importorskip("playwright")
+from playwright.sync_api import Page, expect  # noqa: E402
 
 pytestmark = pytest.mark.browser
 

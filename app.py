@@ -754,6 +754,17 @@ def resize_spin_matrix(
     return rows, _width_rows(shifts, couplings)
 
 
+def invalidate_cache() -> None:
+    """Drop the cached spectrum, because the grid no longer describes it.
+
+    Without this a slider re-distorts whatever was last simulated: edit a five-spin system down to
+    two, drag the phase slider, and the plot re-renders the *old* five spins — still labelled as
+    five — beside a matrix that says something else. Clearing is the honest answer rather than
+    re-simulating on every keystroke, which is the ``2**n`` cost the cache exists to avoid.
+    """
+    return None
+
+
 def simulate_to_state(
     matrix_rows: list[list[object]],
     width_rows: list[list[object]],
@@ -1031,6 +1042,11 @@ def build_ui() -> gr.Blocks:
             outputs=[sim_cache, sim_table, sim_plot, sim_status],
             api_name="simulate_and_detect",
         )
+        # Editing either grid invalidates the cache, so the sliders cannot re-distort a spectrum the
+        # matrix no longer describes. Also fires when a preset or a resize rewrites the grid, which
+        # is equally a change of system.
+        sim_matrix.change(invalidate_cache, outputs=sim_cache, api_name="invalidate_on_matrix_edit")
+        sim_widths.change(invalidate_cache, outputs=sim_cache, api_name="invalidate_on_width_edit")
         # `.release` rather than `.change`: a slider fires continuously while dragged, and each
         # event costs a forward pass. `always_last` keeps the final position authoritative when
         # events are dropped mid-drag, so the view never settles on a stale value.

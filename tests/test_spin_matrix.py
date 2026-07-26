@@ -220,3 +220,28 @@ def test_every_phenotype_round_trips_through_the_grid(app_module) -> None:
         assert shifts == pytest.approx(pheno["shifts_ppm"]), name
         expected = app_module.sp.build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
         assert np.allclose(np.triu(couplings, 1), np.triu(expected, 1)), name
+
+
+@pytest.mark.unit
+def test_editing_the_matrix_invalidates_the_cached_spectrum(app_module) -> None:
+    """A slider must never re-distort a spectrum the grid no longer describes.
+
+    `redistort` reads the cache from `gr.State` and nothing else, so without invalidation this
+    sequence silently lies: simulate a 5-spin system, edit the grid down to 2 spins, drag a slider,
+    and the plot re-renders the *old* five spins — still labelled "5 spin(s) in 1 system(s)" — next
+    to a matrix that says something different. Measured before the fix; the caller has no way to
+    tell the stale result from a fresh one.
+
+    Clearing is the honest response rather than re-simulating silently: re-solving the spin dynamics
+    on every keystroke is exactly the cost the cache exists to avoid.
+    """
+    assert app_module.invalidate_cache() is None
+
+
+@pytest.mark.unit
+def test_a_cleared_cache_prompts_instead_of_rendering(app_module) -> None:
+    """The prompt is what the user sees after an edit, so it has to name the next action."""
+    table, fig, msg = app_module.redistort(None, False, 3.0, 6.0, 0.0, 0.0, 0.3)
+
+    assert (table, fig) == (None, None)
+    assert "Simulate & Predict" in msg
