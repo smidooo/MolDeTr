@@ -72,7 +72,8 @@ def test_distort_kwargs_selective(app_module):
 @pytest.mark.unit
 def test_build_gt_groups_ethyl(app_module):
     pheno = app_module.sp.PHENOTYPES["ethyl"]
-    groups = app_module._build_gt_groups(pheno["shifts_ppm"], pheno["couplings"], 7.0)
+    j = app_module.sp.build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
+    groups = app_module._build_gt_groups(pheno["shifts_ppm"], j)
     # two equivalence groups (3H @1.2, 2H @3.5), sorted high→low ppm, both coupled
     assert [(g["shift_ppm"], g["proton_count"], g["max_j_hz"]) for g in groups] == [
         (3.5, 2, 7.0),
@@ -83,7 +84,8 @@ def test_build_gt_groups_ethyl(app_module):
 @pytest.mark.unit
 def test_build_gt_groups_singlet_has_no_coupling(app_module):
     pheno = app_module.sp.PHENOTYPES["methoxy_singlet"]
-    (group,) = app_module._build_gt_groups(pheno["shifts_ppm"], pheno["couplings"], 0.0)
+    j = app_module.sp.build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
+    (group,) = app_module._build_gt_groups(pheno["shifts_ppm"], j)
     assert group == {"shift_ppm": 3.8, "proton_count": 3, "max_j_hz": None}
 
 
