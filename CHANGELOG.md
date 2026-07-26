@@ -52,6 +52,10 @@ All notable changes to this project are documented here. The format is based on
   every Colab user. The cell now calls `launch_app(share=True)`, the same entry point every other
   frontend uses. A weight-free import guard (`tests/test_notebooks_static.py`) now runs in the fast
   CI lane and fails when a shipped notebook references a module or symbol that no longer exists.
+- **`predict.py --plot` now shows stored ground truth.** ROI `.npz` files carry a `ground_truth`
+  array and the shared renderer can draw it as dashed reference lines, but the CLI never passed it
+  along. Plots from annotated files now include the overlay, with a stdout note of the count.
+  Checkpoint selection via `$MOLDETR_CHECKPOINT` was already in place and tested.
 - **Unreadable files no longer produce a traceback.** `predict` called `_load` unguarded while the input
   check had always wrapped it, so the same corrupt file gave a tidy message above the button and a Python
   traceback below it.

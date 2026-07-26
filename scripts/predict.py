@@ -7,6 +7,9 @@ Examples
 
 Weights (``model_spin_system_ABCDEFG_exp2.pth``) are on Zenodo (10.5281/zenodo.21217102);
 place the file in ``moldetr/model/``, pass ``--checkpoint``, or set ``$MOLDETR_CHECKPOINT``.
+
+When the input ``.npz`` stores annotations under ``ground_truth`` (the ROI files do),
+``--plot`` overlays them as dashed reference lines next to the detections.
 """
 
 from __future__ import annotations
@@ -26,10 +29,11 @@ from moldetr.visualization import plot_spectrum
 ROOT = Path(__file__).resolve().parent.parent
 
 
-def load_input(path: str) -> tuple[np.ndarray, dict]:
-    """Load a real 1D spectrum (+ ppm calibration if present) from .npz or .npy."""
+def load_input(path: str) -> tuple[np.ndarray, dict, list[dict]]:
+    """Load a real 1D spectrum, its ppm calibration, and any stored ground truth."""
     p = Path(path)
     cal: dict = {}
+    ground_truth: list[dict] = []
     if p.suffix == ".npz":
         data = np.load(
             p, allow_pickle=True
@@ -43,11 +47,13 @@ def load_input(path: str) -> tuple[np.ndarray, dict]:
         elif "metadata" in data:
             md = data["metadata"].item()
             cal = {"ppm_left": md.get("left_ppm"), "ppm_right": md.get("right_ppm")}
+        if "ground_truth" in data:
+            ground_truth = [dict(g) for g in data["ground_truth"].tolist()]
         for key in ("spectrum_padded", "spec"):
             if key in data:
-                return np.real(data[key]), cal
-        return np.real(data[list(data.keys())[0]]), cal
-    return np.real(np.load(p)), cal
+                return np.real(data[key]), cal, ground_truth
+        return np.real(data[list(data.keys())[0]]), cal, ground_truth
+    return np.real(np.load(p)), cal, ground_truth
 
 
 def demo_spectrum(n: int = 6144) -> np.ndarray:
@@ -97,7 +103,9 @@ def main() -> None:
             "Download it from Zenodo (10.5281/zenodo.21217102) into moldetr/model/."
         )
 
-    amplitudes, cal = (demo_spectrum(), {}) if args.demo else load_input(args.input)
+    amplitudes, cal, ground_truth = (
+        (demo_spectrum(), {}, []) if args.demo else load_input(args.input)
+    )
     try:
         validate_spectrum(amplitudes, points_per_hz=args.points_per_hz)
     except ValueError as exc:
@@ -132,9 +140,16 @@ def main() -> None:
 
     if args.plot:
         plot_spectrum(
-            amplitudes, predictions, ppm_left=ppm_left, ppm_right=ppm_right, save_path=args.plot
+            amplitudes,
+            predictions,
+            ppm_left=ppm_left,
+            ppm_right=ppm_right,
+            ground_truth=ground_truth or None,
+            save_path=args.plot,
         )
         print(f"Saved annotated spectrum plot to {args.plot}")
+        if ground_truth:
+            print(f"  ({len(ground_truth)} ground-truth multiplet(s) overlaid as dashed lines)")
 
 
 if __name__ == "__main__":
