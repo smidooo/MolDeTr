@@ -32,15 +32,17 @@ import sys
 import tempfile
 import warnings
 from pathlib import Path
+from typing import Any
 
 import gradio as gr
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 
 from moldetr.distort import distort
 from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
-from moldetr.simulate import simulate_systems
+from moldetr.simulate import COUPLING_EPS_HZ, simulate_systems
 from moldetr.validation import INPUT_LENGTH, POINTS_PER_HZ, validate_spectrum
 from app_ui.plotting import (  # BRAND: interactive Plotly plots
     assignment_rows,
@@ -160,7 +162,9 @@ def _spec_report(file, points_per_hz) -> str:
     window = INPUT_LENGTH / pph
     ok_len = "✓" if n == INPUT_LENGTH else f"✗ needs exactly {INPUT_LENGTH}"
     ok_res = (
-        "✓" if abs(pph - POINTS_PER_HZ) <= 0.01 else "⚠ not 1200 Hz, so predictions may be unreliable"
+        "✓"
+        if abs(pph - POINTS_PER_HZ) <= 0.01
+        else "⚠ not 1200 Hz, so predictions may be unreliable"
     )
     dtype = "complex; the real (absorption) part is used" if np.iscomplexobj(arr) else "real ✓"
     finite = "✓" if np.all(np.isfinite(np.real(arr))) else "✗ contains NaN/Inf"
@@ -308,7 +312,9 @@ def _parse_spin_shifts(text: str, n_expected: int, default: list[float]) -> list
     return vals
 
 
-def _build_gt_groups(shifts: list[float], couplings_hz) -> list[dict]:
+def _build_gt_groups(
+    shifts: list[float], couplings_hz: NDArray[np.float64] | list[list[float]]
+) -> list[dict]:
     """Group equivalent spins into ground-truth multiplets (shift, proton count, max J).
 
     ``max_j_hz`` is read **per group from the coupling matrix**: the largest coupling from any spin
@@ -331,7 +337,9 @@ def _build_gt_groups(shifts: list[float], couplings_hz) -> list[dict]:
             abs(float(j[i, k]))
             for i in idxs
             for k in range(j.shape[0])
-            if k not in members and abs(float(j[i, k])) > 0.0
+            # Same tolerance the block decomposition uses, so a stray 1e-15 cannot be "absent" to
+            # one and a reported coupling to the other.
+            if k not in members and abs(float(j[i, k])) > COUPLING_EPS_HZ
         ]
         gt.append(
             {
@@ -424,7 +432,15 @@ def _simulate_distort_kwargs(
     return dk
 
 
-def _simulate_stage(phenotype: str, shifts_text: str, j_hz: float, width_hz: float):
+#: What ``_simulate_stage`` hands to ``_detect_stage``: the clean **complex** spectrum plus the ppm
+#: axis, phenotype label and ground-truth groups — everything needed to distort, detect and compare
+#: without paying the 2**n eigendecomposition again.
+SimCache = dict[str, Any]
+
+
+def _simulate_stage(
+    phenotype: str, shifts_text: str, j_hz: float, width_hz: float
+) -> SimCache | str:
     """Run the spin dynamics once and return everything the cheap stage needs.
 
     Returns a cache dict, or a **string** carrying the user-facing error. The string channel keeps
@@ -473,21 +489,45 @@ def _simulate_stage(phenotype: str, shifts_text: str, j_hz: float, width_hz: flo
     }
 
 
-def _distorted_amplitudes(cache: dict, add_noise, snr, phase0, broaden, baseline):
+def _distorted_amplitudes(
+    cache: SimCache,
+    add_noise: bool,
+    snr: float,
+    phase0: float,
+    broaden: float,
+    baseline: float,
+) -> NDArray[np.float64]:
     """Apply the distortions to the cached clean spectrum and return real amplitudes.
 
-    Pure with respect to ``cache``: ``distort`` copies its input, and nothing here writes back, so
-    dragging a slider re-distorts the original rather than compounding onto the last result.
+    Always returns a fresh array, so ``cache`` survives any number of slider moves. ``distort``
+    copies its input, but with every distortion at its neutral value it is skipped entirely and
+    ``np.asarray(np.real(...))`` is a no-op on a real float64 array — it would hand back the cached
+    array itself, and one in-place edit downstream would corrupt every later re-distortion.
     """
     spectrum = cache["spectrum"]
     dk = _simulate_distort_kwargs(add_noise, snr, phase0, broaden, baseline)
     if dk:
         spectrum = distort(spectrum, cache["ppm_axis"], **dk)
-    return np.asarray(np.real(spectrum), dtype=float)
+    return np.array(np.real(spectrum), dtype=float, copy=True)
 
 
-def _detect_stage(cache: dict, add_noise, snr, phase0, broaden, baseline, threshold):
-    """Distort, detect and compare — everything that must re-run when a slider moves, and no more."""
+def _detect_stage(
+    cache: SimCache | str,
+    add_noise: bool,
+    snr: float,
+    phase0: float,
+    broaden: float,
+    baseline: float,
+    threshold: float,
+) -> tuple[pd.DataFrame | None, object | None, str]:
+    """Distort, detect and compare — everything that must re-run when a slider moves, and no more.
+
+    Accepts the error string ``_simulate_stage`` returns instead of a cache and passes it straight
+    through, so a stage driven directly from a stored cache (rather than through
+    ``simulate_and_detect``) still shows the message rather than indexing a ``str``.
+    """
+    if isinstance(cache, str):
+        return None, None, cache
     try:
         amplitudes = _distorted_amplitudes(cache, add_noise, snr, phase0, broaden, baseline)
     except ValueError as exc:
@@ -536,15 +576,13 @@ def simulate_and_detect(
     broaden: float,
     baseline: float,
     threshold: float,
-):
+) -> tuple[pd.DataFrame | None, object | None, str]:
     """Simulate the (edited) phenotype, optionally distort, detect, and compare to ground truth.
 
     Kept as the single-call entry point (the Gradio event and the gradio_client API both address it)
     and now a thin composition of the two stages, so the one-shot and cached paths cannot drift.
     """
     cache = _simulate_stage(phenotype, shifts_text, j_hz, width_hz)
-    if isinstance(cache, str):
-        return None, None, cache
     return _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
 
 

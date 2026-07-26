@@ -127,6 +127,43 @@ MAX_BLOCK_SPINS = 10
 COUPLING_EPS_HZ = 1e-9
 
 
+def _validated_system(
+    shifts_ppm: Sequence[float],
+    couplings_hz: Sequence[Sequence[float]] | NDArray[np.float64],
+    widths_hz: Sequence[float],
+    n_points: int,
+    scale: Scale,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+    """Coerce the spin-system arguments to arrays and check they describe the same system.
+
+    Shared by :func:`simulate` and :func:`simulate_systems` so both validate the *caller's*
+    arguments. ``simulate_systems`` slices per block before delegating, so without this the inner
+    call would only ever see a self-consistent projection and an undersized ``couplings_hz`` would
+    silently decide how many spins exist.
+    """
+    shifts = np.asarray(shifts_ppm, dtype=float).ravel()
+    n_spins = int(shifts.shape[0])
+    if n_spins == 0:
+        raise ValueError("shifts_ppm must contain at least one spin.")
+
+    couplings = np.asarray(couplings_hz, dtype=float)
+    if couplings.shape != (n_spins, n_spins):
+        raise ValueError(
+            f"couplings_hz must be {n_spins}x{n_spins} for {n_spins} spins, got {couplings.shape}."
+        )
+
+    widths = np.asarray(widths_hz, dtype=float).ravel()
+    if widths.shape[0] != n_spins:
+        raise ValueError(
+            f"widths_hz must have one entry per spin ({n_spins}), got {widths.shape[0]}."
+        )
+    if n_points < 1:
+        raise ValueError(f"n_points must be >= 1, got {n_points}.")
+    if scale not in ("peak", "protons"):
+        raise ValueError(f"scale must be 'peak' or 'protons', got {scale!r}.")
+    return shifts, couplings, widths
+
+
 def coupling_blocks(
     couplings_hz: Sequence[Sequence[float]] | NDArray[np.float64],
 ) -> list[list[int]]:
@@ -177,7 +214,8 @@ def simulate_systems(
     phase, noise and baseline for the same reason). Use this when the spectrum is about to be
     distorted.
 
-    ``"protons"`` leaves the per-proton scale in place, so total area equals the proton count.
+    ``"protons"`` leaves the per-proton scale in place, so total area equals the proton count. Every
+    spin must have an observable transition for that to hold; see :func:`simulate`.
 
     Equivalent to one ``simulate(..., scale="protons")`` call over the whole matrix, but only pays
     ``2**n`` per *block* rather than for the whole system, and lets each block carry its own line
@@ -190,12 +228,15 @@ def simulate_systems(
     Raises
     ------
     ValueError:
-        If any single block exceeds :data:`MAX_BLOCK_SPINS`. Splitting cannot help there — the block
-        is genuinely one coupled system — so this fails fast instead of hanging.
+        If the argument shapes disagree or ``scale`` is unknown (checked here against the caller's
+        arguments, before any block slicing hides the mismatch); if any single block exceeds
+        :data:`MAX_BLOCK_SPINS`, since splitting cannot help — the block is genuinely one coupled
+        system — so this fails fast instead of hanging; or if any block has no observable
+        transition, because blocks are always summed in per-proton space.
     """
-    shifts = np.asarray(shifts_ppm, dtype=float).ravel()
-    couplings = np.asarray(couplings_hz, dtype=float)
-    widths = np.asarray(widths_hz, dtype=float).ravel()
+    shifts, couplings, widths = _validated_system(
+        shifts_ppm, couplings_hz, widths_hz, n_points, scale
+    )
 
     blocks = coupling_blocks(couplings)
     for block in blocks:
@@ -277,7 +318,8 @@ def simulate(
         summing several spin systems into one window. It also makes independent systems superpose
         exactly: simulating two uncoupled blocks jointly repeats each block's lines once per spin
         state of the other (a ``2**n`` degeneracy factor), and normalising per proton cancels it, so
-        ``simulate(A ∪ B) == simulate(A) + simulate(B)``.
+        ``simulate(A ∪ B) == simulate(A) + simulate(B)``. The area promise requires at least one
+        observable transition; a system that has none raises rather than return a silent zero.
 
     Returns
     -------
@@ -289,28 +331,13 @@ def simulate(
     ------
     ValueError:
         If the shapes of ``couplings_hz`` / ``widths_hz`` do not match ``len(shifts_ppm)``, if
-        ``n_points < 1``, or if the mean line width is not positive.
+        ``n_points < 1``, if ``scale`` is unknown, if the mean line width is not positive, or if
+        ``scale="protons"`` is asked of a system with no observable transition.
     """
-    shifts = np.asarray(shifts_ppm, dtype=float).ravel()
+    shifts, couplings, widths = _validated_system(
+        shifts_ppm, couplings_hz, widths_hz, n_points, scale
+    )
     n_spins = int(shifts.shape[0])
-    if n_spins == 0:
-        raise ValueError("shifts_ppm must contain at least one spin.")
-
-    couplings = np.asarray(couplings_hz, dtype=float)
-    if couplings.shape != (n_spins, n_spins):
-        raise ValueError(
-            f"couplings_hz must be {n_spins}x{n_spins} for {n_spins} spins, got {couplings.shape}."
-        )
-
-    widths = np.asarray(widths_hz, dtype=float).ravel()
-    if widths.shape[0] != n_spins:
-        raise ValueError(
-            f"widths_hz must have one entry per spin ({n_spins}), got {widths.shape[0]}."
-        )
-    if n_points < 1:
-        raise ValueError(f"n_points must be >= 1, got {n_points}.")
-    if scale not in ("peak", "protons"):
-        raise ValueError(f"scale must be 'peak' or 'protons', got {scale!r}.")
 
     gamma = float(np.mean(widths)) / 2.0  # HWHM from the mean per-spin FWHM
     if not gamma > 0.0:
@@ -324,8 +351,14 @@ def simulate(
         # Each Lorentzian integrates to its amplitude, so pinning the amplitude sum pins the total
         # area analytically — no dependence on the grid, the line width, or the peak height.
         total = float(amps.sum())
-        if total > 0.0:
-            amps = amps * (n_spins / total)
+        if not total > 0.0:
+            raise ValueError(
+                f"scale='protons' promises an integrated area of {n_spins}, but this spin system "
+                "has no observable transition: every single-quantum frequency is 0 Hz, which the "
+                "positive-frequency filter drops. A spin at exactly 0 ppm is the usual cause. Move "
+                "it off the axis origin, or use scale='peak', which makes no area promise."
+            )
+        amps = amps * (n_spins / total)
 
     ppm_axis = np.linspace(float(left_ppm), float(right_ppm), n_points)
     hz_axis = ppm_axis * float(base_freq_mhz)

@@ -20,10 +20,38 @@ import pytest
 ARGS = ("ethyl", "1.2, 1.2, 1.2, 3.5, 3.5", 7.0, 1.0)
 DISTORTION = (True, 3.0, 2.0, 0.0, 0.0, 0.3)  # noise on, snr, phase0, broaden, baseline, threshold
 
+# Captured from `main`'s monolithic `simulate_and_detect` (pre-split, commit b0241c7) driven by the
+# same deterministic fake model. These are the reference: an external record of what the user saw
+# before the refactor, which is what makes the assertions below impossible to satisfy by definition.
+MAIN_MESSAGE = (
+    "**Simulated `ethyl`**: 2 ground-truth multiplet(s); the model **detected** 3 "
+    "(2 matched, 1 spurious). Teal ▽ = ground truth · clay ● = model detection; a connector turns "
+    "**green** within tolerance and **amber** when off. Missed GT and spurious peaks are outlined "
+    "in red."
+)
+MAIN_TABLE_CSV = [
+    "#,status,GT δ (ppm),GT H,GT J (Hz),pred δ (ppm),pred H,Δδ (Hz),ΔH,conf",
+    "1,~ off,3.50,2,7.0,3.000,3,40.00,+1,1.00",
+    "2,~ off,1.20,3,7.0,7.500,2,504.00,-1,1.00",
+    "3,+ extra,–,–,–,12.000,1,–,–,1.00",
+]
+
+
+def _csv_lines(table) -> list[str]:
+    return [line for line in table.to_csv(index=False).splitlines() if line]
+
 
 @pytest.mark.unit
-def test_stages_compose_to_the_monolithic_result(app_module, patch_model) -> None:
-    """Cache-invariance: simulate-then-detect is identical to the one-shot call."""
+def test_both_paths_still_produce_what_main_showed_the_user(app_module, patch_model) -> None:
+    """The split must not move a single character of the output, one-shot or staged.
+
+    This replaces a test that compared `simulate_and_detect` against
+    `_detect_stage(_simulate_stage(...))`. After the refactor those are the *same expression* —
+    `simulate_and_detect` is defined as that composition — so it asserted `f(x) == g(h(x))` for
+    `f := g∘h` and passed even with `_detect_stage` monkeypatched to prepend "BROKEN" to every
+    message. Pinning main's actual output instead means the refactor cannot define agreement into
+    existence: the goldens came from code that predates it.
+    """
     app = patch_model
 
     table_a, fig_a, msg_a = app.simulate_and_detect(*ARGS, *DISTORTION)
@@ -32,11 +60,29 @@ def test_stages_compose_to_the_monolithic_result(app_module, patch_model) -> Non
     assert not isinstance(cache, str), cache  # a str is the error channel
     table_b, fig_b, msg_b = app._detect_stage(cache, *DISTORTION)
 
-    assert msg_a == msg_b
-    assert (table_a is None) == (table_b is None)
-    if table_a is not None:
-        assert table_a.equals(table_b)
-    assert (fig_a is None) == (fig_b is None)
+    assert msg_a == MAIN_MESSAGE
+    assert msg_b == MAIN_MESSAGE
+    assert _csv_lines(table_a) == MAIN_TABLE_CSV
+    assert _csv_lines(table_b) == MAIN_TABLE_CSV
+    assert fig_a is not None and fig_b is not None
+
+
+@pytest.mark.unit
+def test_detect_stage_passes_a_simulation_error_through(app_module, patch_model) -> None:
+    """`_simulate_stage` reports failure as a string, so `_detect_stage` must recognise one.
+
+    Only `simulate_and_detect` checks for the string today. The moment a cache lives in `gr.State`
+    and a slider re-runs the detect stage on its own, a checkpoint-missing run would store the error
+    *string* in state and the next slider move would index a `str` — a Gradio 500 in place of the
+    message the user should have seen.
+    """
+    app = patch_model
+    error = "Checkpoint not found at `nowhere.pth`."
+
+    table, fig, msg = app._detect_stage(error, *DISTORTION)
+
+    assert (table, fig) == (None, None)
+    assert msg == error
 
 
 @pytest.mark.unit
@@ -88,6 +134,25 @@ def test_the_cache_is_not_mutated_by_distorting(app_module, patch_model) -> None
     first = app._distorted_amplitudes(cache, False, 3.0, 6.0, 0.0, 0.0)
     second = app._distorted_amplitudes(cache, False, 3.0, 6.0, 0.0, 0.0)
     assert np.allclose(first, second)
+
+
+@pytest.mark.unit
+def test_the_no_distortion_path_hands_back_a_copy(app_module, patch_model) -> None:
+    """With every distortion at its neutral value the stage must still not return the cache itself.
+
+    The test above only proves determinism: it uses `phase0=6.0`, which builds a non-empty kwargs
+    dict and goes through `distort()`, and `distort()` copies. With all sliders neutral the dict is
+    empty, `distort()` is skipped, and `np.asarray(np.real(x), dtype=float)` is a no-op on a real
+    C-contiguous float64 array — it returns *the same object*. The caller then holds a writable view
+    of the cached clean spectrum, which is exactly what a long-lived `gr.State` must never hand out:
+    one `amplitudes -= baseline` downstream and every later slider move distorts a corrupted cache.
+    """
+    app = patch_model
+    cache = app._simulate_stage(*ARGS)
+
+    out = app._distorted_amplitudes(cache, False, 3.0, 0.0, 0.0, 0.0)  # neutral: no distortion
+
+    assert not np.shares_memory(out, cache["spectrum"])
 
 
 @pytest.mark.unit

@@ -35,9 +35,7 @@ def _area(spectrum: np.ndarray, ppm_axis: np.ndarray, lo_ppm: float, hi_ppm: flo
 
 
 def _sim(shifts, couplings, widths, **kw):
-    return simulate(
-        shifts, couplings, widths, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS, **kw
-    )
+    return simulate(shifts, couplings, widths, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS, **kw)
 
 
 @pytest.mark.unit
@@ -45,6 +43,30 @@ def test_peak_scaling_is_still_the_default() -> None:
     """Existing callers must be untouched: the default keeps max-normalising to 1.0."""
     spectrum, _ = _sim([7.5, 6.9], np.array([[0.0, 8.0], [8.0, 0.0]]), [1.0, 1.0])
     assert spectrum.max() == pytest.approx(1.0)
+
+
+@pytest.mark.unit
+def test_the_default_spectrum_is_unchanged_point_by_point() -> None:
+    """Sample the shipped default against values captured from `main`, before `scale` existed.
+
+    `spectrum.max() == 1.0` above is trivially true of anything ending in `spectrum /= max()`, so it
+    cannot notice a changed line shape. These samples can: two sit on a line flank, and doubling
+    `gamma` was confirmed to fail them.
+
+    What they do *not* catch, checked rather than assumed: raising `min_intensity` or relaxing the
+    `delta_e > 0.0` transition filter both leave this AB fixture untouched, because all four of its
+    transitions are strong and none sits at zero frequency. Covering those needs a fixture that has
+    a weak or a zero-frequency transition.
+
+    The values are bit-for-bit equal to main's, not merely close.
+    """
+    spectrum, ppm = _sim([7.5, 6.9], np.array([[0.0, 8.0], [8.0, 0.0]]), [1.0, 1.0])
+
+    assert ppm[3300] == pytest.approx(6.9420, abs=1e-4)
+    assert spectrum[2000] == pytest.approx(1.6434620002544492e-05, rel=1e-6)
+    assert spectrum[3000] == pytest.approx(0.0028700842253010996, rel=1e-6)
+    assert spectrum[3300] == pytest.approx(0.7384904159579979, rel=1e-6)  # on a flank
+    assert spectrum[3320] == pytest.approx(0.026610860332643184, rel=1e-6)  # steeper flank
 
 
 @pytest.mark.unit
@@ -94,6 +116,31 @@ def test_total_area_tracks_proton_count() -> None:
     six, _ = _sim([5.0] * 6, np.zeros((6, 6)), [1.0] * 6, scale="protons")
 
     assert _area(six, ppm, 4.0, 6.0) / _area(two, ppm, 4.0, 6.0) == pytest.approx(3.0, rel=0.02)
+
+
+@pytest.mark.unit
+def test_absolute_area_equals_the_proton_count_in_hz() -> None:
+    """The stronger form of the promise: area equals proton count in absolute units, not as a ratio.
+
+    Every other test here compares two areas, so a scaling that was uniformly wrong by a constant
+    would satisfy all of them. Integrating over the **Hz** axis pins the number itself: each
+    Lorentzian integrates to its amplitude over frequency, and `scale="protons"` sets the amplitude
+    sum to the spin count, so the area is the spin count with no dependence on grid or line width.
+
+    The small shortfall is Lorentzian tails outside the 1200 Hz window, and it is predictable rather
+    than slop: a line of HWHM gamma truncated at distance d loses about gamma / (pi * d) on each
+    side. At 7.5 ppm (600 Hz from both edges) that is 5.3e-4; at 1.2 ppm (96 Hz from the near edge)
+    it is 1.8e-3, which is why the tolerance is 2e-3 rather than machine epsilon.
+    """
+    one, ppm = _sim([7.5], np.zeros((1, 1)), [1.0], scale="protons")
+    three, _ = _sim([1.2] * 3, np.zeros((3, 3)), [1.0] * 3, scale="protons")
+
+    hz = ppm * BASE_FREQ_MHZ
+    area_one = abs(float(np.trapezoid(one, hz)))
+    area_three = abs(float(np.trapezoid(three, hz)))
+
+    assert area_one == pytest.approx(1.0, rel=2e-3)
+    assert area_three == pytest.approx(3.0, rel=2e-3)
 
 
 @pytest.mark.unit

@@ -136,3 +136,82 @@ def test_spin_count_guard_rejects_an_unsimulatable_block() -> None:
         j[i, i + 1] = j[i + 1, i] = 5.0
     with pytest.raises(ValueError, match="spins"):
         simulate_systems([1.0] * n, j, [1.0] * n, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS)
+
+
+@pytest.mark.unit
+def test_a_j_matrix_too_small_for_the_shifts_is_rejected() -> None:
+    """An undersized J matrix must not silently define how many spins exist.
+
+    `coupling_blocks` only reads `j.shape[0]`, so a 2x2 matrix against three shifts used to yield
+    two blocks and drop the third proton — area 2.0 where the caller asked for 3, with no error.
+    The per-block slice hid it from `simulate`'s own shape check, which only ever saw 2 of each.
+    """
+    with pytest.raises(ValueError, match="couplings_hz"):
+        simulate_systems(
+            [1.2, 3.5, 7.5],
+            np.zeros((2, 2)),
+            [1.0] * 3,
+            BASE_FREQ_MHZ,
+            LEFT_PPM,
+            RIGHT_PPM,
+            N_POINTS,
+        )
+
+
+@pytest.mark.unit
+def test_a_surplus_line_width_is_rejected() -> None:
+    """One width per spin, checked against the caller's shifts rather than a block's slice."""
+    with pytest.raises(ValueError, match="widths_hz"):
+        simulate_systems(
+            [1.2, 3.5],
+            np.zeros((2, 2)),
+            [1.0] * 3,
+            BASE_FREQ_MHZ,
+            LEFT_PPM,
+            RIGHT_PPM,
+            N_POINTS,
+        )
+
+
+@pytest.mark.unit
+def test_unknown_scale_is_rejected_by_the_block_path_too() -> None:
+    """A misspelled scale must raise, not silently return a per-proton spectrum.
+
+    The inner `simulate` call hardcodes `scale="protons"`, so it never sees the caller's value, and
+    `if scale == "peak"` simply falls through. The result peaks near 0.37 instead of 1.0 and feeds
+    `distort()`, whose magnitudes are calibrated against a peak of 1 — every distortion would land
+    roughly 2.7x too strong.
+    """
+    with pytest.raises(ValueError, match="scale"):
+        simulate_systems(
+            [5.0],
+            np.zeros((1, 1)),
+            [1.0],
+            BASE_FREQ_MHZ,
+            LEFT_PPM,
+            RIGHT_PPM,
+            N_POINTS,
+            scale="Peak",
+        )
+
+
+@pytest.mark.unit
+def test_a_spin_with_no_observable_transition_is_rejected_under_proton_scaling() -> None:
+    """`scale="protons"` promises area == proton count, so a silent zero must not be allowed.
+
+    `_transitions` keeps only `delta_e > 0.0`, so a lone spin at exactly 0.0 ppm produces no
+    transitions at all: its block contributes nothing and the total area is short by one proton with
+    no warning. 0.0 ppm is the right-hand edge of the app's own 15 -> 0 window, so a user can type
+    it. Peak scaling is left alone — it makes no area promise, and that behaviour predates this PR.
+    """
+    with pytest.raises(ValueError, match="no observable transition"):
+        simulate_systems(
+            [0.0, 5.0],
+            np.zeros((2, 2)),
+            [1.0, 1.0],
+            BASE_FREQ_MHZ,
+            LEFT_PPM,
+            RIGHT_PPM,
+            N_POINTS,
+            scale="protons",
+        )
