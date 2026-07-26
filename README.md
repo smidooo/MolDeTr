@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.png">
-    <img src="docs/banner.png" alt="MolDeTr — chemistry-informed deep learning for 1H NMR" width="820">
+    <img src="docs/banner.png" alt="MolDeTr: chemistry-informed deep learning for 1H NMR" width="820">
   </picture>
 </p>
 
@@ -24,8 +24,8 @@
 
 <p align="center">
   <b>A chemistry-informed deep learning model for automated analysis of ¹H NMR spectra.</b><br>
-  One forward pass per spectrum window: chemical shift δ, coupling J, proton count, line width —<br>
-  no prior structure, no reference standards, no iterative fitting.
+  One forward pass per spectrum window returns chemical shift δ, coupling J, proton count, and line width.<br>
+  No prior structure, no reference standards, no iterative fitting.
 </p>
 
 ---
@@ -37,7 +37,7 @@
     <img src="docs/img/example_prediction.png" alt="MolDeTr detects three aromatic 1H multiplets of guajazulene at 500 MHz; the assignment table lists proton count, chemical shift in ppm, largest coupling max J in Hz, and line width for each" width="760">
   </picture>
 </p>
-<p align="center"><b>Guajazulene, 500 MHz</b> — a clean high-field case: three aromatic protons, resolved in one forward pass.</p>
+<p align="center"><b>Guajazulene, 500 MHz.</b> A clean high-field case: three aromatic protons, resolved in one forward pass.</p>
 
 Reading a ¹H NMR spectrum by hand means picking peaks, grouping them into multiplets, counting protons,
 and measuring coupling constants. It is slow and hard to reproduce, and least reliable on the hardest
@@ -56,8 +56,8 @@ evaluation entry points, the Hydra configuration, and the ground-truth ROI annot
 **weights** and the **spectral data** live on Zenodo (see [Install](#install)).
 
 > **Research code accompanying the paper.** MolDeTr extracts δ, proton count, and couplings from real
-> ¹H NMR spectra — including the congested, strongly-coupled cases it was built for. It is largely
-> field-agnostic — it works in Hz, so it was tested across 80–600 MHz (and simulated down to ~5 MHz).
+> ¹H NMR spectra, including the congested, strongly-coupled cases it was built for. It is largely
+> field-agnostic: it works in Hz, so it was tested across 80–600 MHz (and simulated down to ~5 MHz).
 > Predictions can deviate for inputs outside its trained regime: unusual distortions, non-standard pulse
 > sequences or processing, mixtures/impurities, or regions wider than the 1200 Hz window. `max J` is the
 > dominant coupling per multiplet (the full set is in the committed `structured_output` path). Read
@@ -76,12 +76,12 @@ evaluation entry points, the Hydra configuration, and the ground-truth ROI annot
 | **Method developer** | [Scope &amp; limitations](docs/SCOPE.md) · [Input format](docs/INPUT_FORMAT.md) · [Usage notes](docs/USAGE_NOTES.md) |
 | **New to NMR or ML** | [Glossary](#glossary-nmr--ml) · [How it works](#how-it-works) · [FAQ](#faq) |
 
-## What it does — and what it does not
+## What it does and what it does not
 
 | **Does** | **Does not** |
 |---|---|
-| Detects the multiplets in one spectral window and reports δ, proton count, line width, and the largest coupling (`max J`) per multiplet — see [Scope](docs/SCOPE.md) for how much to trust each output. | Read raw vendor files, phase/baseline-correct, or choose regions — you supply one preprocessed window (see [Test it on YOUR data](#test-it-on-your-data)). |
-| Handles overlap and strong coupling that defeat rule-based peak-picking. | Identify the molecule or assign peaks to atoms — it returns spin-system parameters, not a structure. |
+| Detects the multiplets in one spectral window and reports δ, proton count, line width, and the largest coupling (`max J`) per multiplet; see [Scope](docs/SCOPE.md) for how much to trust each output. | Read raw vendor files, phase/baseline-correct, or choose regions; you supply one preprocessed window (see [Test it on YOUR data](#test-it-on-your-data)). |
+| Handles overlap and strong coupling that defeat rule-based peak-picking. | Identify the molecule or assign peaks to atoms; it returns spin-system parameters, not a structure. |
 | Generalises across field strengths (80–600 MHz) because it works in Hz, not ppm. | Handle a multiplet whose coupling partner sits outside the analysed window (see the rule in [Test it on YOUR data](#test-it-on-your-data)). |
 
 ## A harder case: the vanillin ABX
@@ -92,20 +92,20 @@ evaluation entry points, the Hydra configuration, and the ground-truth ROI annot
     <img src="docs/img/example_prediction_vanillin.png" alt="MolDeTr detects the three aromatic protons of vanillin at 300 MHz as a classic ABX pattern; the assignment table lists proton count, chemical shift, and largest coupling for each, matching the ground truth" width="760">
   </picture>
 </p>
-<p align="center"><b>Vanillin, 300 MHz</b> — the classic 1,2,4-trisubstituted-benzene ABX: two ortho doublets
-(J ≈ 8 Hz) and a meta doublet (J ≈ 2 Hz). The live predictions reproduce the ground truth — proton counts, δ,
+<p align="center"><b>Vanillin, 300 MHz.</b> The classic 1,2,4-trisubstituted-benzene ABX: two ortho doublets
+(J ≈ 8 Hz) and a meta doublet (J ≈ 2 Hz). The live predictions reproduce the ground truth: proton counts, δ,
 and <code>max J</code> 8.2 / 2.0 / 8.7 vs 8.1 / 2.0 / 8.1 Hz.</p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/vanillin_spin_systems-dark.png">
-    <img src="docs/img/vanillin_spin_systems.png" alt="Vanillin drawn from its structure with the three aromatic protons colour-coded by spin system — H2 a meta doublet, H5 an ortho doublet, H6 a doublet-of-doublets — each linked by colour to its multiplet in the 300 MHz 1H NMR spectrum" width="820">
+    <img src="docs/img/vanillin_spin_systems.png" alt="Vanillin drawn from its structure with the three aromatic protons colour-coded by spin system, H2 a meta doublet, H5 an ortho doublet, H6 a doublet-of-doublets, each linked by colour to its multiplet in the 300 MHz 1H NMR spectrum" width="820">
   </picture>
 </p>
 <p align="center"><b>The same three protons, on the molecule.</b> Each aromatic proton is its own spin system:
 H5 is a clean ortho doublet (J ≈ 8 Hz to H6), H2 a meta doublet (J ≈ 2 Hz to H6), and H6 the
-doublet-of-doublets that couples to both. The colours link every ring position to its multiplet above — the
-spin-system structure MolDeTr recovers without ever seeing the molecule.</p>
+doublet-of-doublets that couples to both. The colours link every ring position to its multiplet above; that
+is the spin-system structure MolDeTr recovers without ever seeing the molecule.</p>
 
 ## Try it in 2 minutes
 
@@ -125,7 +125,7 @@ python scripts/predict.py --input examples/roi_S8_example.npz --plot   # a bundl
 python app.py                                                     # the point-and-click GUI (pip install -e ".[app]")
 ```
 
-Prefer no install at all? Run it in Colab — the [▶ interactive app](https://colab.research.google.com/github/smidooo/MolDeTr/blob/main/notebooks/MolDeTr_colab_demo.ipynb)
+To skip the install entirely, run it in Colab: the [▶ interactive app](https://colab.research.google.com/github/smidooo/MolDeTr/blob/main/notebooks/MolDeTr_colab_demo.ipynb)
 (Detect + Simulate, launched with a public share link) or the [▶ quickstart notebook](https://colab.research.google.com/github/smidooo/MolDeTr/blob/main/notebooks/MolDeTr_quickstart.ipynb) (predict on a bundled example).
 
 ## How it works
@@ -133,7 +133,7 @@ Prefer no install at all? Run it in Colab — the [▶ interactive app](https://
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="docs/img/pipeline-dark.png">
-    <img src="docs/img/pipeline.png" alt="Pipeline: a 1H NMR window of up to 1200 Hz is resampled to 6144 points at 5.12 points per Hz, passed through MolDeTr — a Deformable-DETR with an FPN backbone and transformer — which emits one box per multiplet, decoded to chemical shift, coupling, proton count, and line width" width="860">
+    <img src="docs/img/pipeline.png" alt="Pipeline: a 1H NMR window of up to 1200 Hz is resampled to 6144 points at 5.12 points per Hz, passed through MolDeTr, a Deformable-DETR with an FPN backbone and transformer, which emits one box per multiplet, decoded to chemical shift, coupling, proton count, and line width" width="860">
   </picture>
 </p>
 
@@ -144,14 +144,14 @@ chemical shift δ, a coupling J, a proton count, and a line width.
 
 A convolutional FPN backbone turns the 6144-point window into multi-scale features. A deformable-attention
 transformer with a fixed set of object queries then predicts, for each query, whether it found a multiplet
-and — if so — its position and parameters. Training matches predictions to ground truth with the Hungarian
+and, if so, its position and parameters. Training matches predictions to ground truth with the Hungarian
 algorithm, so the model learns set prediction directly and needs no hand-tuned peak-picking. Detection at
 inference is a single pass; the parameters come straight from the matched queries. The op that makes the
 attention practical on long 1D signals has a compiled CUDA kernel and a pure-PyTorch fallback, so inference
-runs on CPU with no build step. Terms in **bold** above are defined in the [glossary](#glossary-nmr--ml).
+runs on CPU with no build step. Key terms are defined in the [glossary](#glossary-nmr--ml).
 
-The network in full — an FPN backbone, a deformable-attention transformer with a fixed set of object
-queries, and per-query heads matched to ground truth by the Hungarian algorithm at training time:
+The network in full: an FPN backbone, a deformable-attention transformer with a fixed set of object
+queries, and per-query heads matched to ground truth by the Hungarian algorithm at training time.
 
 <p align="center">
   <picture>
@@ -163,17 +163,17 @@ queries, and per-query heads matched to ground truth by the Hungarian algorithm 
 ## Repository layout
 
 ```
-moldetr/            the installable package — model + inference stack
+moldetr/            the installable package: model + inference stack
 ├── model/          Deformable-DETR + FPN backbone + the deformable-attention op (CPU + CUDA)
 ├── dataloader/     dataset, normalization, and the training-time distortions
 ├── loss/ matcher/ metrics/ learner/   Hungarian matching · combined loss · FastAI wrapper
 ├── simulate.py     exact spin-Hamiltonian spectrum simulator (powers the Simulate tab)
 ├── distort.py      deterministic per-effect wrapper over the training-time augmentations
-├── inference.py    run() — the forward pass;  postprocess.py — decode_predictions()
+├── inference.py    run(), the forward pass · postprocess.py, decode_predictions()
 └── visualization.py  static matplotlib renderer (predict.py --plot / figure exports)
 app.py              Gradio GUI entry point (kept at repo root for Hugging Face Spaces)
-app_ui/             GUI-support imported by app.py — plotting.py (interactive Plotly) · theme.py (branding/CSS)
-scripts/            CLIs — predict · evaluate_experimental · evaluate_synthetic · aggregate_experimental
+app_ui/             GUI support imported by app.py: plotting.py (interactive Plotly) · theme.py (branding/CSS)
+scripts/            CLIs: predict · evaluate_experimental · evaluate_synthetic · aggregate_experimental
                     · simulate_and_predict · quick_validation
 conf/               Hydra YAML configs (training)
 structured_output/  committed experimental ground-truth metadata (the paper's headline numbers)
@@ -187,11 +187,11 @@ tests/              pytest suite (unit · e2e · browser tiers)
 
 There are three ways in, from zero-effort to full control:
 
-**1. No install — the GUI in Colab.** The [▶ interactive Colab app](https://colab.research.google.com/github/smidooo/MolDeTr/blob/main/notebooks/MolDeTr_colab_demo.ipynb)
-launches the same point-and-click GUI — drop a `.npz`/`.npy` window in; it shows the assignment table +
-annotated plot and validates the input for you — or run it locally with `python app.py`.
+**1. No install: the GUI in Colab.** The [▶ interactive Colab app](https://colab.research.google.com/github/smidooo/MolDeTr/blob/main/notebooks/MolDeTr_colab_demo.ipynb)
+launches the same point-and-click GUI. Drop a `.npz`/`.npy` window in and it shows the assignment table and
+the annotated plot, validating the input for you. Or run it locally with `python app.py`.
 
-**2. One line — `predict.py`.** With the checkpoint in place:
+**2. One line: `predict.py`.** With the checkpoint in place:
 ```bash
 python scripts/predict.py --input your_window.npz --plot
 # → per multiplet: proton count · δ (ppm/Hz) · max J (Hz) · line width · confidence, and an annotated PNG
@@ -231,16 +231,16 @@ cd MolDeTr
 conda env create -f environment.yml
 conda activate moldetr
 ```
-Prefer pip? `pip install -e ".[app]"` (add `dev` for the tests, `eval` for `evaluate_synthetic.py`).
+If you prefer pip: `pip install -e ".[app]"` (add `dev` for the tests, `eval` for `evaluate_synthetic.py`).
 For **bit-exact** reproduction of the training environment (CUDA 11.7, linux-64), use the explicit lockfile:
 `conda create --name moldetr --file requirements-lock-linux64.txt`.
 
 **CPU-only:** remove the `pytorch-cuda` line from `environment.yml` first (or install CPU PyTorch with pip).
-Inference then uses the pure-PyTorch fallback of the deformable-attention op — no CUDA, no compilation.
+Inference then uses the pure-PyTorch fallback of the deformable-attention op: no CUDA, no compilation.
 
 **Supported versions:** Python 3.10–3.12 (newer versions may lack compatible PyTorch wheels). The
-`fastai>=2.7,<2.8` pin — required so `learner.load()` works — caps PyTorch at 2.6; this is a downgrade
-from the latest release but is benign for CPU inference.
+`fastai>=2.7,<2.8` pin (required so `learner.load()` works) caps PyTorch at 2.6; that is a downgrade
+from the latest release, but it is benign for CPU inference.
 
 ### 2. (GPU only) Build the deformable-attention op
 ```bash
@@ -248,7 +248,7 @@ cd moldetr/model/ops
 bash make.sh            # or: python setup.py build install
 cd ../../..
 ```
-Optional for CPU inference — the model falls back to `ms_deform_attn_core_pytorch` when the extension is absent.
+Optional for CPU inference: the model falls back to `ms_deform_attn_core_pytorch` when the extension is absent.
 
 ### 3. Smoke test
 ```bash
@@ -264,8 +264,8 @@ checkpoint straight into `moldetr/model/` (where `conf/config_big.yaml` expects 
 python scripts/download_weights.py   # downloads + MD5-verifies model_spin_system_ABCDEFG_exp2.pth (~974 MB)
 ```
 
-Or fetch it from **[Hugging Face](https://huggingface.co/smidooo/moldetr)** — a byte-identical mirror
-(`huggingface-cli download smidooo/moldetr model_spin_system_ABCDEFG_exp2.pth --local-dir moldetr/model`) —
+Or fetch it from **[Hugging Face](https://huggingface.co/smidooo/moldetr)**, a byte-identical mirror
+(`huggingface-cli download smidooo/moldetr model_spin_system_ABCDEFG_exp2.pth --local-dir moldetr/model`),
 or download it from the Zenodo record by hand and place it in `moldetr/model/`
 (`paths.model_folder_save`, `lognames.best_model_file`).
 
@@ -289,7 +289,9 @@ python scripts/evaluate_synthetic.py device.device_name=cpu   # force CPU on a b
 python scripts/predict.py --demo                                     # synthetic smoke run (checkpoint only)
 python scripts/predict.py --input examples/roi_S8_example.npz --plot   # a real ROI; ppm read from the .npz
 ```
-Add `--input your_window.npz` for your own data. The `--plot` flag writes the annotated figure shown above.
+Add `--input your_window.npz` for your own data. The `--plot` flag writes the annotated figure shown above;
+when the input file carries `ground_truth` annotations (the ROI examples do), they are overlaid as dashed
+reference lines.
 
 After `pip install -e .` these are also available as one command: `moldetr predict …`, `moldetr app`,
 `moldetr reproduce`, `moldetr download-weights` (run `moldetr --help` for the full list).
@@ -308,7 +310,7 @@ Ready-to-try inputs are in [`examples/`](examples/).
 
 <details><summary>Static screenshot (full detail)</summary>
 
-![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, Paper/GitHub/Scope links) over a two-pane layout — an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
+![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, Paper/GitHub/Scope links) over a two-pane layout with an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
 
 </details>
 
@@ -334,14 +336,14 @@ contributes two regions, S5 and S5_R2), spanning 10 compounds at 80–600 MHz.
 `aggregate_experimental.py` reads the article's Hungarian-matched pairs
 (`structured_output/experimental_matched_pairs.json`) and reproduces all three headline numbers exactly:
 median |Δδ| = 0.90 Hz, median |ΔJ| = 0.20 Hz, and overall proton-count accuracy = 93.5 % (matched-only
-92.1 %). "Overall" is the DETR-style figure — matched-correct plus correctly-empty queries, over all
+92.1 %). "Overall" is the DETR-style figure: matched-correct plus correctly-empty queries, over all
 queries. Two decode paths exist, and this matters for J. The committed path (`structured_output` +
-`aggregate_experimental.py`) inverts the article's exact coupling post-processing — these are the
+`aggregate_experimental.py`) inverts the article's exact coupling post-processing; these are the
 paper's numbers. The live tools (`predict.py`, the GUI, `evaluate_experimental.py`) instead report a
 single **largest coupling, max(J)**, per multiplet (the coupling head emits a permutation-invariant
 embedding `[sum, min, max, std]`, and the demo surfaces only its max component). The live path
 **reproduces the paper's proton counts, shifts, and largest coupling `max J`**; the committed path
-additionally recovers the *full* coupling set per multiplet (the exact E⁻¹) — that is the only
+additionally recovers the *full* coupling set per multiplet (the exact E⁻¹). That is the only
 difference. Predictions can deviate for inputs outside the trained regime. (The live tools also inject the same calibrated input noise the
 model was trained and evaluated with; see [Scope](docs/SCOPE.md).)
 
@@ -350,10 +352,10 @@ model was trained and evaluated with; see [Scope](docs/SCOPE.md).)
 > synthetic figures. The experimental numbers above reproduce exactly.
 
 ## Platform and hardware
-- **CPU (any OS):** works out of the box — the deformable-attention op falls back to pure PyTorch, so no
+- **CPU (any OS):** works out of the box. The deformable-attention op falls back to pure PyTorch, so no
   CUDA build is needed for inference, the tests, or `predict.py`.
 - **NVIDIA GPU:** optional; build the CUDA op (`moldetr/model/ops/`) for faster training and inference.
-- **Apple Silicon:** CPU or MPS — install without `pytorch-cuda`; `device.device_name=cuda` falls back to
+- **Apple Silicon:** CPU or MPS. Install without `pytorch-cuda`; `device.device_name=cuda` falls back to
   `mps` then `cpu`.
 - **Windows:** supported for inference and the test suite; the Linux `file_system` sharing strategy is
   skipped automatically.
@@ -371,12 +373,12 @@ New to one side of this? These are the terms that matter.
 | **multiplet** | a peak split into sub-peaks by coupling (singlet, doublet, triplet, …) |
 | proton count | number of equivalent protons giving rise to the multiplet |
 | **spin system** | a set of mutually coupled protons |
-| **ROI** | region of interest — one analysed window of the spectrum |
+| **ROI** | region of interest: one analysed window of the spectrum |
 
 | ML | Meaning |
 |---|---|
 | object detection / **box** | here, a 1D interval on the ppm axis marking one multiplet |
-| **DETR** | detection transformer — predicts a *set* of objects, no hand-tuned peak-picking |
+| **DETR** | detection transformer: predicts a *set* of objects, no hand-tuned peak-picking |
 | deformable attention | attention that samples a few relevant points, so it scales to long signals |
 | object **query** | a learned slot that becomes one predicted multiplet (or "nothing") |
 | Hungarian matching | optimal prediction-to-ground-truth assignment, used in training |
@@ -385,7 +387,7 @@ New to one side of this? These are the terms that matter.
 ## FAQ
 
 **"Spectrum has N points, but MolDeTr needs exactly 6144."** Your window is the wrong size. Resample it to
-5.12 points/Hz over a 1200 Hz region and pad/crop to 6144 points — see
+5.12 points/Hz over a 1200 Hz region and pad/crop to 6144 points; see
 [`docs/INPUT_FORMAT.md`](docs/INPUT_FORMAT.md).
 
 **"Checkpoint not found."** Download `model_spin_system_ABCDEFG_exp2.pth` from
@@ -400,10 +402,10 @@ A GPU only speeds up training and large batches.
 **A multiplet came out wrong at the edge of my window.** Its coupling partner is probably outside the
 window. Widen or re-centre the region so the whole spin system is inside it (≤ 1200 Hz).
 
-**How many multiplets can it find at once?** Up to **10 equivalent-spin groups** per 1200 Hz window —
-an engineering limit, not a physical one. Split a busier region into several windows.
+**How many multiplets can it find at once?** Up to **10 equivalent-spin groups** per 1200 Hz window,
+an engineering limit rather than a physical one. Split a busier region into several windows.
 
-**Can it do ¹³C, 2D, or mixtures?** No — 1-D ¹H only, one clean compound per spectrum. Water/solvent
+**Can it do ¹³C, 2D, or mixtures?** No. 1-D ¹H only, one clean compound per spectrum. Water/solvent
 suppression, mixtures, and non-¹³C heteronuclear artifacts are out of scope; see
 [`docs/SCOPE.md`](docs/SCOPE.md). The 4H and 6H proton classes exist in training but were not tested
 on real spectra.
@@ -411,7 +413,7 @@ on real spectra.
 **How accurate is the coupling (J)?** The live `predict.py`/GUI reproduce the
 paper's largest coupling `max J` closely (e.g. vanillin `max J` 8.2/2.0/8.7 vs 8.1/2.0/8.1 Hz). `max J`
 is only the *largest* coupling per multiplet; the committed `structured_output` path recovers the full set
-(the paper's per-coupling 0.20 Hz median). Predictions can deviate for inputs outside the trained regime —
+(the paper's per-coupling 0.20 Hz median). Predictions can deviate for inputs outside the trained regime;
 see [Scope → coupling constants](docs/SCOPE.md#about-the-coupling-constants).
 
 ## How to cite
@@ -432,7 +434,7 @@ Cite the **article** as the primary reference:
 
 For the **software**, use the Zenodo concept DOI `10.5281/zenodo.21214876` (it resolves to the latest
 release). For the **data**, use the Zenodo concept DOI `10.5281/zenodo.21217101` (it resolves to the latest
-dataset version). Machine-readable metadata is in [`CITATION.cff`](CITATION.cff) — GitHub's "Cite this repository"
+dataset version). Machine-readable metadata is in [`CITATION.cff`](CITATION.cff); GitHub's "Cite this repository"
 button uses it.
 
 ## Availability
@@ -455,7 +457,7 @@ Corresponding authors: Nicolas Schmid (<nicolas.schmid.research@gmail.com>, ORCI
 reports, an [issue](https://github.com/smidooo/MolDeTr/issues/new/choose) is often fastest.
 
 ## Acknowledgements
-Supported by Innosuisse — Swiss Innovation Agency (Grant No. 2155007318).
+Supported by Innosuisse – Swiss Innovation Agency (Grant No. 2155007318).
 
 ## Star history
 
