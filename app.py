@@ -80,9 +80,19 @@ EXAMPLES_DIR = ROOT / "examples"
 
 
 def _is_bundled_example(path: Path) -> bool:
-    """True only for a file that ships inside this repo's ``examples/`` directory."""
+    """True only for a file that ships inside this repo's ``examples/`` directory.
+
+    Relative paths resolve against ``ROOT``, **not** the process CWD. ``build_ui()`` wires the
+    examples as relative paths (``"examples/roi_S10_example.npz"``), so a CWD-relative resolution
+    silently disarms the gate whenever the app is launched from another directory — invisible
+    today only because no bundled example needs pickle.
+
+    This cannot widen the gate: a relative path can only resolve inside ``examples/`` if such a
+    file actually ships there, and uploads always arrive as absolute temp paths.
+    """
     try:
-        return path.resolve().is_relative_to(EXAMPLES_DIR)
+        candidate = path if path.is_absolute() else ROOT / path
+        return candidate.resolve().is_relative_to(EXAMPLES_DIR)
     except (OSError, ValueError):  # unresolvable path (broken link, bad drive) → not ours
         return False
 
@@ -232,9 +242,15 @@ _EXPORT_DIR: str | None = None
 def _export_dir() -> str:
     """One temp directory per process, reused by every Detect click.
 
-    `mkdtemp` *per click* leaked a directory on every detection — unbounded on a Space that stays
-    up for weeks. The two export files are overwritten in place instead, which also means a stale
-    download link can never serve a previous run's numbers.
+    `mkdtemp` *per click* leaked a directory on every detection — unbounded on a process that
+    stays up for weeks. The two export files are overwritten in place instead.
+
+    Reusing one path looks like it should let a later detection hand an earlier user someone
+    else's numbers, but it cannot: ``gr.DownloadButton`` copies the file into Gradio's own
+    **content-addressed** cache when the event returns, so the link a user holds points at a hash
+    of the bytes they were shown, not at this file. Verified in
+    ``test_download_links_are_content_addressed_so_the_shared_dir_is_safe`` — which exists
+    precisely so a future Gradio that served this path directly would fail loudly here.
     """
     global _EXPORT_DIR
     if _EXPORT_DIR is None or not os.path.isdir(_EXPORT_DIR):
