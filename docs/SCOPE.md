@@ -27,7 +27,8 @@ The README carries a short summary; the detail lives here.
 - **Proton-count classes 1, 2, 3, 4, 6.**
 - Experimental medians (reproduced from the committed matched pairs): chemical-shift median absolute
   error (MedAE) **0.90 Hz**, coupling MedAE **0.20 Hz**, overall proton-count accuracy **93.5 %**
-  (per-class 97 % / 88.75 % / 75 % for 1H / 2H / 3H). (0.90 Hz is the aggregate/reproduced figure used
+  (per-class 97 % / 88.75 % / 75 % for 1H / 2H / 3H; 88.75 % is 71 of 80, which the benchmark figure
+  rounds to 89 %). (0.90 Hz is the aggregate/reproduced figure used
   throughout; the README's *Reproducing the paper* section explains how it relates to the value printed
   in the article.)
 
