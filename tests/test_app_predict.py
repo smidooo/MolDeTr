@@ -236,18 +236,51 @@ def test_downloads_enabled_and_parse(patch_model, tmp_npz, valid_spectrum):
 
 @pytest.mark.unit
 def test_repeated_detections_reuse_one_export_directory(patch_model, tmp_npz, valid_spectrum):
-    """`mkdtemp` *per click* leaked a directory on every detection — unbounded on a Space that
+    """`mkdtemp` *per click* leaked a directory on every detection — unbounded on a process that
     stays up for weeks, and invisible locally where you click twice and quit.
     """
     app = patch_model
     path = _valid_npz_with_ppm(tmp_npz, valid_spectrum)
 
-    parents = set()
     for _ in range(3):
-        _t, _f, _m, csv_btn, _json_btn = app.predict_ui(path, 0.3, app.AUTO, None, None, 5.12)
-        parents.add(Path(_download_path(csv_btn)).parent)
+        app.predict_ui(path, 0.3, app.AUTO, None, None, 5.12)
 
-    assert len(parents) == 1, f"one export dir per process expected, got {len(parents)}"
+    assert app._export_dir() == app._export_dir()  # one dir, reused
+
+
+@pytest.mark.unit
+def test_download_links_are_content_addressed_so_the_shared_dir_is_safe(
+    patch_model, make_fake_model, tmp_npz, valid_spectrum, monkeypatch
+):
+    """Pins the assumption that makes one reused export path safe.
+
+    Reusing a fixed filename *looks* like a data-mixing bug — a later detection overwrites the
+    file an earlier user is about to download. It is not, because ``gr.DownloadButton`` copies
+    the file into Gradio's **content-addressed** cache when the event returns: the link a user
+    holds is a hash of the bytes they were shown.
+
+    That is an assumption about Gradio, not about this code, so it deserves a test rather than a
+    comment. If a future Gradio served the source path directly, the shared directory would
+    become a real bug — and this test is what would notice.
+    """
+    app = patch_model
+    path = _valid_npz_with_ppm(tmp_npz, valid_spectrum)
+
+    _t, _f, _m, csv_a, _j = app.predict_ui(path, 0.3, app.AUTO, None, None, 5.12)
+    served_a = _download_path(csv_a)
+    rows_a = Path(served_a).read_text(encoding="utf-8")
+
+    # A second detection with *different* results overwrites the shared source file.
+    monkeypatch.setattr(app, "_MODEL", make_fake_model([{"proton": 2, "center_frac": 0.3}]))
+    _t, _f, _m, csv_b, _j = app.predict_ui(path, 0.3, app.AUTO, None, None, 5.12)
+    served_b = _download_path(csv_b)
+
+    assert served_a != served_b, "distinct results were served from the same path"
+    assert Path(served_a).exists(), "the earlier download link stopped resolving"
+    assert Path(served_a).read_text(encoding="utf-8") == rows_a, (
+        "the earlier link now serves the later detection's numbers — the shared export directory "
+        "is no longer safe and _export_dir() must go back to a unique path per detection"
+    )
 
 
 @pytest.mark.unit

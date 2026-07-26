@@ -58,6 +58,30 @@ def test_only_paths_inside_examples_are_trusted(app_module, tmp_path, example_pa
 
 
 @pytest.mark.unit
+def test_trust_gate_does_not_depend_on_the_working_directory(app_module, monkeypatch, tmp_path):
+    """`build_ui()` wires examples as the RELATIVE path "examples/roi_S8_example.npz", so
+    resolving against the process CWD makes the gate depend on where the app was launched from.
+
+    Launching as `python /abs/path/to/MolDeTr/app.py` from elsewhere silently marks every bundled
+    example untrusted. That is invisible today only because no bundled example needs pickle — which
+    is exactly why it would surface as a mystery the day one does.
+    """
+    relative = Path("examples/roi_S8_example.npz")
+    monkeypatch.chdir(tmp_path)
+    assert app_module._is_bundled_example(relative), (
+        "a bundled example stopped being trusted purely because the CWD changed"
+    )
+
+
+@pytest.mark.unit
+def test_a_relative_path_outside_examples_is_still_untrusted(app_module, monkeypatch, tmp_path):
+    """Resolving relative paths against the repo root must not widen the gate."""
+    monkeypatch.chdir(tmp_path)
+    assert not app_module._is_bundled_example(Path("uploaded.npz"))
+    assert not app_module._is_bundled_example(Path("../examples/roi_S8_example.npz"))
+
+
+@pytest.mark.unit
 def test_npz_spec_only_has_no_calibration(app_module, tmp_npz, valid_spectrum):
     _arr, cal = app_module._load(tmp_npz(spec=valid_spectrum))
     assert cal == {}
