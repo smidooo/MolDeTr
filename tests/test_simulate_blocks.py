@@ -171,6 +171,35 @@ def test_an_upper_triangle_matrix_blocks_the_same_as_a_symmetric_one() -> None:
 
 
 @pytest.mark.unit
+def test_the_lower_triangle_is_ignored_by_blocking_and_by_simulation_alike() -> None:
+    """ "Only the upper triangle is read" has to mean the same thing to both, or they disagree.
+
+    `simulate` builds its Hamiltonian from `couplings[i, j]` with `i < j`, so a coupling written
+    *below* the diagonal is simply not there. `coupling_blocks` must reach the same verdict — if it
+    symmetrised the whole matrix instead of the upper half, it would fuse spins into one block that
+    `simulate` then simulates uncoupled, and the two halves of the pipeline would describe different
+    spin systems.
+
+    So this is not a claim that the lower triangle *should* be read. It pins that both sides ignore
+    it, which is what makes the upper triangle a usable contract for a matrix editor.
+    """
+    below_only = np.zeros((2, 2))
+    below_only[1, 0] = 12.0
+    empty = np.zeros((2, 2))
+
+    assert coupling_blocks(below_only) == coupling_blocks(empty) == [[0], [1]]
+
+    shifts, widths = [3.50, 3.60], [1.0, 1.0]
+    from_below, _ = simulate_systems(
+        shifts, below_only, widths, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS
+    )
+    from_empty, _ = simulate_systems(
+        shifts, empty, widths, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS
+    )
+    assert np.allclose(from_below, from_empty, atol=1e-12)
+
+
+@pytest.mark.unit
 def test_a_j_matrix_too_small_for_the_shifts_is_rejected() -> None:
     """An undersized J matrix must not silently define how many spins exist.
 
