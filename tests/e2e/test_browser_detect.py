@@ -38,5 +38,5 @@ def test_example_to_detection_journey(page: Page, served_app_url):
 def test_tab_switch_to_simulate(page: Page, served_app_url):
     page.goto(served_app_url)
     page.get_by_role("tab", name="Simulate").click()
-    # the Simulate phenotype control is present once the tab is active
-    expect(page.get_by_label("Phenotype")).to_be_visible()
+    # the spin matrix is the Simulate tab's input, and it is present once the tab is active
+    expect(page.locator("#sim-matrix")).to_be_visible()

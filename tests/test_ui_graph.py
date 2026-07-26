@@ -15,14 +15,30 @@ import inspect
 
 import pytest
 
-N_COMPONENTS = 56  # every Block in the graph (rows/columns/tabs included, not just inputs)
-N_EVENTS = (
-    6  # load_example · _spec_report ×2 · predict_ui · _phenotype_defaults · simulate_and_detect
-)
+#: Unchanged across the matrix rebuild by coincidence, not by stasis: the shift textbox, the two
+#: number boxes and their row went away, and a spin-count slider, two dataframes and a hint line
+#: arrived. `gr.State` holds the simulation cache but is not itself a Block.
+N_COMPONENTS = 56
+#: load_example · _spec_report ×2 · predict_ui · preset_grid · resize_spin_matrix ·
+#: simulate_to_state · redistort ×6. Gradio derives an endpoint id for *every* wiring, so the six
+#: re-distort handlers are named one per control — `api_name=False` becomes the literal "false",
+#: "false_1", ..., which is the auto-derived surface these tests exist to prevent.
+N_EVENTS = 13
 
 # elem_ids the CSS and the browser tests address by name. `md-check`/`md-plot` carry no CSS rule of
 # their own (see the L7 exclusion list) but are still selector anchors for the e2e suite.
-EXPECTED_ELEM_IDS = {"md-check", "md-examples", "md-file", "md-plot", "md-ppm", "md-table"}
+EXPECTED_ELEM_IDS = {
+    "md-check",
+    "md-examples",
+    "md-file",
+    "md-plot",
+    "md-ppm",
+    "md-table",
+    "sim-matrix",
+    "sim-nspins",
+    "sim-preset",
+    "sim-widths",
+}
 
 
 @pytest.fixture(scope="module")
@@ -122,3 +138,25 @@ def test_every_event_is_addressable_over_the_api(demo):
     # the `_1` suffix decided by registration order.
     derived = [n for n in names if n.startswith("_")]
     assert not derived, f"api_names derived from private callbacks: {derived}"
+
+
+@pytest.mark.unit
+def test_editable_dataframes_hand_back_plain_lists(demo):
+    """The Simulate grids must be `type="array"`, not Gradio's default `type="pandas"`.
+
+    The handlers index rows positionally (`row[i + 1]`, since column 0 is the spin label). A pandas
+    component satisfies that shape in every direct-call test — those pass a list of lists in — and
+    then delivers a DataFrame over the wire, where iterating yields *column names*: the first row
+    becomes the string "spin" and the parser reports a character as a bad cell. Only the
+    `gradio_client` tier can see it, so this pins the setting where it is cheap to check.
+    """
+    import gradio as gr
+
+    editable = [
+        b
+        for b in demo.blocks.values()
+        if isinstance(b, gr.Dataframe) and getattr(b, "interactive", None) is not False
+    ]
+    assert editable, "expected the Simulate matrix and width tables"
+    for block in editable:
+        assert block.type == "array", f"{block.elem_id or block} is {block.type!r}"

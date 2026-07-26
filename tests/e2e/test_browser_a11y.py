@@ -157,7 +157,7 @@ def test_results_state_has_no_serious_axe_violations(page: Page, served_app_url:
 def test_simulate_tab_has_no_serious_axe_violations(page: Page, served_app_url: str) -> None:
     page.goto(served_app_url)
     page.get_by_role("tab", name="Simulate").click()
-    expect(page.get_by_label("Phenotype")).to_be_visible()
+    expect(page.locator("#sim-matrix")).to_be_visible()
 
     violations = _violations(page)
     assert not violations, "axe found blocking violations on Simulate:\n" + _format(violations)
