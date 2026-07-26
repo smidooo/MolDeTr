@@ -42,19 +42,19 @@ def test_nan_flagged(app_module, tmp_npz, valid_spectrum):
 @pytest.mark.unit
 def test_complex_flagged_as_recoverable(app_module, tmp_npz, valid_spectrum):
     r = app_module._spec_report(tmp_npz(spec=valid_spectrum.astype(np.complex64)), 5.12)
-    assert "Data type: complex — the real (absorption) part is used" in r
+    assert "Data type: complex; the real (absorption) part is used" in r
 
 
 @pytest.mark.unit
 def test_no_ppm_axis_reported(app_module, tmp_npz, valid_spectrum):
     r = app_module._spec_report(tmp_npz(spec=valid_spectrum), 5.12)
-    assert "ppm axis in file: no — use Manual or None" in r
+    assert "ppm axis in file: no; use Manual or None" in r
 
 
 @pytest.mark.unit
 def test_wrong_resolution_warns(app_module, tmp_npz, valid_spectrum):
     r = app_module._spec_report(tmp_npz(spec=valid_spectrum), 10.0)
-    assert "**614 Hz** window ⚠ not 1200 Hz — predictions may be unreliable" in r
+    assert "**614 Hz** window ⚠ not 1200 Hz, so predictions may be unreliable" in r
 
 
 @pytest.mark.unit
