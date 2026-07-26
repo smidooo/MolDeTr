@@ -172,8 +172,16 @@ def coupling_blocks(
     Two spins share a block when a non-zero coupling connects them, directly or through a chain.
     Uncoupled spins become singleton blocks. Blocks are returned in ascending order of their lowest
     index, and each block's members are sorted, so the result is deterministic.
+
+    Only the upper triangle is read, matching :func:`simulate`, and the matrix is rebuilt
+    symmetrically from it. The walk below scans whole rows, so without that step a matrix filled
+    only above the diagonal — the natural output of an editor whose contract is "fill the upper
+    triangle" — would split into different blocks than the symmetric matrix meaning the same thing.
+    Two spins coupled to a third came out as ``[[0, 2], [1]]`` rather than ``[[0, 1, 2]]``.
     """
-    j = np.asarray(couplings_hz, dtype=float)
+    given = np.asarray(couplings_hz, dtype=float)
+    upper = np.triu(given, 1)
+    j = upper + upper.T
     n = int(j.shape[0])
     seen: set[int] = set()
     blocks: list[list[int]] = []

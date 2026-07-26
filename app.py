@@ -446,10 +446,15 @@ def _simulate_stage(
     Returns a cache dict, or a **string** carrying the user-facing error. The string channel keeps
     the two stages composable into the original single-return-shape callback.
 
-    The cached spectrum is the *clean* one, exactly as ``simulate_systems`` produced it — never a
-    distorted result and never ``np.real`` of something that had an imaginary part. Re-distorting a
-    previously distorted spectrum would compound effects; taking the real part of an analytic signal
-    would silently strip the dispersion that phasing depends on.
+    The cached spectrum is the *clean* one, exactly as ``simulate_systems`` produced it, because
+    re-distorting an already distorted spectrum would compound the effects as a slider is dragged.
+
+    It is **real**: ``simulate_systems`` sums Lorentzian absorption lines and never forms an
+    analytic signal, so there is no dispersion component to preserve or to strip. ``distort``
+    documents a complex input and this path has always handed it a real one, on ``main`` as here, so
+    the phase controls rotate a spectrum with no imaginary part rather than the analytic signal
+    training used. That is a pre-existing limitation of the tab, noted for the distortion pass, not
+    something this cache introduces.
     """
     if not Path(CHECKPOINT).exists():
         return (

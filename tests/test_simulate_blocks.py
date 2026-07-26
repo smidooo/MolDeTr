@@ -139,6 +139,38 @@ def test_spin_count_guard_rejects_an_unsimulatable_block() -> None:
 
 
 @pytest.mark.unit
+def test_an_upper_triangle_matrix_blocks_the_same_as_a_symmetric_one() -> None:
+    """`simulate` documents that only the upper triangle is read, so blocking must agree.
+
+    `coupling_blocks` walks the *full* row, so a matrix filled only above the diagonal used to split
+    differently from the symmetric matrix meaning the same thing. Two spins both coupled to a third
+    came out as `[[0, 2], [1]]` instead of `[[0, 1, 2]]`: the depth-first walk reaches spin 2 from
+    spin 0, then finds nothing in row 2 because `j[2, 1]` is the empty half, and by the time it
+    starts from spin 1 the shared partner is already claimed.
+
+    Nothing hit it before because the only producer, `sp.build_coupling_matrix`, fills both halves.
+    A matrix editor whose contract is "fill the upper triangle" produces exactly this input, and the
+    result is a silently wrong spectrum — a coupled three-spin system simulated as a pair plus a
+    singlet.
+    """
+    symmetric = np.zeros((3, 3))
+    symmetric[0, 2] = symmetric[2, 0] = 7.0
+    symmetric[1, 2] = symmetric[2, 1] = 5.0
+    upper = np.triu(symmetric, 1)
+
+    assert coupling_blocks(upper) == coupling_blocks(symmetric) == [[0, 1, 2]]
+
+    shifts, widths = [7.5, 6.9, 3.5], [1.0] * 3
+    from_upper, _ = simulate_systems(
+        shifts, upper, widths, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS
+    )
+    from_symmetric, _ = simulate_systems(
+        shifts, symmetric, widths, BASE_FREQ_MHZ, LEFT_PPM, RIGHT_PPM, N_POINTS
+    )
+    assert np.allclose(from_upper, from_symmetric, atol=1e-12)
+
+
+@pytest.mark.unit
 def test_a_j_matrix_too_small_for_the_shifts_is_rejected() -> None:
     """An undersized J matrix must not silently define how many spins exist.
 
