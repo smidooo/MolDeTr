@@ -5,8 +5,8 @@ Two tabs share the paper-branded theme (theme.py) and, on Detect, the interactiv
 - **Detect**: load a 1-D ¹H NMR window (.npz/.npy), get the multiplet assignment table + an
   interactive annotated spectrum (drag to box-zoom, double-click resets), with CSV / JSON export.
 - **Simulate**: build a known spin system on the model's grid, optionally add training-range
-  distortions, detect, and compare against ground truth. The Simulate plot stays on matplotlib
-  (``moldetr.visualization.plot_spectrum``); the ground-truth overlay reuses that renderer.
+  distortions, detect, and compare against ground truth. Both tabs render with Plotly
+  (``app_ui.plotting``); the ground-truth comparison uses ``comparison_figure``.
 
 Run locally:
     pip install -e ".[app]"
@@ -40,7 +40,7 @@ import pandas as pd
 from moldetr.distort import distort
 from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
-from moldetr.simulate import simulate
+from moldetr.simulate import simulate_systems
 from moldetr.validation import INPUT_LENGTH, POINTS_PER_HZ, validate_spectrum
 from app_ui.plotting import (  # BRAND: interactive Plotly plots
     assignment_rows,
@@ -308,22 +308,36 @@ def _parse_spin_shifts(text: str, n_expected: int, default: list[float]) -> list
     return vals
 
 
-def _build_gt_groups(
-    shifts: list[float], pairs: list[tuple[int, int, float]], j_hz: float
-) -> list[dict]:
-    """Group equivalent spins into ground-truth multiplets (shift, proton count, max J)."""
-    coupled = {s for pair in pairs for s in pair[:2]}
+def _build_gt_groups(shifts: list[float], couplings_hz) -> list[dict]:
+    """Group equivalent spins into ground-truth multiplets (shift, proton count, max J).
+
+    ``max_j_hz`` is read **per group from the coupling matrix**: the largest coupling from any spin
+    in the group to any spin outside it. Couplings *within* a group are excluded deliberately —
+    equivalent protons may carry a mutual J, but it produces no observable splitting, so reporting it
+    would claim a multiplet the spectrum does not show.
+
+    Groups are ordered down-field first, matching how the spectrum is read and how the comparison
+    table is numbered.
+    """
+    j = np.asarray(couplings_hz, dtype=float)
     groups: dict[float, list[int]] = {}
     for idx, shift in enumerate(shifts):
         groups.setdefault(round(float(shift), 4), []).append(idx)
+
     gt = []
     for shift_val, idxs in sorted(groups.items(), reverse=True):
-        has_coupling = any(i in coupled for i in idxs)
+        members = set(idxs)
+        outside = [
+            abs(float(j[i, k]))
+            for i in idxs
+            for k in range(j.shape[0])
+            if k not in members and abs(float(j[i, k])) > 0.0
+        ]
         gt.append(
             {
                 "shift_ppm": shift_val,
                 "proton_count": len(idxs),
-                "max_j_hz": float(j_hz) if has_coupling else None,
+                "max_j_hz": max(outside) if outside else None,
             }
         )
     return gt
@@ -410,36 +424,37 @@ def _simulate_distort_kwargs(
     return dk
 
 
-def simulate_and_detect(
-    phenotype: str,
-    shifts_text: str,
-    j_hz: float,
-    width_hz: float,
-    add_noise: bool,
-    snr: float,
-    phase0: float,
-    broaden: float,
-    baseline: float,
-    threshold: float,
-):
-    """Simulate the (edited) phenotype, optionally distort, detect, and compare to ground truth."""
+def _simulate_stage(phenotype: str, shifts_text: str, j_hz: float, width_hz: float):
+    """Run the spin dynamics once and return everything the cheap stage needs.
+
+    Returns a cache dict, or a **string** carrying the user-facing error. The string channel keeps
+    the two stages composable into the original single-return-shape callback.
+
+    The cached spectrum is the *clean* one, exactly as ``simulate_systems`` produced it — never a
+    distorted result and never ``np.real`` of something that had an imaginary part. Re-distorting a
+    previously distorted spectrum would compound effects; taking the real part of an analytic signal
+    would silently strip the dispersion that phasing depends on.
+    """
     if not Path(CHECKPOINT).exists():
         return (
-            None,
-            None,
             f"Checkpoint not found at `{CHECKPOINT}`. "
-            "Download it from Zenodo (10.5281/zenodo.21217102) into `moldetr/model/`.",
+            "Download it from Zenodo (10.5281/zenodo.21217102) into `moldetr/model/`."
         )
     pheno = sp.PHENOTYPES[phenotype]
     n_spins = len(pheno["shifts_ppm"])
     try:
         shifts = _parse_spin_shifts(shifts_text, n_spins, pheno["shifts_ppm"])
     except ValueError as exc:
-        return None, None, f"Invalid shifts: {exc}"
+        return f"Invalid shifts: {exc}"
     pairs = [(i, j, float(j_hz)) for (i, j, _j0) in pheno["couplings"]]
     couplings = sp.build_coupling_matrix(n_spins, pairs)
     try:
-        spectrum, ppm_axis = simulate(
+        # simulate_systems, not simulate: it splits the coupling matrix into independent blocks,
+        # simulates each on a per-proton scale and sums them, so several spin systems in one window
+        # keep the right relative integrals (one proton = one unit of area, everywhere). The default
+        # "peak" rescale then restores max = 1 before distortion, which is what the distortion
+        # magnitudes are calibrated against.
+        spectrum, ppm_axis = simulate_systems(
             shifts,
             couplings,
             [float(width_hz)] * n_spins,
@@ -448,12 +463,37 @@ def simulate_and_detect(
             sp.RIGHT_PPM,
             sp.N_POINTS,
         )
-        dk = _simulate_distort_kwargs(add_noise, snr, phase0, broaden, baseline)
-        if dk:
-            spectrum = distort(spectrum, ppm_axis, **dk)
+    except ValueError as exc:
+        return f"Invalid parameters: {exc}"
+    return {
+        "phenotype": phenotype,
+        "spectrum": spectrum,
+        "ppm_axis": ppm_axis,
+        "gt_groups": _build_gt_groups(shifts, couplings),
+    }
+
+
+def _distorted_amplitudes(cache: dict, add_noise, snr, phase0, broaden, baseline):
+    """Apply the distortions to the cached clean spectrum and return real amplitudes.
+
+    Pure with respect to ``cache``: ``distort`` copies its input, and nothing here writes back, so
+    dragging a slider re-distorts the original rather than compounding onto the last result.
+    """
+    spectrum = cache["spectrum"]
+    dk = _simulate_distort_kwargs(add_noise, snr, phase0, broaden, baseline)
+    if dk:
+        spectrum = distort(spectrum, cache["ppm_axis"], **dk)
+    return np.asarray(np.real(spectrum), dtype=float)
+
+
+def _detect_stage(cache: dict, add_noise, snr, phase0, broaden, baseline, threshold):
+    """Distort, detect and compare — everything that must re-run when a slider moves, and no more."""
+    try:
+        amplitudes = _distorted_amplitudes(cache, add_noise, snr, phase0, broaden, baseline)
     except ValueError as exc:
         return None, None, f"Invalid parameters: {exc}"
-    amplitudes = np.asarray(np.real(spectrum), dtype=float)
+    phenotype = cache["phenotype"]
+    gt_groups = cache["gt_groups"]
     preds = decode_predictions(
         run(_get_model(), amplitudes),
         load_extrema(EXTREMA),
@@ -462,7 +502,6 @@ def simulate_and_detect(
         ppm_right=sp.RIGHT_PPM,
         threshold=threshold,
     )
-    gt_groups = _build_gt_groups(shifts, pheno["couplings"], j_hz)
     matched = sp.match_to_gt(gt_groups, preds)
     matched_ids = {id(p) for _g, p in matched if p is not None}
     spurious = [p for p in preds if id(p) not in matched_ids]
@@ -484,6 +523,29 @@ def simulate_and_detect(
         "tolerance and **amber** when off. Missed GT and spurious peaks are outlined in red."
     )
     return table, fig, msg
+
+
+def simulate_and_detect(
+    phenotype: str,
+    shifts_text: str,
+    j_hz: float,
+    width_hz: float,
+    add_noise: bool,
+    snr: float,
+    phase0: float,
+    broaden: float,
+    baseline: float,
+    threshold: float,
+):
+    """Simulate the (edited) phenotype, optionally distort, detect, and compare to ground truth.
+
+    Kept as the single-call entry point (the Gradio event and the gradio_client API both address it)
+    and now a thin composition of the two stages, so the one-shot and cached paths cannot drift.
+    """
+    cache = _simulate_stage(phenotype, shifts_text, j_hz, width_hz)
+    if isinstance(cache, str):
+        return None, None, cache
+    return _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
 
 
 CONTRACT = (
