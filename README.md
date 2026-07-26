@@ -148,7 +148,7 @@ and, if so, its position and parameters. Training matches predictions to ground 
 algorithm, so the model learns set prediction directly and needs no hand-tuned peak-picking. Detection at
 inference is a single pass; the parameters come straight from the matched queries. The op that makes the
 attention practical on long 1D signals has a compiled CUDA kernel and a pure-PyTorch fallback, so inference
-runs on CPU with no build step. The terms above are defined in the [glossary](#glossary-nmr--ml).
+runs on CPU with no build step. Key terms are defined in the [glossary](#glossary-nmr--ml).
 
 The network in full: an FPN backbone, a deformable-attention transformer with a fixed set of object
 queries, and per-query heads matched to ground truth by the Hungarian algorithm at training time.
