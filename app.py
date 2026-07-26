@@ -322,10 +322,21 @@ def _build_gt_groups(
     equivalent protons may carry a mutual J, but it produces no observable splitting, so reporting it
     would claim a multiplet the spectrum does not show.
 
+    Spins are grouped by **shift alone**, deliberately, and not by coupling block. Ground truth here
+    describes what the spectrum shows, because it is compared against a detector that sees only the
+    spectrum: protons sharing a shift produce one peak carrying their combined area whether or not a
+    coupling connects them. Grouping by block would split a methoxy — three equivalent uncoupled
+    protons — into three 1H multiplets where the spectrum has a single 3H line. See
+    ``tests/test_gt_groups_from_matrix.py`` for the measured case and the one known limitation.
+
     Groups are ordered down-field first, matching how the spectrum is read and how the comparison
     table is numbered.
     """
-    j = np.asarray(couplings_hz, dtype=float)
+    given = np.asarray(couplings_hz, dtype=float)
+    # Mirror `coupling_blocks`: the upper triangle is the contract, so both read the same couplings.
+    upper = np.triu(given, 1)
+    j = upper + upper.T
+
     groups: dict[float, list[int]] = {}
     for idx, shift in enumerate(shifts):
         groups.setdefault(round(float(shift), 4), []).append(idx)
