@@ -101,6 +101,55 @@ def test_predict_reads_moldetr_checkpoint_env():
 
 
 @pytest.mark.unit
+def test_load_input_returns_ground_truth_from_roi_npz():
+    """load_input surfaces the ground truth stored in a ROI npz (feeds the dashed overlay)."""
+    from scripts.predict import load_input
+
+    amplitudes, cal, ground_truth = load_input(str(REPO / "examples" / "roi_S8_example.npz"))
+    assert amplitudes.ndim == 1 and amplitudes.size > 0
+    assert cal.get("ppm_left") is not None
+    assert ground_truth, "the bundled ROI example carries ground_truth"
+    assert all("chemical_shift_in_points" in g for g in ground_truth)
+
+
+@pytest.mark.unit
+def test_predict_plot_hands_ground_truth_to_the_renderer(tmp_path, monkeypatch):
+    """--plot on a ROI file passes the file's ground truth to plot_spectrum (dashed overlay)."""
+    import scripts.predict as predict
+
+    seen = {}
+
+    def fake_plot(*args, **kwargs):
+        seen.update(kwargs)
+        return None, []
+
+    ckpt = tmp_path / "ckpt.pth"
+    ckpt.write_bytes(b"stub")
+    monkeypatch.setattr(predict, "plot_spectrum", fake_plot)
+    monkeypatch.setattr(predict, "build_model", lambda: object())
+    monkeypatch.setattr(predict, "load_checkpoint", lambda model, path: model)
+    monkeypatch.setattr(predict, "run", lambda model, amplitudes: object())
+    monkeypatch.setattr(predict, "decode_predictions", lambda *args, **kwargs: [])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "predict.py",
+            "--input",
+            str(REPO / "examples" / "roi_S8_example.npz"),
+            "--checkpoint",
+            str(ckpt),
+            "--plot",
+            str(tmp_path / "out.png"),
+        ],
+    )
+    predict.main()
+    ground_truth = seen.get("ground_truth")
+    assert ground_truth, "plot_spectrum never received the file's ground truth"
+    assert all("chemical_shift_in_points" in g for g in ground_truth)
+
+
+@pytest.mark.unit
 def test_aggregate_missing_matched_pairs_fails_cleanly():
     """A bad --matched-pairs path gives a friendly message, not a raw traceback."""
     r = _run("scripts/aggregate_experimental.py", "--matched-pairs", "no_such.json")
