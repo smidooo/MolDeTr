@@ -33,7 +33,10 @@ def _ppm() -> np.ndarray:
 _EFFECTS = [
     ("noise_snr_log10", 3.0),
     ("phase0_deg", 5.0),
-    ("phase1", 1.0),
+    # 0.5, not 1.0: on the 8 ppm _ppm() axis the enforced bound is exactly 8/8 = 1.0, so 1.0 passes
+    # only because _check_range is inclusive. Widening the fixture would then break these two
+    # unrelated parametrized tests. 0.5 keeps margin and still perturbs the spectrum.
+    ("phase1", 0.5),
     ("baseline", True),
     ("baseline", 0.05),
     ("sat_j_hz", 130.0),
@@ -125,6 +128,85 @@ def test_out_of_range_raises(kwargs: dict[str, float]) -> None:
     spec, ppm = _spectrum(), _ppm()
     with pytest.raises(ValueError):
         distort(spec, ppm, **kwargs)
+
+
+def test_phase1_outside_trained_range_raises() -> None:
+    """``phase1`` is range-checked like every other knob.
+
+    Training drew it from ``uniform(-8/ppm_width, +8/ppm_width)``
+    (``data_augmentation.add_phase_distortion``, ``phase_1_factor=8.0``), so on this 8 ppm axis the
+    trained range is +-1.0 deg/ppm. Without the check, a wildly out-of-distribution first-order
+    phase sailed through while every neighbouring knob was validated.
+    """
+    spec, ppm = _spectrum(), _ppm()
+    with pytest.raises(ValueError, match="phase1"):
+        distort(spec, ppm, phase1=5.0)
+
+
+def test_non_1d_ppm_axis_raises_a_named_error() -> None:
+    """A column-vector ppm axis fails with a clear message, not a bare numpy TypeError.
+
+    The width is now read from the endpoints on EVERY call, so ``float(ppm[0])`` runs even for
+    effects that never touch the axis. On numpy 2.x that raises
+    ``TypeError: only 0-dimensional arrays can be converted to Python scalars`` for an (N, 1)
+    array -- a shape a CSV load produces easily. The contract is "one ppm value per point", so
+    say so.
+    """
+    spec = _spectrum()
+    column = _ppm().reshape(-1, 1)
+    with pytest.raises(ValueError, match="must be a non-empty 1-D array"):
+        distort(spec, column, noise_snr_log10=3.0)
+    # An empty 1-D axis clears the ndim test but would then hit a bare IndexError.
+    with pytest.raises(ValueError, match="must be a non-empty 1-D array"):
+        distort(spec, np.asarray([]), phase0_deg=1.0)
+
+
+@pytest.mark.parametrize(
+    "axis",
+    [
+        pytest.param(np.full(N, 5.0), id="constant-axis-width-0"),
+        pytest.param(np.asarray([5.0]), id="single-point-axis-width-unknown"),
+        pytest.param(np.asarray([np.nan, 1.0]), id="nan-endpoint-width-nan"),
+    ],
+)
+@pytest.mark.parametrize(
+    "kwargs", [{"phase1": 0.1}, {"baseline": True}], ids=["phase1", "baseline"]
+)
+def test_width_dependent_effects_on_a_degenerate_axis_raise(
+    axis: np.ndarray, kwargs: dict[str, object]
+) -> None:
+    """Width-dependent effects must reject an axis that cannot supply a width.
+
+    ``phase1``'s bound is ``8/ppm_width``; the baseline tilt is
+    ``(ppm - left) / (right - left)``. On a zero-width, single-point or NaN axis both are
+    undefined -- and ``baseline`` used to fail *silently*, returning an all-NaN spectrum (with no
+    warning at all for the NaN axis), which is worse than raising.
+    """
+    spec = _spectrum()
+    with pytest.raises(ValueError, match="positive, finite width"):
+        distort(spec, axis, **kwargs)  # type: ignore[arg-type]
+
+
+def test_width_independent_effects_survive_a_degenerate_axis() -> None:
+    """Effects that never divide by the width still work on a constant axis."""
+    spec = _spectrum()
+    out = distort(spec, np.full(N, 5.0), noise_snr_log10=3.0)
+    assert np.isfinite(out).all()
+
+
+def test_phase1_bound_follows_the_window_width() -> None:
+    """The bound is 8/ppm_width, so the deg/ppm coefficient SHRINKS as the window grows.
+
+    What training capped is the total first-order swing across the window (bound * width = 8
+    degrees), not the coefficient. So the model's own 15 ppm grid allows 8/15 = 0.533 deg/ppm while
+    the narrower 8 ppm axis allows a full 1.0 -- a hardcoded constant would be wrong on one of them.
+    """
+    spec = _spectrum()
+    model_window = np.linspace(14.5, -0.5, N)  # 15 ppm, the model grid -> bound 0.5333
+    distort(spec, model_window, phase1=0.53)  # just inside; must not raise
+    with pytest.raises(ValueError, match="phase1"):
+        distort(spec, model_window, phase1=0.54)  # just outside
+    distort(spec, _ppm(), phase1=0.54)  # same value, narrower 8 ppm window (bound 1.0) -> fine
 
 
 def test_noise_realises_requested_snr() -> None:
