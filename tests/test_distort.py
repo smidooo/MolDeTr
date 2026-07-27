@@ -127,6 +127,34 @@ def test_out_of_range_raises(kwargs: dict[str, float]) -> None:
         distort(spec, ppm, **kwargs)
 
 
+def test_phase1_outside_trained_range_raises() -> None:
+    """``phase1`` is range-checked like every other knob.
+
+    Training drew it from ``uniform(-8/ppm_width, +8/ppm_width)``
+    (``data_augmentation.add_phase_distortion``, ``phase_1_factor=8.0``), so on this 8 ppm axis the
+    trained range is +-1.0 deg/ppm. Without the check, a wildly out-of-distribution first-order
+    phase sailed through while every neighbouring knob was validated.
+    """
+    spec, ppm = _spectrum(), _ppm()
+    with pytest.raises(ValueError, match="phase1"):
+        distort(spec, ppm, phase1=5.0)
+
+
+def test_phase1_bound_follows_the_window_width() -> None:
+    """The bound is 8/ppm_width, not a constant -- a narrower window means a tighter bound.
+
+    The model's own grid is 1200 Hz at 80 MHz = 15 ppm, where the trained bound is 8/15 = 0.533
+    deg/ppm. The same value is comfortably in range on the wider 8 ppm axis, so a hardcoded
+    constant would be wrong in one direction or the other.
+    """
+    spec = _spectrum()
+    narrow = np.linspace(14.5, -0.5, N)  # 15 ppm, the model window -> bound 0.5333
+    distort(spec, narrow, phase1=0.53)  # just inside; must not raise
+    with pytest.raises(ValueError, match="phase1"):
+        distort(spec, narrow, phase1=0.54)  # just outside
+    distort(spec, _ppm(), phase1=0.54)  # same value, wider window -> fine
+
+
 def test_noise_realises_requested_snr() -> None:
     """Noise std matches max(Re) / (2 * 10**log10) to within a loose tolerance."""
     spec, ppm = _spectrum(), _ppm()

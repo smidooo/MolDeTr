@@ -38,7 +38,7 @@ from numpy.typing import NDArray
 from moldetr.distort import distort
 from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
-from moldetr.simulate import simulate
+from moldetr.simulate import simulate_systems
 from moldetr.visualization import plot_spectrum
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -144,7 +144,11 @@ def simulate_phenotype(
         raise KeyError(f"unknown phenotype {name!r}; choose from {sorted(PHENOTYPES)}")
     pheno = PHENOTYPES[name]
     couplings = build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
-    spectrum, ppm_axis = simulate(
+    # simulate_systems, not simulate: a phenotype is several independent spin systems in one
+    # window, and simulate collapses every width to a single mean across all of them. Simulating
+    # the blocks apart keeps each group's own line width and sums them in per-proton space, so
+    # relative integrals across groups are right by construction.
+    spectrum, ppm_axis = simulate_systems(
         pheno["shifts_ppm"],
         couplings,
         pheno["widths_hz"],
