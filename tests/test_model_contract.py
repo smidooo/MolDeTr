@@ -55,7 +55,10 @@ def _vanillin_predictions(model, example_paths, extrema):
     from moldetr.reproducibility import set_seed
     from moldetr.validation import validate_spectrum
 
-    set_seed(42)  # normalize_spectrum injects seeded noise; without this the decode drifts
+    # NB: this does NOT control the injected noise -- normalize_spectrum builds its own
+    # RandomState(noise_seed=0), which global seeding cannot reach. Kept for the torch/numpy
+    # global state the model path touches; the noise realisation is already deterministic.
+    set_seed(42)
     data = np.load(example_paths["roi_S8"], allow_pickle=True)
     axis = np.asarray(data["ppm_axis_padded"], dtype=float)
     amp = validate_spectrum(data["spectrum_padded"], points_per_hz=5.12)
