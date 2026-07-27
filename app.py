@@ -1056,9 +1056,9 @@ def build_ui() -> gr.Blocks:
                             step=0.1,
                             label="Broadening FWHM (Hz; 0 = off)",
                             info=(
-                                "⚠ Outside the model's training distribution: the shipped model was "
-                                "trained without line broadening, so enabling this feeds it an effect "
-                                "it never saw and detection may degrade."
+                                "Within the model's training distribution: the shipped checkpoint "
+                                "saw added line broadening on roughly a third of its training "
+                                "spectra."
                             ),
                         )
                         sim_baseline = gr.Slider(
