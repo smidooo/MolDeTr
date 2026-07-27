@@ -154,23 +154,44 @@ def test_non_1d_ppm_axis_raises_a_named_error() -> None:
     """
     spec = _spectrum()
     column = _ppm().reshape(-1, 1)
-    with pytest.raises(ValueError, match="1-D"):
+    with pytest.raises(ValueError, match="must be a non-empty 1-D array"):
         distort(spec, column, noise_snr_log10=3.0)
+    # An empty 1-D axis clears the ndim test but would then hit a bare IndexError.
+    with pytest.raises(ValueError, match="must be a non-empty 1-D array"):
+        distort(spec, np.asarray([]), phase0_deg=1.0)
 
 
-def test_phase1_on_a_degenerate_axis_raises() -> None:
-    """Supplying ``phase1`` when no bound can be formed is an error, not a silent pass.
+@pytest.mark.parametrize(
+    "axis",
+    [
+        pytest.param(np.full(N, 5.0), id="constant-axis-width-0"),
+        pytest.param(np.asarray([5.0]), id="single-point-axis-width-unknown"),
+        pytest.param(np.asarray([np.nan, 1.0]), id="nan-endpoint-width-nan"),
+    ],
+)
+@pytest.mark.parametrize(
+    "kwargs", [{"phase1": 0.1}, {"baseline": True}], ids=["phase1", "baseline"]
+)
+def test_width_dependent_effects_on_a_degenerate_axis_raise(
+    axis: np.ndarray, kwargs: dict[str, object]
+) -> None:
+    """Width-dependent effects must reject an axis that cannot supply a width.
 
-    ``8/ppm_width`` is undefined for a zero-width or single-point axis. Skipping validation there
-    would let any first-order phase through on exactly the axes where ``phase1 * ppm`` degenerates
-    into a disguised zeroth-order phase.
+    ``phase1``'s bound is ``8/ppm_width``; the baseline tilt is
+    ``(ppm - left) / (right - left)``. On a zero-width, single-point or NaN axis both are
+    undefined -- and ``baseline`` used to fail *silently*, returning an all-NaN spectrum (with no
+    warning at all for the NaN axis), which is worse than raising.
     """
     spec = _spectrum()
-    flat = np.full(N, 5.0)  # constant axis -> width 0
-    with pytest.raises(ValueError, match="phase1"):
-        distort(spec, flat, phase1=0.1)
-    # Effects that do not need the width are unaffected by the degenerate axis.
-    distort(spec, flat, noise_snr_log10=3.0)
+    with pytest.raises(ValueError, match="positive, finite width"):
+        distort(spec, axis, **kwargs)  # type: ignore[arg-type]
+
+
+def test_width_independent_effects_survive_a_degenerate_axis() -> None:
+    """Effects that never divide by the width still work on a constant axis."""
+    spec = _spectrum()
+    out = distort(spec, np.full(N, 5.0), noise_snr_log10=3.0)
+    assert np.isfinite(out).all()
 
 
 def test_phase1_bound_follows_the_window_width() -> None:

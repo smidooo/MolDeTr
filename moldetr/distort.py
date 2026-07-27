@@ -79,28 +79,41 @@ def _validate(
     broaden_hz: float | None,
     *,
     phase1: float | None = None,
+    baseline: bool | float | None = None,
     ppm_width: float | None = None,
 ) -> None:
     """Validate every supplied (non-``None``) parameter against its trained range.
 
     ``phase1`` needs ``ppm_width`` because its trained bound is ``+-8/ppm_width`` rather than a
-    fixed number; it is skipped when the width is unknown or degenerate. Keyword-only so the two
-    late additions cannot be silently mis-ordered against ``distort``'s own signature, where
-    ``phase1`` sits before ``sat_j_hz``.
+    fixed number. Supplying a width-dependent effect without a usable width is an **error, not a
+    skip**: a degenerate axis is exactly where ``phase1 * ppm`` collapses into a disguised
+    ``phase0``, and where the baseline tilt's ``(ppm - left) / (right - left)`` becomes ``0/0`` and
+    silently returns an all-NaN spectrum.
+
+    Keyword-only so the late additions cannot be silently mis-ordered against ``distort``'s own
+    signature, where ``phase1`` sits before ``sat_j_hz``.
     """
     if noise_snr_log10 is not None:
         _check_range("noise_snr_log10", noise_snr_log10, *_SNR_LOG10_RANGE)
     if phase0_deg is not None:
         _check_range("phase0_deg", phase0_deg, -_PHASE0_ABS_MAX, _PHASE0_ABS_MAX)
+    # Both effects divide by the window width. `not > 0.0` also catches a NaN width, which would
+    # otherwise reach _check_range and be rejected with a baffling "[nan, nan]" message.
+    width_dependent = [
+        name
+        for name, supplied in (
+            ("phase1", phase1 is not None),
+            ("baseline", baseline is not None and baseline is not False),
+        )
+        if supplied
+    ]
+    if width_dependent and (ppm_width is None or not ppm_width > 0.0):
+        raise ValueError(
+            f"{'/'.join(width_dependent)} needs a ppm axis with a positive, finite width; this "
+            f"axis has none (computed width: {ppm_width!r})."
+        )
     if phase1 is not None:
-        # `not > 0.0` also catches a NaN width, which would otherwise reach _check_range and be
-        # rejected with a baffling "[nan, nan]" message.
-        if ppm_width is None or not ppm_width > 0.0:
-            raise ValueError(
-                f"phase1={phase1!r} needs a ppm axis with non-zero width: its trained bound is "
-                f"{_PHASE1_FACTOR}/ppm_width, which cannot be formed from this axis."
-            )
-        bound = _PHASE1_FACTOR / ppm_width
+        bound = _PHASE1_FACTOR / float(ppm_width)  # type: ignore[arg-type]  # guarded above
         _check_range("phase1", phase1, -bound, bound)
     if sat_j_hz is not None:
         _check_range("sat_j_hz", sat_j_hz, *_SAT_J_RANGE)
@@ -206,8 +219,9 @@ def distort(
     spectrum:
         Complex simulated spectrum. Copied; never mutated in place.
     ppm_axis:
-        ppm value per point; its endpoints supply ``ppm_right``/``ppm_left`` for the phase and
-        baseline effects.
+        ppm value per point; must be a non-empty **1-D** array. Its endpoints supply
+        ``ppm_right``/``ppm_left`` for the phase and baseline effects, and their separation is the
+        window width that bounds ``phase1``.
     noise_snr_log10:
         log10 SNR exponent, 2.0-5.0 (SNR 1e2-1e5). Realised noise std ~= max(Re) / (2 * 10**x).
     phase0_deg:
@@ -232,13 +246,27 @@ def distort(
     -------
     np.ndarray
         The distorted complex spectrum.
+
+    Raises
+    ------
+    ValueError
+        If any supplied parameter is outside its trained range; if ``ppm_axis`` is not a non-empty
+        1-D array; or if a width-dependent effect (``phase1``, ``baseline``) is requested on an axis
+        with no positive finite width. Note the last case is an error where ``main`` previously
+        returned a spectrum -- silently an all-NaN one for ``baseline``.
     """
     ppm = np.asarray(ppm_axis, dtype=np.float64)
     # The width is read from the endpoints on every call now, so float(ppm[0]) runs even for
     # effects that never touch the axis. On numpy 2.x that is a bare TypeError for an (N, 1)
     # column vector; the contract is one ppm value per point, so reject the shape by name.
-    if ppm.ndim != 1:
-        raise ValueError(f"ppm_axis must be 1-D (one ppm value per point), got shape {ppm.shape}.")
+    # `size == 0` is checked too: an empty 1-D axis passes the ndim test but then dies with a bare
+    # `IndexError` from float(ppm[0]) inside _apply_phase/_apply_baseline -- the same unnamed numpy
+    # error at the API boundary this guard exists to remove.
+    if ppm.ndim != 1 or ppm.size == 0:
+        raise ValueError(
+            "ppm_axis must be a non-empty 1-D array (one ppm value per point), "
+            f"got shape {ppm.shape}."
+        )
     _validate(
         noise_snr_log10,
         phase0_deg,
@@ -246,6 +274,7 @@ def distort(
         sat_intensity,
         broaden_hz,
         phase1=phase1,
+        baseline=baseline,
         # Width from the array endpoints, not from _apply_phase's ppm_right/ppm_left arguments:
         # every real caller supplies a descending axis, which makes those two names the reverse of
         # their contents. abs() keeps the bound on the symmetric interval training sampled.
