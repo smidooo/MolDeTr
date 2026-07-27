@@ -49,6 +49,11 @@ _FWHM_PER_SIGMA: float = 2.0 * np.sqrt(2.0 * np.log(2.0))
 # Trained parameter ranges (mirrors data_augmentation defaults / the paper).
 _SNR_LOG10_RANGE = (2.0, 5.0)
 _PHASE0_ABS_MAX = 8.0
+# First-order phase was drawn from uniform(-factor/ppm_width, +factor/ppm_width), so what training
+# actually capped is the TOTAL first-order swing across the window: bound * ppm_width = 8 degrees,
+# whatever the window. The deg/ppm coefficient therefore SHRINKS as the window grows -- 0.533 on the
+# model's own 15 ppm grid, 1.0 on an 8 ppm window. Mirrors add_phase_distortion's phase_1_factor.
+_PHASE1_FACTOR = 8.0
 _SAT_J_RANGE = (40.0, 220.0)
 _SAT_INTENSITY_RANGE = (0.005, 0.015)
 _BROADEN_HZ_RANGE = (0.0, 3.0)
@@ -72,12 +77,44 @@ def _validate(
     sat_j_hz: float | None,
     sat_intensity: float | None,
     broaden_hz: float | None,
+    *,
+    phase1: float | None = None,
+    baseline: bool | float | None = None,
+    ppm_width: float | None = None,
 ) -> None:
-    """Validate every supplied (non-``None``) parameter against its trained range."""
+    """Validate every supplied (non-``None``) parameter against its trained range.
+
+    ``phase1`` needs ``ppm_width`` because its trained bound is ``+-8/ppm_width`` rather than a
+    fixed number. Supplying a width-dependent effect without a usable width is an **error, not a
+    skip**: a degenerate axis is exactly where ``phase1 * ppm`` collapses into a disguised
+    ``phase0``, and where the baseline tilt's ``(ppm - left) / (right - left)`` becomes ``0/0`` and
+    silently returns an all-NaN spectrum.
+
+    Keyword-only so the late additions cannot be silently mis-ordered against ``distort``'s own
+    signature, where ``phase1`` sits before ``sat_j_hz``.
+    """
     if noise_snr_log10 is not None:
         _check_range("noise_snr_log10", noise_snr_log10, *_SNR_LOG10_RANGE)
     if phase0_deg is not None:
         _check_range("phase0_deg", phase0_deg, -_PHASE0_ABS_MAX, _PHASE0_ABS_MAX)
+    # Both effects divide by the window width. `not > 0.0` also catches a NaN width, which would
+    # otherwise reach _check_range and be rejected with a baffling "[nan, nan]" message.
+    width_dependent = [
+        name
+        for name, supplied in (
+            ("phase1", phase1 is not None),
+            ("baseline", baseline is not None and baseline is not False),
+        )
+        if supplied
+    ]
+    if width_dependent and (ppm_width is None or not ppm_width > 0.0):
+        raise ValueError(
+            f"{'/'.join(width_dependent)} needs a ppm axis with a positive, finite width; this "
+            f"axis has none (computed width: {ppm_width!r})."
+        )
+    if phase1 is not None:
+        bound = _PHASE1_FACTOR / float(ppm_width)  # type: ignore[arg-type]  # guarded above
+        _check_range("phase1", phase1, -bound, bound)
     if sat_j_hz is not None:
         _check_range("sat_j_hz", sat_j_hz, *_SAT_J_RANGE)
     if sat_intensity is not None:
@@ -182,14 +219,17 @@ def distort(
     spectrum:
         Complex simulated spectrum. Copied; never mutated in place.
     ppm_axis:
-        ppm value per point; its endpoints supply ``ppm_right``/``ppm_left`` for the phase and
-        baseline effects.
+        ppm value per point; must be a non-empty **1-D** array. Its endpoints supply
+        ``ppm_right``/``ppm_left`` for the phase and baseline effects, and their separation is the
+        window width that bounds ``phase1``.
     noise_snr_log10:
         log10 SNR exponent, 2.0-5.0 (SNR 1e2-1e5). Realised noise std ~= max(Re) / (2 * 10**x).
     phase0_deg:
         Zeroth-order phase in degrees, |.| <= 8.
     phase1:
-        First-order (frequency-dependent) phase coefficient.
+        First-order (frequency-dependent) phase coefficient in deg/ppm. Training capped the total
+        swing across the window at 8 degrees, so the coefficient bound is ``|.| <= 8/ppm_width``
+        (0.533 on the model's own 15 ppm window) and is read from ``ppm_axis`` rather than fixed.
     baseline:
         ``None``/``False`` = off; ``True`` = default tilt; a float = tilt magnitude.
     sat_j_hz:
@@ -206,11 +246,42 @@ def distort(
     -------
     np.ndarray
         The distorted complex spectrum.
+
+    Raises
+    ------
+    ValueError
+        If any supplied parameter is outside its trained range; if ``ppm_axis`` is not a non-empty
+        1-D array; or if a width-dependent effect (``phase1``, ``baseline``) is requested on an axis
+        with no positive finite width. Note the last case is an error where ``main`` previously
+        returned a spectrum -- silently an all-NaN one for ``baseline``.
     """
-    _validate(noise_snr_log10, phase0_deg, sat_j_hz, sat_intensity, broaden_hz)
+    ppm = np.asarray(ppm_axis, dtype=np.float64)
+    # The width is read from the endpoints on every call now, so float(ppm[0]) runs even for
+    # effects that never touch the axis. On numpy 2.x that is a bare TypeError for an (N, 1)
+    # column vector; the contract is one ppm value per point, so reject the shape by name.
+    # `size == 0` is checked too: an empty 1-D axis passes the ndim test but then dies with a bare
+    # `IndexError` from float(ppm[0]) inside _apply_phase/_apply_baseline -- the same unnamed numpy
+    # error at the API boundary this guard exists to remove.
+    if ppm.ndim != 1 or ppm.size == 0:
+        raise ValueError(
+            "ppm_axis must be a non-empty 1-D array (one ppm value per point), "
+            f"got shape {ppm.shape}."
+        )
+    _validate(
+        noise_snr_log10,
+        phase0_deg,
+        sat_j_hz,
+        sat_intensity,
+        broaden_hz,
+        phase1=phase1,
+        baseline=baseline,
+        # Width from the array endpoints, not from _apply_phase's ppm_right/ppm_left arguments:
+        # every real caller supplies a descending axis, which makes those two names the reverse of
+        # their contents. abs() keeps the bound on the symmetric interval training sampled.
+        ppm_width=abs(float(ppm[0]) - float(ppm[-1])) if ppm.size >= 2 else None,
+    )
 
     out = np.array(spectrum, dtype=np.complex128, copy=True)
-    ppm = np.asarray(ppm_axis, dtype=np.float64)
 
     rng_state = np.random.get_state()
     try:
