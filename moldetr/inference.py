@@ -110,8 +110,14 @@ def normalize_spectrum(
     return torch.from_numpy(a).float()[None, None, :]
 
 
-def run(model, amplitudes, noise_seed: int = 0) -> torch.Tensor:
-    """Forward one spectrum; return a flat (n_groups*num_queries, num_classes+num_params) block."""
+def run(model, amplitudes, noise_seed: int = 0, noise_frac: float = 0.005) -> torch.Tensor:
+    """Forward one spectrum; return a flat (n_groups*num_queries, num_classes+num_params) block.
+
+    ``noise_frac`` is forwarded so the in-model noise floor is reachable from the public API. It
+    previously was not: ``normalize_spectrum`` accepted it, but ``run`` neither took nor passed it,
+    so every production caller was pinned to 0.005 and ``docs/SCOPE.md``'s advice to "set
+    ``noise_frac=0``" described an affordance no supported call path offered.
+    """
     with torch.no_grad():
-        out = model(normalize_spectrum(amplitudes, noise_seed=noise_seed))
+        out = model(normalize_spectrum(amplitudes, noise_seed=noise_seed, noise_frac=noise_frac))
     return out[0].reshape(-1, out.shape[-1])

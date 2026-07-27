@@ -128,7 +128,10 @@ def test_predict_plot_hands_ground_truth_to_the_renderer(tmp_path, monkeypatch):
     monkeypatch.setattr(predict, "plot_spectrum", fake_plot)
     monkeypatch.setattr(predict, "build_model", lambda: object())
     monkeypatch.setattr(predict, "load_checkpoint", lambda model, path: model)
-    monkeypatch.setattr(predict, "run", lambda model, amplitudes: object())
+    # **kwargs, not a fixed signature: this double stands in for moldetr.inference.run, and pinning
+    # its parameter list here means any new keyword on the real function fails as a TypeError in an
+    # unrelated plotting test rather than where it belongs.
+    monkeypatch.setattr(predict, "run", lambda model, amplitudes, **kwargs: object())
     monkeypatch.setattr(predict, "decode_predictions", lambda *args, **kwargs: [])
     monkeypatch.setattr(
         sys,
