@@ -160,3 +160,30 @@ def test_editable_dataframes_hand_back_plain_lists(demo):
     assert editable, "expected the Simulate matrix and width tables"
     for block in editable:
         assert block.type == "array", f"{block.elem_id or block} is {block.type!r}"
+
+
+@pytest.mark.unit
+def test_the_matrix_edit_handler_clears_the_cache_and_rebuilds_the_widths(demo):
+    """Assert the wiring, not just that a function exists.
+
+    The first version of this guard called `invalidate_cache()` and checked it returned `None`,
+    which cannot fail while the function is defined: deleting the `.change` wiring outright, and
+    mis-wiring its output to the status box so the cache was never cleared, both left it green. What
+    actually has to hold is that editing the matrix is wired to the state block *and* to the width
+    table, so this reads the built graph.
+    """
+    import gradio as gr
+
+    edit = next(d for d in demo.fns.values() if d.api_name == "matrix_edited")
+    state_ids = {b._id for b in demo.blocks.values() if isinstance(b, gr.State)}
+    widths = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == "sim-widths")
+    matrix = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == "sim-matrix")
+
+    output_ids = {c._id for c in edit.outputs}
+    assert output_ids & state_ids, "a matrix edit must clear the cached spectrum"
+    assert widths._id in output_ids, "a matrix edit must re-derive the line-width table"
+    assert {matrix._id, widths._id} <= {c._id for c in edit.inputs}
+
+    # The width table clears the cache too, and must not be wired to rewrite itself.
+    width_edit = next(d for d in demo.fns.values() if d.api_name == "invalidate_on_width_edit")
+    assert {c._id for c in width_edit.outputs} <= state_ids

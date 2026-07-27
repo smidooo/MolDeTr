@@ -342,12 +342,20 @@ def _cell_value(cell: object, row: int, col: int) -> float:
         if not cell.strip():
             return 0.0
     try:
-        return float(cell)  # type: ignore[arg-type]
+        value = float(cell)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         raise ValueError(
             f"row {row + 1}, column {col + 1} is not a number: {cell!r}. "
             "Use a plain decimal, or clear the cell for zero."
         ) from None
+    # NaN and inf survive float(), then surface far away as "this spin system has no observable
+    # transition" — a description of the symptom rather than of the cell the user typed into.
+    if not np.isfinite(value):
+        raise ValueError(
+            f"row {row + 1}, column {col + 1} is not a finite number: {cell!r}. "
+            "Use a plain decimal, or clear the cell for zero."
+        )
+    return value
 
 
 def _matrix_to_system(rows: list[list[object]]) -> tuple[list[float], NDArray[np.float64]]:
@@ -358,11 +366,21 @@ def _matrix_to_system(rows: list[list[object]]) -> tuple[list[float], NDArray[np
     the upper triangle is read, matching :func:`moldetr.simulate.simulate` and
     :func:`moldetr.simulate.coupling_blocks`, so a stale value below the diagonal cannot couple two
     spins the plotted spectrum treats as independent.
+
+    Both grids let a user add or remove rows and columns directly, so the shape is checked rather
+    than assumed. Indexing a ragged row unguarded raised ``IndexError``, which ``_simulate_stage``
+    does not catch — it escaped the error-string channel and took the tab down with a Gradio toast
+    instead of naming the row. A surplus column is a mismatch too, not something to drop silently.
     """
     n = len(rows)
     shifts: list[float] = []
     couplings = np.zeros((n, n), dtype=float)
     for i, row in enumerate(rows):
+        if len(row) != n + 1:
+            raise ValueError(
+                f"row {i + 1} has {len(row) - 1} value(s) but the matrix has {n} spin(s). "
+                "Use the spin-count slider to resize rather than editing rows directly."
+            )
         shifts.append(_cell_value(row[i + 1], i, i + 1))
         for k in range(i + 1, n):
             couplings[i, k] = _cell_value(row[k + 1], i, k + 1)
@@ -418,19 +436,51 @@ def _width_rows(
     """
     rows: list[list[object]] = []
     for block in coupling_blocks(couplings):
-        members = sorted({round(float(shifts[i]), 4) for i in block}, reverse=True)
         default = float(widths[block[0]]) if widths is not None and block[0] < len(widths) else 1.0
-        rows.append(["δ " + ", ".join(f"{s:g}" for s in members), len(block), default])
+        rows.append([_block_label(block), _block_shifts(shifts, block), len(block), default])
     return rows
+
+
+def _block_label(block: list[int]) -> str:
+    """Name a spin system by its member spins — "A, B" — which is the key widths are matched on.
+
+    Deliberately the spin letters and not the shifts. The label has to survive a shift edit, or
+    retyping δ silently resets that system's line width; and it has to *change* when a coupling
+    merges two systems, because the width then belongs to a system that no longer exists. Membership
+    does exactly that; a shift list does neither.
+    """
+    return ", ".join(_spin_label(i) for i in block)
+
+
+def _block_shifts(shifts: list[float], block: list[int]) -> str:
+    """The shifts a system covers, down-field first — shown so the row is readable, never keyed on."""
+    members = sorted({round(float(shifts[i]), 4) for i in block}, reverse=True)
+    return ", ".join(f"{s:g}" for s in members)
 
 
 def _widths_per_spin(
     shifts: list[float], couplings: NDArray[np.float64], width_rows: list[list[object]]
 ) -> list[float]:
-    """Expand the per-system width table back to the one-entry-per-spin list `simulate` wants."""
+    """Expand the per-system width table back to the one-entry-per-spin list `simulate` wants.
+
+    Rows are matched to systems by **label**, not by position. Typing a coupling into the matrix
+    merges two blocks without rebuilding the table, so a positional match hands row 2's width to
+    whatever block now sits second — a different set of spins, with the label on screen contradicting
+    the value applied. An unmatched system falls back to 1.0, which is visibly wrong rather than
+    quietly wrong.
+    """
+    by_label: dict[str, float] = {}
+    for n, row in enumerate(width_rows):
+        if len(row) < 4:
+            raise ValueError(
+                f"line-width row {n + 1} is missing its FWHM value. "
+                "Use the spin-count slider to rebuild the table."
+            )
+        by_label[str(row[0])] = _cell_value(row[3], n, 3)
+
     per_spin = [1.0] * len(shifts)
-    for n, block in enumerate(coupling_blocks(couplings)):
-        width = _cell_value(width_rows[n][2], n, 2) if n < len(width_rows) else 1.0
+    for block in coupling_blocks(couplings):
+        width = by_label.get(_block_label(block), 1.0)
         for spin in block:
             per_spin[spin] = width
     return per_spin
@@ -736,33 +786,63 @@ def preset_grid(name: str) -> tuple[list[list[object]], list[list[object]], int]
 
 
 def resize_spin_matrix(
-    matrix_rows: list[list[object]], n_spins: float
+    matrix_rows: list[list[object]], width_rows: list[list[object]], n_spins: float
 ) -> tuple[list[list[object]], list[list[object]]]:
-    """Grow or shrink the matrix, keeping everything already typed, and rebuild the width table.
+    """Grow or shrink the matrix, keeping what was typed in **both** grids.
 
-    The width table is derived from the grid rather than resized alongside it: its rows are ground
-    truth *groups*, so adding a spin at the same shift as an existing one adds a proton to a group
-    instead of adding a row.
+    The width table is re-derived rather than resized alongside the matrix, because its rows are
+    spin *systems*: adding a spin coupled to an existing one enlarges a system instead of adding a
+    row. Widths whose system survives the resize are carried across by label, so the count slider is
+    not a way to lose them.
     """
     rows = _resize_matrix(matrix_rows, int(n_spins))
     try:
         shifts, couplings = _matrix_to_system(rows)
-    except ValueError:
-        # A bad cell is reported when Simulate is pressed; resizing must not swallow the value or
-        # raise in the middle of a slider drag.
-        return rows, []
-    return rows, _width_rows(shifts, couplings)
+        rebuilt = _width_rows(shifts, couplings)
+        carried = _widths_per_spin(shifts, couplings, width_rows)
+    except (ValueError, IndexError):
+        # A bad cell is reported when Simulate is pressed. Leave the width table untouched rather
+        # than replacing it with an empty one, which silently reset every width to the default.
+        return rows, width_rows
+    for row, block in zip(rebuilt, coupling_blocks(couplings)):
+        row[3] = carried[block[0]]
+    return rows, rebuilt
 
 
 def invalidate_cache() -> None:
-    """Drop the cached spectrum, because the grid no longer describes it.
+    """Drop the cached spectrum without touching the grids.
 
-    Without this a slider re-distorts whatever was last simulated: edit a five-spin system down to
-    two, drag the phase slider, and the plot re-renders the *old* five spins — still labelled as
-    five — beside a matrix that says something else. Clearing is the honest answer rather than
-    re-simulating on every keystroke, which is the ``2**n`` cost the cache exists to avoid.
+    Used by the width table, whose edits change the spectrum but not which spin systems exist, so
+    there is nothing to re-derive — unlike a matrix edit, which can merge two systems into one.
     """
     return None
+
+
+def matrix_edited(
+    matrix_rows: list[list[object]], width_rows: list[list[object]]
+) -> tuple[None, list[list[object]]]:
+    """React to a matrix edit: drop the cached spectrum and re-derive the width table.
+
+    Two things go stale the moment a cell changes. The **cache** must go, or a slider re-distorts
+    whatever was last simulated — edit five spins down to two, drag the phase slider, and the plot
+    re-renders the old five, still labelled as five, beside a matrix saying otherwise. Clearing beats
+    re-simulating on every keystroke, which is the ``2**n`` cost the cache exists to avoid.
+
+    The **width table** goes stale differently: typing a coupling merges two systems into one, so the
+    rows no longer describe the systems that exist. Rebuilding here keeps the screen honest, and
+    widths whose system survived the edit are carried across by label.
+    """
+    try:
+        shifts, couplings = _matrix_to_system(matrix_rows)
+        rebuilt = _width_rows(shifts, couplings)
+        carried = _widths_per_spin(shifts, couplings, width_rows)
+    except (ValueError, IndexError):
+        # A half-typed cell is reported when Simulate is pressed. Leave the table alone rather than
+        # destroying the user's widths mid-edit.
+        return None, width_rows
+    for row, block in zip(rebuilt, coupling_blocks(couplings)):
+        row[3] = carried[block[0]]
+    return None, rebuilt
 
 
 def simulate_to_state(
@@ -943,8 +1023,8 @@ def build_ui() -> gr.Blocks:
                         gr.Markdown(MATRIX_HINT, elem_classes="md-footnote")
                         sim_widths = gr.Dataframe(
                             value=_widths,
-                            headers=["spin system", "n H", "FWHM (Hz)"],
-                            datatype=["str", "number", "number"],
+                            headers=["system", "δ (ppm)", "n H", "FWHM (Hz)"],
+                            datatype=["str", "str", "number", "number"],
                             type="array",
                             label="Line width FWHM per spin system (coupled spins share one)",
                             elem_id="sim-widths",
@@ -1024,7 +1104,7 @@ def build_ui() -> gr.Blocks:
         )
         sim_n_spins.change(
             resize_spin_matrix,
-            inputs=[sim_matrix, sim_n_spins],
+            inputs=[sim_matrix, sim_widths, sim_n_spins],
             outputs=[sim_matrix, sim_widths],
             api_name="resize_spin_matrix",
         )
@@ -1043,16 +1123,25 @@ def build_ui() -> gr.Blocks:
             api_name="simulate_and_detect",
         )
         # Editing either grid invalidates the cache, so the sliders cannot re-distort a spectrum the
-        # matrix no longer describes. Also fires when a preset or a resize rewrites the grid, which
-        # is equally a change of system.
-        sim_matrix.change(invalidate_cache, outputs=sim_cache, api_name="invalidate_on_matrix_edit")
+        # matrix no longer describes. A matrix edit also re-derives the width table, because a new
+        # coupling can merge two spin systems into one and the rows must describe the systems that
+        # actually exist. Also fires when a preset or a resize rewrites the grid.
+        sim_matrix.change(
+            matrix_edited,
+            inputs=[sim_matrix, sim_widths],
+            outputs=[sim_cache, sim_widths],
+            api_name="matrix_edited",
+        )
         sim_widths.change(invalidate_cache, outputs=sim_cache, api_name="invalidate_on_width_edit")
         # `.release` rather than `.change`: a slider fires continuously while dragged, and each
         # event costs a forward pass. `always_last` keeps the final position authoritative when
         # events are dropped mid-drag, so the view never settles on a stale value.
-        # Not exposed over the API, deliberately: the cache lives in `gr.State`, which a
-        # `gradio_client` caller has no way to hold, so a public re-distort endpoint would be
-        # unusable. `/simulate_and_detect` remains the one programmatic entry point.
+        # These do get endpoint ids, one per control — Gradio derives one for every wiring, and
+        # `api_name=False` becomes the literal "false", "false_1", ..., which is the auto-derived
+        # surface the graph tests exist to prevent. They are named but not *useful* to a
+        # `gradio_client` caller: the cache lives in `gr.State`, which such a caller cannot hold, so
+        # calling one only ever returns the "press Simulate first" prompt. `/simulate_and_detect`
+        # remains the one programmatic entry point.
         # Sliders fire on `.release` so a drag costs one re-distort at the end rather than one per
         # pixel; the checkbox has no release event, so it re-distorts on change. Listed explicitly
         # rather than derived from the control type, which reads better and keeps the pairing

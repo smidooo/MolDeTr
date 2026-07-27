@@ -180,5 +180,5 @@ def test_simulate_stage_reports_bad_input_without_raising(app_module, patch_mode
     assert isinstance(app._simulate_stage(typo, widths), str)
 
     zero_width = [list(row) for row in widths]
-    zero_width[0][2] = 0.0
+    zero_width[0][3] = 0.0  # FWHM is the last column: system | δ | n H | FWHM
     assert isinstance(app._simulate_stage(grid, zero_width), str)

@@ -79,7 +79,7 @@ def test_simulate_reports_a_bad_matrix_cell(patch_model):
 def test_simulate_nonpositive_width(patch_model):
     app = patch_model
     grid, widths = app._phenotype_grid("ethyl")
-    widths[0][2] = 0.0
+    widths[0][3] = 0.0  # FWHM is the last column: system | δ | n H | FWHM
     _t, _f, msg = app.simulate_and_detect(grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3)
     assert msg.startswith("Invalid parameters:") and "line width must be positive" in msg
 

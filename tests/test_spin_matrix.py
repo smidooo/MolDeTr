@@ -166,7 +166,7 @@ def test_the_width_table_has_one_row_per_spin_system_not_per_peak(app_module) ->
     """
     _rows, widths = app_module._phenotype_grid("ethyl")
     assert len(widths) == 1
-    assert widths[0][1] == 5  # all five protons, one system
+    assert widths[0][2] == 5  # all five protons, one system
 
     # Two genuinely independent systems do get a row each.
     shifts = [7.5, 1.2]
@@ -185,8 +185,8 @@ def test_independent_systems_can_carry_different_line_widths(patch_model) -> Non
     grid = app._resize_matrix([], 2)
     grid[0][1], grid[1][2] = 7.5, 1.2  # two uncoupled spins
 
-    uneven = app._simulate_stage(grid, [["δ 7.5", 1, 0.5], ["δ 1.2", 1, 3.0]])
-    uniform = app._simulate_stage(grid, [["δ 7.5", 1, 1.75], ["δ 1.2", 1, 1.75]])
+    uneven = app._simulate_stage(grid, [["A", "7.5", 1, 0.5], ["B", "1.2", 1, 3.0]])
+    uniform = app._simulate_stage(grid, [["A", "7.5", 1, 1.75], ["B", "1.2", 1, 1.75]])
 
     assert not isinstance(uneven, str) and not isinstance(uniform, str)
     assert not np.allclose(uneven["spectrum"], uniform["spectrum"], atol=1e-6)
@@ -223,19 +223,68 @@ def test_every_phenotype_round_trips_through_the_grid(app_module) -> None:
 
 
 @pytest.mark.unit
-def test_editing_the_matrix_invalidates_the_cached_spectrum(app_module) -> None:
-    """A slider must never re-distort a spectrum the grid no longer describes.
+def test_editing_the_matrix_clears_the_cache_and_re_derives_the_widths(app_module) -> None:
+    """Drive the handler the way the graph does, and check both of its outputs.
 
-    `redistort` reads the cache from `gr.State` and nothing else, so without invalidation this
-    sequence silently lies: simulate a 5-spin system, edit the grid down to 2 spins, drag a slider,
-    and the plot re-renders the *old* five spins — still labelled "5 spin(s) in 1 system(s)" — next
-    to a matrix that says something different. Measured before the fix; the caller has no way to
-    tell the stale result from a fresh one.
-
-    Clearing is the honest response rather than re-simulating silently: re-solving the spin dynamics
-    on every keystroke is exactly the cost the cache exists to avoid.
+    An earlier version of this test asserted `invalidate_cache() is None`, which cannot fail while
+    the function exists: deleting the `.change` wiring entirely, and mis-wiring its output to the
+    status box instead of the cache, both left it green. Asserting on the returned cache *and* the
+    rebuilt table is what makes it discriminating; `test_the_matrix_edit_handler_is_wired_to_the_cache`
+    covers the wiring itself.
     """
-    assert app_module.invalidate_cache() is None
+    grid = app_module._resize_matrix([], 3)
+    grid[0][1], grid[1][2], grid[2][3] = 7.5, 3.5, 1.2  # three uncoupled spins
+    table = app_module._width_rows(*app_module._matrix_to_system(grid))
+    table[0][3], table[1][3], table[2][3] = 0.5, 1.5, 3.0
+
+    cache, rebuilt = app_module.matrix_edited(grid, table)
+
+    assert cache is None  # the cached spectrum is dropped
+    assert [row[3] for row in rebuilt] == [0.5, 1.5, 3.0]  # untouched systems keep their widths
+
+    grid[0][2] = 8.0  # couple A-B: three systems become two
+    _cache, merged = app_module.matrix_edited(grid, table)
+
+    assert [row[0] for row in merged] == ["A, B", "C"]
+    assert merged[1][3] == pytest.approx(3.0)  # δ 1.2 keeps its own width, not a neighbour's
+
+
+@pytest.mark.unit
+def test_retyping_a_shift_keeps_the_line_width_the_user_set(app_module) -> None:
+    """Editing δ must not silently reset that system's line width.
+
+    Rows are keyed on the spins a system contains ("A", "A, B"), not on its shifts, precisely so
+    this holds. Keying on the shift list — the obvious first choice, since that is what the row
+    displays — made every δ edit rewrite the label, so the width fell back to the 1.0 default with
+    nothing on screen to say it had.
+    """
+    grid = app_module._resize_matrix([], 2)
+    grid[0][1], grid[1][2] = 7.5, 1.2
+    table = [["A", "7.5", 1, 2.5], ["B", "1.2", 1, 0.4]]
+
+    grid[0][1] = 7.0  # the user retypes the first shift
+    cache, kept = app_module.matrix_edited(grid, table)
+
+    assert cache is None
+    assert [row[3] for row in kept] == [2.5, 0.4]  # widths survive
+    assert kept[0][1] == "7"  # the δ column is derived, so it follows the edit
+
+
+@pytest.mark.unit
+def test_a_broken_cell_leaves_the_width_table_alone(app_module) -> None:
+    """A grid that cannot be parsed mid-edit must not destroy what the user typed.
+
+    Returning an empty table here — the first implementation — pushed `[]` into the component and
+    silently reverted every width to 1.0 on the next simulate.
+    """
+    grid = app_module._resize_matrix([], 2)
+    grid[0][1] = "seven point five"
+    table = [["A", "7.5", 1, 2.5], ["B", "1.2", 1, 0.4]]
+
+    cache, kept = app_module.matrix_edited(grid, table)
+
+    assert cache is None
+    assert kept == table
 
 
 @pytest.mark.unit
@@ -245,3 +294,74 @@ def test_a_cleared_cache_prompts_instead_of_rendering(app_module) -> None:
 
     assert (table, fig) == (None, None)
     assert "Simulate & Predict" in msg
+
+
+@pytest.mark.unit
+def test_a_stale_width_table_never_lands_on_the_wrong_spins(app_module) -> None:
+    """Width rows are matched to spin systems by label, not by position in the table.
+
+    Typing a coupling into the matrix merges two blocks into one, so the table's rows no longer
+    line up with the systems. Matched positionally, row 2's width lands on block 2 — which is now a
+    *different* set of spins — and the spin at δ 1.2 is simulated with the width shown beside the
+    label "δ 3.5". The screen and the spectrum disagree, with no error.
+    """
+    shifts = [7.5, 3.5, 1.2]
+    uncoupled = np.zeros((3, 3))
+    table = app_module._width_rows(shifts, uncoupled)
+    table[0][3], table[1][3], table[2][3] = 0.5, 1.5, 3.0
+    assert app_module._widths_per_spin(shifts, uncoupled, table) == [0.5, 1.5, 3.0]
+
+    coupled = np.zeros((3, 3))
+    coupled[0, 1] = 8.0  # A and B are now one system; the table still shows three rows
+
+    applied = app_module._widths_per_spin(shifts, coupled, table)
+
+    # δ 1.2 keeps its own row's 3.0 rather than inheriting the row labelled "δ 3.5".
+    assert applied[2] == pytest.approx(3.0)
+
+
+@pytest.mark.unit
+def test_a_ragged_grid_is_reported_not_raised(app_module) -> None:
+    """Both grids allow adding rows, so a row can be shorter than the matrix is wide.
+
+    `_matrix_to_system` indexes `row[k + 1]` unguarded, so a short row raised `IndexError` — and
+    `_simulate_stage` catches only `ValueError`, so it escaped the error-string channel entirely and
+    took the tab down with a Gradio toast instead of naming the problem.
+    """
+    ragged = [
+        ["A", 7.5, 8.0, 1.0],
+        ["B", 0.0, 6.9],  # one cell short
+        ["C", 0.0, 0.0, 1.2],
+    ]
+
+    with pytest.raises(ValueError, match="row 2"):
+        app_module._matrix_to_system(ragged)
+
+
+@pytest.mark.unit
+def test_a_short_width_row_is_reported_not_raised(app_module) -> None:
+    """Same hole on the width table, reachable the same way."""
+    shifts = [7.5, 1.2]
+    couplings = np.zeros((2, 2))
+
+    with pytest.raises(ValueError, match="width"):
+        app_module._widths_per_spin(shifts, couplings, [["A", "7.5", 1], ["B", "1.2", 1, 1.0]])
+
+
+@pytest.mark.unit
+def test_a_non_finite_cell_names_the_cell(app_module) -> None:
+    """NaN and inf pass `float()` and then fail much later, describing the wrong cause.
+
+    A NaN shift produces a spin system with no observable transition, so the user is told the
+    system is degenerate rather than that they typed something unusable into a specific cell.
+    """
+    for bad in ("nan", "inf", "-inf", float("nan")):
+        with pytest.raises(ValueError, match="row 1"):
+            app_module._matrix_to_system([["A", bad, 7.0], ["B", 2.0, 0.0]])
+
+
+@pytest.mark.unit
+def test_extra_columns_are_reported_rather_than_dropped(app_module) -> None:
+    """`n` comes from the row count, so surplus columns used to vanish without comment."""
+    with pytest.raises(ValueError, match="row 1"):
+        app_module._matrix_to_system([["A", 1.0, 7.0, 5.0], ["B", 2.0, 0.0, 5.0]])
