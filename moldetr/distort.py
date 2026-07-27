@@ -92,7 +92,14 @@ def _validate(
         _check_range("noise_snr_log10", noise_snr_log10, *_SNR_LOG10_RANGE)
     if phase0_deg is not None:
         _check_range("phase0_deg", phase0_deg, -_PHASE0_ABS_MAX, _PHASE0_ABS_MAX)
-    if phase1 is not None and ppm_width is not None and ppm_width > 0.0:
+    if phase1 is not None:
+        # `not > 0.0` also catches a NaN width, which would otherwise reach _check_range and be
+        # rejected with a baffling "[nan, nan]" message.
+        if ppm_width is None or not ppm_width > 0.0:
+            raise ValueError(
+                f"phase1={phase1!r} needs a ppm axis with non-zero width: its trained bound is "
+                f"{_PHASE1_FACTOR}/ppm_width, which cannot be formed from this axis."
+            )
         bound = _PHASE1_FACTOR / ppm_width
         _check_range("phase1", phase1, -bound, bound)
     if sat_j_hz is not None:
@@ -227,6 +234,11 @@ def distort(
         The distorted complex spectrum.
     """
     ppm = np.asarray(ppm_axis, dtype=np.float64)
+    # The width is read from the endpoints on every call now, so float(ppm[0]) runs even for
+    # effects that never touch the axis. On numpy 2.x that is a bare TypeError for an (N, 1)
+    # column vector; the contract is one ppm value per point, so reject the shape by name.
+    if ppm.ndim != 1:
+        raise ValueError(f"ppm_axis must be 1-D (one ppm value per point), got shape {ppm.shape}.")
     _validate(
         noise_snr_log10,
         phase0_deg,

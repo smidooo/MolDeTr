@@ -143,6 +143,36 @@ def test_phase1_outside_trained_range_raises() -> None:
         distort(spec, ppm, phase1=5.0)
 
 
+def test_non_1d_ppm_axis_raises_a_named_error() -> None:
+    """A column-vector ppm axis fails with a clear message, not a bare numpy TypeError.
+
+    The width is now read from the endpoints on EVERY call, so ``float(ppm[0])`` runs even for
+    effects that never touch the axis. On numpy 2.x that raises
+    ``TypeError: only 0-dimensional arrays can be converted to Python scalars`` for an (N, 1)
+    array -- a shape a CSV load produces easily. The contract is "one ppm value per point", so
+    say so.
+    """
+    spec = _spectrum()
+    column = _ppm().reshape(-1, 1)
+    with pytest.raises(ValueError, match="1-D"):
+        distort(spec, column, noise_snr_log10=3.0)
+
+
+def test_phase1_on_a_degenerate_axis_raises() -> None:
+    """Supplying ``phase1`` when no bound can be formed is an error, not a silent pass.
+
+    ``8/ppm_width`` is undefined for a zero-width or single-point axis. Skipping validation there
+    would let any first-order phase through on exactly the axes where ``phase1 * ppm`` degenerates
+    into a disguised zeroth-order phase.
+    """
+    spec = _spectrum()
+    flat = np.full(N, 5.0)  # constant axis -> width 0
+    with pytest.raises(ValueError, match="phase1"):
+        distort(spec, flat, phase1=0.1)
+    # Effects that do not need the width are unaffected by the degenerate axis.
+    distort(spec, flat, noise_snr_log10=3.0)
+
+
 def test_phase1_bound_follows_the_window_width() -> None:
     """The bound is 8/ppm_width, so the deg/ppm coefficient SHRINKS as the window grows.
 
