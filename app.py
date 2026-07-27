@@ -32,7 +32,7 @@ import sys
 import tempfile
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import gradio as gr
 import numpy as np
@@ -42,7 +42,7 @@ from numpy.typing import NDArray
 from moldetr.distort import distort
 from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
-from moldetr.simulate import COUPLING_EPS_HZ, simulate_systems
+from moldetr.simulate import COUPLING_EPS_HZ, coupling_blocks, simulate_systems
 from moldetr.validation import INPUT_LENGTH, POINTS_PER_HZ, validate_spectrum
 from app_ui.plotting import (  # BRAND: interactive Plotly plots
     assignment_rows,
@@ -285,31 +285,205 @@ def predict_ui(file, threshold, ppm_mode, manual_left, manual_right, points_per_
 # --- "Simulate" tab: reuse the scripts/ round-trip against the same model + decode + plot ---------
 
 SIMULATE_INTRO = (
-    "Simulate a known spin system on the model's grid (80 MHz, 15→0 ppm, 6144 pts), optionally add "
-    "training-range distortions, then detect and compare against ground truth. Edit the per-spin "
-    "shifts, the coupling, and the line width, or add noise / phase / broadening / baseline. Every "
-    "distortion slider is bounded to the range the model was trained on."
+    "Build a spin system on the model's grid (80 MHz, 15→0 ppm, 6144 pts), distort it within the "
+    "range the model was trained on, then run the detector on it and compare against ground truth "
+    "you defined. Start from a known system or edit the matrix directly: shifts on the diagonal, "
+    "couplings above it, and as many independent systems in one window as you leave uncoupled. "
+    "Once a spectrum is simulated, the distortion sliders re-distort it live — the spin dynamics "
+    "are not solved again."
 )
 
 PHENOTYPE_CHOICES = sorted(sp.PHENOTYPES)
 
+MATRIX_HINT = (
+    "Each row is one spin. The **diagonal** holds its shift δ in ppm; cells **above** the diagonal "
+    "hold the coupling J in Hz between that pair. Leave a pair at 0 and the two spins belong to "
+    "separate spin systems, which are simulated independently and summed — so one matrix can "
+    "describe several molecules in the same window. Cells below the diagonal are ignored."
+)
 
-def _phenotype_defaults(name: str) -> tuple[str, float, float]:
-    """Default editable fields (per-spin shift string, coupling J, line width) for a phenotype."""
+
+#: Largest spin count the matrix editor offers. `simulate` pays 2**n per coupled block, and
+#: `MAX_BLOCK_SPINS` caps a single block at 10, so offering more rows than that would only ever
+#: produce systems the simulator refuses.
+MAX_MATRIX_SPINS = 8
+
+#: Pople letters name the spins the way the spin-system literature and the paper's table do.
+_POPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+#: The cell types `gr.Dataframe` accepts, spelled out so the grid's column list type-checks.
+DataframeCell = Literal["str", "number", "bool", "date", "markdown", "html"]
+
+
+def _matrix_datatype(n_spins: int) -> list[DataframeCell]:
+    """Column types for the spin grid: a text label column, then one numeric column per spin."""
+    columns: list[DataframeCell] = ["str"]
+    columns.extend("number" for _ in range(n_spins))
+    return columns
+
+
+def _spin_label(index: int) -> str:
+    """A, B, C ... then A', B', ... once the alphabet runs out (it will not, at 8 spins)."""
+    letter = _POPLE[index % len(_POPLE)]
+    return letter + "'" * (index // len(_POPLE))
+
+
+def _cell_value(cell: object, row: int, col: int) -> float:
+    """Read one grid cell as a float, treating blanks as zero and naming the cell on a typo.
+
+    Gradio hands back ``""`` or ``None`` for a cleared cell and the raw string for anything it could
+    not parse. Both must be resolved here: `float("")` raises, and a coupling that silently vanished
+    looks exactly like a spectrum the user meant to produce.
+    """
+    if cell is None:
+        return 0.0
+    if isinstance(cell, str):
+        if not cell.strip():
+            return 0.0
+    try:
+        value = float(cell)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"row {row + 1}, column {col + 1} is not a number: {cell!r}. "
+            "Use a plain decimal, or clear the cell for zero."
+        ) from None
+    # NaN and inf survive float(), then surface far away as "this spin system has no observable
+    # transition" — a description of the symptom rather than of the cell the user typed into.
+    if not np.isfinite(value):
+        raise ValueError(
+            f"row {row + 1}, column {col + 1} is not a finite number: {cell!r}. "
+            "Use a plain decimal, or clear the cell for zero."
+        )
+    return value
+
+
+def _matrix_to_system(rows: list[list[object]]) -> tuple[list[float], NDArray[np.float64]]:
+    """Split the editor grid into per-spin shifts and a coupling matrix.
+
+    The grid is ``[label, v0, v1, ...]`` per row, so every value is offset by one column. The
+    **diagonal** carries chemical shifts in ppm and the **upper triangle** the couplings in Hz. Only
+    the upper triangle is read, matching :func:`moldetr.simulate.simulate` and
+    :func:`moldetr.simulate.coupling_blocks`, so a stale value below the diagonal cannot couple two
+    spins the plotted spectrum treats as independent.
+
+    Both grids let a user add or remove rows and columns directly, so the shape is checked rather
+    than assumed. Indexing a ragged row unguarded raised ``IndexError``, which ``_simulate_stage``
+    does not catch — it escaped the error-string channel and took the tab down with a Gradio toast
+    instead of naming the row. A surplus column is a mismatch too, not something to drop silently.
+    """
+    n = len(rows)
+    shifts: list[float] = []
+    couplings = np.zeros((n, n), dtype=float)
+    for i, row in enumerate(rows):
+        if len(row) != n + 1:
+            raise ValueError(
+                f"row {i + 1} has {len(row) - 1} value(s) but the matrix has {n} spin(s). "
+                "Use the spin-count slider to resize rather than editing rows directly."
+            )
+        shifts.append(_cell_value(row[i + 1], i, i + 1))
+        for k in range(i + 1, n):
+            couplings[i, k] = _cell_value(row[k + 1], i, k + 1)
+    return shifts, couplings
+
+
+def _resize_matrix(rows: list[list[object]], n_spins: int) -> list[list[object]]:
+    """Rebuild the grid at ``n_spins`` rows, keeping every value that still has a home.
+
+    Rebuilding from scratch on each slider step is simpler and throws away a half-entered system on
+    a mis-click, so the overlap is copied across instead. New spins arrive at 0 ppm and uncoupled.
+    """
+    grid: list[list[object]] = []
+    for i in range(n_spins):
+        row: list[object] = [_spin_label(i)]
+        for k in range(n_spins):
+            keep = i < len(rows) and (k + 1) < len(rows[i])
+            row.append(rows[i][k + 1] if keep else 0.0)
+        grid.append(row)
+    return grid
+
+
+def _phenotype_grid(name: str) -> tuple[list[list[object]], list[list[object]]]:
+    """Populate the matrix and the per-group width table from a named phenotype.
+
+    The dropdown pre-fills the grid rather than feeding the simulator, so the matrix stays the one
+    description of what is being simulated and a preset is just a starting point the user can edit.
+    """
     pheno = sp.PHENOTYPES[name]
-    shifts_str = ", ".join(f"{s:g}" for s in pheno["shifts_ppm"])
-    j_default = float(pheno["couplings"][0][2]) if pheno["couplings"] else 0.0
-    return shifts_str, j_default, 1.0
+    shifts = [float(s) for s in pheno["shifts_ppm"]]
+    matrix = sp.build_coupling_matrix(len(shifts), pheno["couplings"])
+
+    rows: list[list[object]] = []
+    for i, shift in enumerate(shifts):
+        row: list[object] = [_spin_label(i)]
+        for k in range(len(shifts)):
+            row.append(shift if k == i else float(matrix[i, k]) if k > i else 0.0)
+        rows.append(row)
+    return rows, _width_rows(shifts, matrix, [float(w) for w in pheno["widths_hz"]])
 
 
-def _parse_spin_shifts(text: str, n_expected: int, default: list[float]) -> list[float]:
-    """Parse a comma/space/semicolon-separated per-spin shift list; fall back to the default."""
-    if not text or not text.strip():
-        return [float(s) for s in default]
-    vals = [float(t) for t in text.replace(";", ",").replace(" ", ",").split(",") if t.strip()]
-    if len(vals) != n_expected:
-        raise ValueError(f"expected {n_expected} shift value(s), got {len(vals)}")
-    return vals
+def _width_rows(
+    shifts: list[float], couplings: NDArray[np.float64], widths: list[float] | None = None
+) -> list[list[object]]:
+    """One editable line width per **spin system**: ``system | n H | FWHM (Hz)``.
+
+    Per coupling block, not per ground-truth group, because that is the finest grain the simulator
+    can honour. ``simulate`` collapses widths to a single mean *within* a block, so two groups of one
+    coupled system are physically incapable of carrying different line shapes — for ethyl, widths of
+    (1, 1, 1, 3, 3) produce a spectrum bit-identical to a uniform 1.8. Offering a row per group would
+    put two controls on screen that silently average into one. Splitting blocks apart is what made
+    per-system widths real in the first place.
+    """
+    rows: list[list[object]] = []
+    for block in coupling_blocks(couplings):
+        default = float(widths[block[0]]) if widths is not None and block[0] < len(widths) else 1.0
+        rows.append([_block_label(block), _block_shifts(shifts, block), len(block), default])
+    return rows
+
+
+def _block_label(block: list[int]) -> str:
+    """Name a spin system by its member spins — "A, B" — which is the key widths are matched on.
+
+    Deliberately the spin letters and not the shifts. The label has to survive a shift edit, or
+    retyping δ silently resets that system's line width; and it has to *change* when a coupling
+    merges two systems, because the width then belongs to a system that no longer exists. Membership
+    does exactly that; a shift list does neither.
+    """
+    return ", ".join(_spin_label(i) for i in block)
+
+
+def _block_shifts(shifts: list[float], block: list[int]) -> str:
+    """The shifts a system covers, down-field first — shown so the row is readable, never keyed on."""
+    members = sorted({round(float(shifts[i]), 4) for i in block}, reverse=True)
+    return ", ".join(f"{s:g}" for s in members)
+
+
+def _widths_per_spin(
+    shifts: list[float], couplings: NDArray[np.float64], width_rows: list[list[object]]
+) -> list[float]:
+    """Expand the per-system width table back to the one-entry-per-spin list `simulate` wants.
+
+    Rows are matched to systems by **label**, not by position. Typing a coupling into the matrix
+    merges two blocks without rebuilding the table, so a positional match hands row 2's width to
+    whatever block now sits second — a different set of spins, with the label on screen contradicting
+    the value applied. An unmatched system falls back to 1.0, which is visibly wrong rather than
+    quietly wrong.
+    """
+    by_label: dict[str, float] = {}
+    for n, row in enumerate(width_rows):
+        if len(row) < 4:
+            raise ValueError(
+                f"line-width row {n + 1} is missing its FWHM value. "
+                "Use the spin-count slider to rebuild the table."
+            )
+        by_label[str(row[0])] = _cell_value(row[3], n, 3)
+
+    per_spin = [1.0] * len(shifts)
+    for block in coupling_blocks(couplings):
+        width = by_label.get(_block_label(block), 1.0)
+        for spin in block:
+            per_spin[spin] = width
+    return per_spin
 
 
 def _build_gt_groups(
@@ -322,10 +496,21 @@ def _build_gt_groups(
     equivalent protons may carry a mutual J, but it produces no observable splitting, so reporting it
     would claim a multiplet the spectrum does not show.
 
+    Spins are grouped by **shift alone**, deliberately, and not by coupling block. Ground truth here
+    describes what the spectrum shows, because it is compared against a detector that sees only the
+    spectrum: protons sharing a shift produce one peak carrying their combined area whether or not a
+    coupling connects them. Grouping by block would split a methoxy — three equivalent uncoupled
+    protons — into three 1H multiplets where the spectrum has a single 3H line. See
+    ``tests/test_gt_groups_from_matrix.py`` for the measured case and the one known limitation.
+
     Groups are ordered down-field first, matching how the spectrum is read and how the comparison
     table is numbered.
     """
-    j = np.asarray(couplings_hz, dtype=float)
+    given = np.asarray(couplings_hz, dtype=float)
+    # Mirror `coupling_blocks`: the upper triangle is the contract, so both read the same couplings.
+    upper = np.triu(given, 1)
+    j = upper + upper.T
+
     groups: dict[float, list[int]] = {}
     for idx, shift in enumerate(shifts):
         groups.setdefault(round(float(shift), 4), []).append(idx)
@@ -439,9 +624,14 @@ SimCache = dict[str, Any]
 
 
 def _simulate_stage(
-    phenotype: str, shifts_text: str, j_hz: float, width_hz: float
+    matrix_rows: list[list[object]], width_rows: list[list[object]]
 ) -> SimCache | str:
     """Run the spin dynamics once and return everything the cheap stage needs.
+
+    The spin system comes entirely from the matrix grid — shifts on the diagonal, couplings in the
+    upper triangle — so there is one description of what is being simulated rather than a phenotype
+    and an edited copy of it that can disagree. The preset dropdown fills the grid and then has no
+    further say.
 
     Returns a cache dict, or a **string** carrying the user-facing error. The string channel keeps
     the two stages composable into the original single-return-shape callback.
@@ -461,14 +651,13 @@ def _simulate_stage(
             f"Checkpoint not found at `{CHECKPOINT}`. "
             "Download it from Zenodo (10.5281/zenodo.21217102) into `moldetr/model/`."
         )
-    pheno = sp.PHENOTYPES[phenotype]
-    n_spins = len(pheno["shifts_ppm"])
     try:
-        shifts = _parse_spin_shifts(shifts_text, n_spins, pheno["shifts_ppm"])
+        shifts, couplings = _matrix_to_system(matrix_rows)
+        widths = _widths_per_spin(shifts, couplings, width_rows)
     except ValueError as exc:
-        return f"Invalid shifts: {exc}"
-    pairs = [(i, j, float(j_hz)) for (i, j, _j0) in pheno["couplings"]]
-    couplings = sp.build_coupling_matrix(n_spins, pairs)
+        return f"Invalid spin matrix: {exc}"
+    if not shifts:
+        return "Add at least one spin to the matrix."
     try:
         # simulate_systems, not simulate: it splits the coupling matrix into independent blocks,
         # simulates each on a per-proton scale and sums them, so several spin systems in one window
@@ -478,7 +667,7 @@ def _simulate_stage(
         spectrum, ppm_axis = simulate_systems(
             shifts,
             couplings,
-            [float(width_hz)] * n_spins,
+            widths,
             sp.BASE_FREQ_MHZ,
             sp.LEFT_PPM,
             sp.RIGHT_PPM,
@@ -486,8 +675,9 @@ def _simulate_stage(
         )
     except ValueError as exc:
         return f"Invalid parameters: {exc}"
+    blocks = coupling_blocks(couplings)
     return {
-        "phenotype": phenotype,
+        "label": f"{len(shifts)} spin(s) in {len(blocks)} system(s)",
         "spectrum": spectrum,
         "ppm_axis": ppm_axis,
         "gt_groups": _build_gt_groups(shifts, couplings),
@@ -537,7 +727,7 @@ def _detect_stage(
         amplitudes = _distorted_amplitudes(cache, add_noise, snr, phase0, broaden, baseline)
     except ValueError as exc:
         return None, None, f"Invalid parameters: {exc}"
-    phenotype = cache["phenotype"]
+    label = cache["label"]
     gt_groups = cache["gt_groups"]
     preds = decode_predictions(
         run(_get_model(), amplitudes),
@@ -562,7 +752,7 @@ def _detect_stage(
     table = _comparison_dataframe(gt_groups, preds)
     n_match = sum(1 for _g, p in matched if p is not None)
     msg = (
-        f"**Simulated `{phenotype}`**: {len(gt_groups)} ground-truth multiplet(s); the model "
+        f"**Simulated {label}**: {len(gt_groups)} ground-truth multiplet(s); the model "
         f"**detected** {len(preds)} ({n_match} matched, {len(spurious)} spurious). "
         "Teal ▽ = ground truth · clay ● = model detection; a connector turns **green** within "
         "tolerance and **amber** when off. Missed GT and spurious peaks are outlined in red."
@@ -571,10 +761,8 @@ def _detect_stage(
 
 
 def simulate_and_detect(
-    phenotype: str,
-    shifts_text: str,
-    j_hz: float,
-    width_hz: float,
+    matrix_rows: list[list[object]],
+    width_rows: list[list[object]],
     add_noise: bool,
     snr: float,
     phase0: float,
@@ -582,12 +770,120 @@ def simulate_and_detect(
     baseline: float,
     threshold: float,
 ) -> tuple[pd.DataFrame | None, object | None, str]:
-    """Simulate the (edited) phenotype, optionally distort, detect, and compare to ground truth.
+    """Simulate the matrix, optionally distort, detect, and compare to ground truth.
 
     Kept as the single-call entry point (the Gradio event and the gradio_client API both address it)
-    and now a thin composition of the two stages, so the one-shot and cached paths cannot drift.
+    and a thin composition of the two stages, so the one-shot and cached paths cannot drift.
     """
-    cache = _simulate_stage(phenotype, shifts_text, j_hz, width_hz)
+    cache = _simulate_stage(matrix_rows, width_rows)
+    return _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
+
+
+def preset_grid(name: str) -> tuple[list[list[object]], list[list[object]], int]:
+    """Fill the matrix and width table from a preset, and resize the spin slider to match."""
+    rows, widths = _phenotype_grid(name)
+    return rows, widths, len(rows)
+
+
+def resize_spin_matrix(
+    matrix_rows: list[list[object]], width_rows: list[list[object]], n_spins: float
+) -> tuple[list[list[object]], list[list[object]]]:
+    """Grow or shrink the matrix, keeping what was typed in **both** grids.
+
+    The width table is re-derived rather than resized alongside the matrix, because its rows are
+    spin *systems*: adding a spin coupled to an existing one enlarges a system instead of adding a
+    row. Widths whose system survives the resize are carried across by label, so the count slider is
+    not a way to lose them.
+    """
+    rows = _resize_matrix(matrix_rows, int(n_spins))
+    try:
+        shifts, couplings = _matrix_to_system(rows)
+        rebuilt = _width_rows(shifts, couplings)
+        carried = _widths_per_spin(shifts, couplings, width_rows)
+    except (ValueError, IndexError):
+        # A bad cell is reported when Simulate is pressed. Leave the width table untouched rather
+        # than replacing it with an empty one, which silently reset every width to the default.
+        return rows, width_rows
+    for row, block in zip(rebuilt, coupling_blocks(couplings)):
+        row[3] = carried[block[0]]
+    return rows, rebuilt
+
+
+def invalidate_cache() -> None:
+    """Drop the cached spectrum without touching the grids.
+
+    Used by the width table, whose edits change the spectrum but not which spin systems exist, so
+    there is nothing to re-derive — unlike a matrix edit, which can merge two systems into one.
+    """
+    return None
+
+
+def matrix_edited(
+    matrix_rows: list[list[object]], width_rows: list[list[object]]
+) -> tuple[None, list[list[object]]]:
+    """React to a matrix edit: drop the cached spectrum and re-derive the width table.
+
+    Two things go stale the moment a cell changes. The **cache** must go, or a slider re-distorts
+    whatever was last simulated — edit five spins down to two, drag the phase slider, and the plot
+    re-renders the old five, still labelled as five, beside a matrix saying otherwise. Clearing beats
+    re-simulating on every keystroke, which is the ``2**n`` cost the cache exists to avoid.
+
+    The **width table** goes stale differently: typing a coupling merges two systems into one, so the
+    rows no longer describe the systems that exist. Rebuilding here keeps the screen honest, and
+    widths whose system survived the edit are carried across by label.
+    """
+    try:
+        shifts, couplings = _matrix_to_system(matrix_rows)
+        rebuilt = _width_rows(shifts, couplings)
+        carried = _widths_per_spin(shifts, couplings, width_rows)
+    except (ValueError, IndexError):
+        # A half-typed cell is reported when Simulate is pressed. Leave the table alone rather than
+        # destroying the user's widths mid-edit.
+        return None, width_rows
+    for row, block in zip(rebuilt, coupling_blocks(couplings)):
+        row[3] = carried[block[0]]
+    return None, rebuilt
+
+
+def simulate_to_state(
+    matrix_rows: list[list[object]],
+    width_rows: list[list[object]],
+    add_noise: bool,
+    snr: float,
+    phase0: float,
+    broaden: float,
+    baseline: float,
+    threshold: float,
+) -> tuple[SimCache | str, pd.DataFrame | None, object | None, str]:
+    """Simulate once, hand the cache back for `gr.State`, and render the first result.
+
+    The cache is returned alongside the outputs so a later slider move can re-distort it without
+    paying the eigendecomposition again. It is deliberately the *same* cache
+    :func:`simulate_and_detect` builds internally, so the live path and the one-shot API path cannot
+    describe different spectra.
+    """
+    cache = _simulate_stage(matrix_rows, width_rows)
+    table, fig, msg = _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
+    return cache, table, fig, msg
+
+
+def redistort(
+    cache: SimCache | str | None,
+    add_noise: bool,
+    snr: float,
+    phase0: float,
+    broaden: float,
+    baseline: float,
+    threshold: float,
+) -> tuple[pd.DataFrame | None, object | None, str]:
+    """Re-apply the distortions to an already-simulated spectrum held in `gr.State`.
+
+    This is the whole point of splitting the stages: dragging a distortion slider costs one
+    `distort` plus one forward pass, not another ``2**n`` eigendecomposition. An empty state means
+    the user moved a slider before pressing Simulate, which is a prompt rather than an error.
+    """
+    if cache is None:
+        return None, None, "Press **Simulate & Predict** first, then move the distortion sliders."
     return _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
 
 
@@ -699,16 +995,40 @@ def build_ui() -> gr.Blocks:
                 gr.Markdown(SIMULATE_INTRO)
                 with gr.Row():
                     with gr.Column(scale=2):
-                        _defaults = _phenotype_defaults("ethyl")
+                        _grid, _widths = _phenotype_grid("ethyl")
+                        sim_cache = gr.State(None)
                         sim_phenotype = gr.Dropdown(
-                            PHENOTYPE_CHOICES, value="ethyl", label="Phenotype"
+                            PHENOTYPE_CHOICES,
+                            value="ethyl",
+                            label="Start from a known spin system",
+                            elem_id="sim-preset",
                         )
-                        sim_shifts = gr.Textbox(
-                            value=_defaults[0], label="Per-spin shifts δ (ppm, comma-separated)"
+                        sim_n_spins = gr.Slider(
+                            1,
+                            MAX_MATRIX_SPINS,
+                            value=len(_grid),
+                            step=1,
+                            label="Number of spins",
+                            elem_id="sim-nspins",
                         )
-                        with gr.Row():
-                            sim_j = gr.Number(value=_defaults[1], label="Coupling J (Hz)")
-                            sim_width = gr.Number(value=_defaults[2], label="Line width FWHM (Hz)")
+                        sim_matrix = gr.Dataframe(
+                            value=_grid,
+                            headers=["spin", *(_spin_label(i) for i in range(len(_grid)))],
+                            datatype=_matrix_datatype(len(_grid)),
+                            type="array",
+                            label="Spin matrix — δ in ppm on the diagonal · J in Hz above it",
+                            elem_id="sim-matrix",
+                            static_columns=[0],
+                        )
+                        gr.Markdown(MATRIX_HINT, elem_classes="md-footnote")
+                        sim_widths = gr.Dataframe(
+                            value=_widths,
+                            headers=["system", "δ (ppm)", "n H", "FWHM (Hz)"],
+                            datatype=["str", "str", "number", "number"],
+                            type="array",
+                            label="Line width FWHM per spin system (coupled spins share one)",
+                            elem_id="sim-widths",
+                        )
                         gr.Markdown("**Distortions**: each bounded to the model's trained range.")
                         with gr.Row():
                             sim_add_noise = gr.Checkbox(value=False, label="Add noise")
@@ -743,8 +1063,8 @@ def build_ui() -> gr.Blocks:
                         sim_btn = gr.Button("Simulate & Predict", variant="primary")
                     with gr.Column(scale=3):
                         sim_status = gr.Markdown(
-                            "Pick a phenotype, adjust the parameters, then press "
-                            "**Simulate & Predict**."
+                            "Edit the matrix, or start from a known system, then press "
+                            "**Simulate & Predict**. The distortion sliders update live afterwards."
                         )
                         sim_plot = gr.Plot(label="Ground truth vs detected")
                         sim_table = gr.Dataframe(
@@ -774,29 +1094,77 @@ def build_ui() -> gr.Blocks:
             outputs=[table, plot, status, csv_btn, json_btn],
             api_name="detect",
         )
+        # The preset only *fills* the matrix; from then on the matrix is the sole description of
+        # what gets simulated, so a preset and an edited copy of it can never disagree.
         sim_phenotype.change(
-            _phenotype_defaults,
+            preset_grid,
             inputs=sim_phenotype,
-            outputs=[sim_shifts, sim_j, sim_width],
+            outputs=[sim_matrix, sim_widths, sim_n_spins],
             api_name="phenotype_defaults",
         )
+        sim_n_spins.change(
+            resize_spin_matrix,
+            inputs=[sim_matrix, sim_widths, sim_n_spins],
+            outputs=[sim_matrix, sim_widths],
+            api_name="resize_spin_matrix",
+        )
+        _distortions = [
+            sim_add_noise,
+            sim_snr,
+            sim_phase0,
+            sim_broaden,
+            sim_baseline,
+            sim_threshold,
+        ]
         sim_btn.click(
-            simulate_and_detect,
-            inputs=[
-                sim_phenotype,
-                sim_shifts,
-                sim_j,
-                sim_width,
-                sim_add_noise,
-                sim_snr,
-                sim_phase0,
-                sim_broaden,
-                sim_baseline,
-                sim_threshold,
-            ],
-            outputs=[sim_table, sim_plot, sim_status],
+            simulate_to_state,
+            inputs=[sim_matrix, sim_widths, *_distortions],
+            outputs=[sim_cache, sim_table, sim_plot, sim_status],
             api_name="simulate_and_detect",
         )
+        # Editing either grid invalidates the cache, so the sliders cannot re-distort a spectrum the
+        # matrix no longer describes. A matrix edit also re-derives the width table, because a new
+        # coupling can merge two spin systems into one and the rows must describe the systems that
+        # actually exist. Also fires when a preset or a resize rewrites the grid.
+        sim_matrix.change(
+            matrix_edited,
+            inputs=[sim_matrix, sim_widths],
+            outputs=[sim_cache, sim_widths],
+            api_name="matrix_edited",
+        )
+        sim_widths.change(invalidate_cache, outputs=sim_cache, api_name="invalidate_on_width_edit")
+        # `.release` rather than `.change`: a slider fires continuously while dragged, and each
+        # event costs a forward pass. `always_last` keeps the final position authoritative when
+        # events are dropped mid-drag, so the view never settles on a stale value.
+        # These do get endpoint ids, one per control — Gradio derives one for every wiring, and
+        # `api_name=False` becomes the literal "false", "false_1", ..., which is the auto-derived
+        # surface the graph tests exist to prevent. They are named but not *useful* to a
+        # `gradio_client` caller: the cache lives in `gr.State`, which such a caller cannot hold, so
+        # calling one only ever returns the "press Simulate first" prompt. `/simulate_and_detect`
+        # remains the one programmatic entry point.
+        # Sliders fire on `.release` so a drag costs one re-distort at the end rather than one per
+        # pixel; the checkbox has no release event, so it re-distorts on change. Listed explicitly
+        # rather than derived from the control type, which reads better and keeps the pairing
+        # visible next to the names the endpoints take.
+        _live_triggers = [
+            (sim_add_noise.change, "noise"),
+            (sim_snr.release, "snr"),
+            (sim_phase0.release, "phase"),
+            (sim_broaden.release, "broaden"),
+            (sim_baseline.release, "baseline"),
+            (sim_threshold.release, "threshold"),
+        ]
+        for _trigger, _name in _live_triggers:
+            _trigger(
+                redistort,
+                inputs=[sim_cache, *_distortions],
+                outputs=[sim_table, sim_plot, sim_status],
+                # Named per control rather than shared: Gradio derives an endpoint id for every
+                # wiring, and `api_name=False` becomes the literal "false", "false_1", ... which is
+                # exactly the auto-derived surface the graph test exists to prevent.
+                api_name=f"redistort_{_name}",
+                trigger_mode="always_last",
+            )
     return demo
 
 

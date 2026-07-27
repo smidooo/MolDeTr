@@ -83,30 +83,45 @@ def test_detect_over_gradio_client(live_app, tmp_npz, valid_spectrum):
 
 @pytest.mark.e2e
 def test_simulate_round_trip_over_gradio_client(live_app):
-    """The 10-input Simulate handler had never been fired over the wire.
+    """The Simulate handler now carries two tabular payloads, which serialisation can mangle.
 
-    It is the widest signature in the app, so it is also where a positional-argument drift between
-    the input list and the callback would first show up — and the direct-call tests cannot see it,
-    because they bypass serialization entirely.
+    Direct-call tests hand the grid over as a plain list of lists; over the wire it becomes a
+    dataframe payload and comes back as one. That round trip is exactly where a column offset — the
+    label column that shifts every value by one — would first show up, and it is invisible to every
+    other tier.
     """
     _app, url = live_app
     client = Client(url, verbose=False)
+    grid, widths = _app._phenotype_grid("ethyl")
+    # Over the wire a dataframe is a `{headers, data}` payload, not a bare list of lists. This is
+    # also what catches a component left on Gradio's default `type="pandas"`: the direct-call tests
+    # hand the handler a list of lists either way, but a pandas component delivers a DataFrame here,
+    # and iterating one yields *column names* — the first "row" becomes the string "spin".
+    matrix_payload = {"headers": ["spin", *(r[0] for r in grid)], "data": grid}
+    width_payload = {"headers": ["spin system", "n H", "FWHM (Hz)"], "data": widths}
 
-    out = client.predict("ethyl", "", 7.0, 1.0, False, 3.0, 0.0, 0.0, 0.0, 0.3, api_name=SIMULATE)
+    out = client.predict(
+        matrix_payload, width_payload, False, 3.0, 0.0, 0.0, 0.0, 0.3, api_name=SIMULATE
+    )
 
-    status = out[2]  # (table, plot, status)
-    assert "Simulated `ethyl`" in status and "2 ground-truth multiplet(s)" in status
+    status = out[-1]
+    assert "2 ground-truth multiplet(s)" in status and "detected" in status
 
 
 @pytest.mark.e2e
-def test_phenotype_change_returns_its_three_defaults(live_app):
-    """The `.change` wiring that repopulates the Simulate form — three outputs from one input."""
+def test_preset_fills_the_matrix_over_the_wire(live_app):
+    """The preset dropdown returns a grid, a width table and a spin count — not form fields."""
     _app, url = live_app
     client = Client(url, verbose=False)
 
-    shifts, j_hz, width = client.predict("aromatic_ax", api_name=PHENOTYPE_DEFAULTS)
+    grid, widths, n_spins = client.predict("aromatic_ax", api_name=PHENOTYPE_DEFAULTS)
 
-    assert (shifts, j_hz, width) == ("7.5, 6.9", 8.0, 1.0)
+    rows = grid["data"] if isinstance(grid, dict) else grid
+    width_rows = widths["data"] if isinstance(widths, dict) else widths
+    assert n_spins == 2
+    assert [row[1] for row in rows] == [7.5, 0.0]  # δ on the diagonal, column offset by the label
+    assert rows[0][2] == 8.0  # the AX coupling, above the diagonal
+    assert len(width_rows) == 1  # one coupled system, so one line-width row
 
 
 @pytest.mark.e2e

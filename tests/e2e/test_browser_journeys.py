@@ -153,16 +153,21 @@ def test_spectrum_plot_zooms_and_resets(page: Page, served_app_url: str) -> None
 
 
 def test_simulate_tab_round_trip(page: Page, served_app_url: str) -> None:
-    """The whole second tab, end to end: choose a phenotype, simulate, detect, read the table.
+    """The whole second tab, end to end: the matrix as loaded, simulate, detect, read the table.
 
-    The Simulate handler takes ten inputs and is the widest surface in the app; this is the only
-    test that drives it through real controls rather than a function call or an API payload.
+    The Simulate handler carries two tabular payloads and is the widest surface in the app; this is
+    the only test that drives it through real controls rather than a function call or an API
+    payload.
     """
     page.goto(served_app_url)
     page.get_by_role("tab", name="Simulate").click()
-    expect(page.get_by_label("Phenotype")).to_be_visible()
+    expect(page.locator("#sim-matrix")).to_be_visible()
 
     page.get_by_role("button", name="Simulate & Predict").click()
 
-    expect(page.get_by_text("Simulated", exact=False)).to_be_visible(timeout=60_000)
+    # `.first`: the status renders the label in markdown bold, so "Simulated" lives in a <strong>
+    # nested inside the paragraph and matches both elements.
+    expect(page.get_by_text("Simulated", exact=False).first).to_be_visible(timeout=60_000)
     expect(page.get_by_text("ground-truth multiplet(s)", exact=False)).to_be_visible()
+    # The label now reports the system the matrix describes rather than a phenotype name.
+    expect(page.get_by_text("spin(s) in", exact=False).first).to_be_visible()
