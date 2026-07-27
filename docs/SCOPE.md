@@ -53,8 +53,8 @@ The model was trained on ~5 million simulated Lorentzian spectra with these rang
 | Property | Range |
 |---|---|
 | SNR | 10² – 10⁵ |
-| Baseline distortion | ≤ 5× noise |
-| Phase | zero-order ±8°, plus first-order |
+| Baseline distortion | ≤ 1× σ (the noise standard deviation) |
+| Phase | zero-order ±8°; first-order ≤ 8° total swing across the window (±8/Δppm deg·ppm⁻¹ = ±0.53 on the 15 ppm grid) |
 | ¹³C satellites | 0.5 – 1.5 % (¹J₍CH₎ 40–220 Hz) |
 | Shim / line broadening | 0 – 3 Hz added |
 | Chemical shift δ | 0 – 15 ppm |
