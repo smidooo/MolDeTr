@@ -602,12 +602,29 @@ def _comparison_dataframe(
 
 
 def _simulate_distort_kwargs(
-    add_noise: bool, snr: float, phase0: float, broaden: float, baseline: float
+    add_noise: bool,
+    snr: float,
+    phase0: float,
+    broaden: float,
+    baseline: float,
+    satellites: bool,
+    sat_j: float,
 ) -> dict[str, float]:
-    """Assemble ``distort`` kwargs from the sliders (neutral / identity values are skipped)."""
+    """Assemble ``distort`` kwargs from the sliders (neutral / identity values are skipped).
+
+    ``satellites`` defaults **on** because training applied ¹³C satellites unconditionally --
+    ``augment_distortions`` calls ``add_13C_satellites_with_variability`` on every sample, with no
+    coin toss and no custom-values path. Leaving them off produced Simulate spectra systematically
+    cleaner than anything the model was trained on, and the tab offered no control to fix it.
+    ``distort`` treats them as opt-in (they apply only when a parameter is supplied), which is the
+    inverse of training semantics, so parity has to be asserted here by the caller.
+    """
     dk: dict[str, float] = {}
     if add_noise:
         dk["noise_snr_log10"] = float(snr)
+    if satellites:
+        dk["sat_j_hz"] = float(sat_j)
+        dk["sat_intensity"] = 0.01  # midpoint of the trained 0.005-0.015 range
     if float(phase0) != 0.0:
         dk["phase0_deg"] = float(phase0)
     if float(broaden) > 0.0:
@@ -691,6 +708,8 @@ def _distorted_amplitudes(
     phase0: float,
     broaden: float,
     baseline: float,
+    satellites: bool,
+    sat_j: float,
 ) -> NDArray[np.float64]:
     """Apply the distortions to the cached clean spectrum and return real amplitudes.
 
@@ -700,7 +719,7 @@ def _distorted_amplitudes(
     array itself, and one in-place edit downstream would corrupt every later re-distortion.
     """
     spectrum = cache["spectrum"]
-    dk = _simulate_distort_kwargs(add_noise, snr, phase0, broaden, baseline)
+    dk = _simulate_distort_kwargs(add_noise, snr, phase0, broaden, baseline, satellites, sat_j)
     if dk:
         spectrum = distort(spectrum, cache["ppm_axis"], **dk)
     return np.array(np.real(spectrum), dtype=float, copy=True)
@@ -714,6 +733,8 @@ def _detect_stage(
     broaden: float,
     baseline: float,
     threshold: float,
+    satellites: bool,
+    sat_j: float,
 ) -> tuple[pd.DataFrame | None, object | None, str]:
     """Distort, detect and compare — everything that must re-run when a slider moves, and no more.
 
@@ -724,7 +745,9 @@ def _detect_stage(
     if isinstance(cache, str):
         return None, None, cache
     try:
-        amplitudes = _distorted_amplitudes(cache, add_noise, snr, phase0, broaden, baseline)
+        amplitudes = _distorted_amplitudes(
+            cache, add_noise, snr, phase0, broaden, baseline, satellites, sat_j
+        )
     except ValueError as exc:
         return None, None, f"Invalid parameters: {exc}"
     label = cache["label"]
@@ -776,6 +799,8 @@ def simulate_and_detect(
     broaden: float,
     baseline: float,
     threshold: float,
+    satellites: bool,
+    sat_j: float,
 ) -> tuple[pd.DataFrame | None, object | None, str]:
     """Simulate the matrix, optionally distort, detect, and compare to ground truth.
 
@@ -783,7 +808,9 @@ def simulate_and_detect(
     and a thin composition of the two stages, so the one-shot and cached paths cannot drift.
     """
     cache = _simulate_stage(matrix_rows, width_rows)
-    return _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
+    return _detect_stage(
+        cache, add_noise, snr, phase0, broaden, baseline, threshold, satellites, sat_j
+    )
 
 
 def preset_grid(name: str) -> tuple[list[list[object]], list[list[object]], int]:
@@ -861,6 +888,8 @@ def simulate_to_state(
     broaden: float,
     baseline: float,
     threshold: float,
+    satellites: bool,
+    sat_j: float,
 ) -> tuple[SimCache | str, pd.DataFrame | None, object | None, str]:
     """Simulate once, hand the cache back for `gr.State`, and render the first result.
 
@@ -870,7 +899,9 @@ def simulate_to_state(
     describe different spectra.
     """
     cache = _simulate_stage(matrix_rows, width_rows)
-    table, fig, msg = _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
+    table, fig, msg = _detect_stage(
+        cache, add_noise, snr, phase0, broaden, baseline, threshold, satellites, sat_j
+    )
     return cache, table, fig, msg
 
 
@@ -882,6 +913,8 @@ def redistort(
     broaden: float,
     baseline: float,
     threshold: float,
+    satellites: bool,
+    sat_j: float,
 ) -> tuple[pd.DataFrame | None, object | None, str]:
     """Re-apply the distortions to an already-simulated spectrum held in `gr.State`.
 
@@ -891,7 +924,9 @@ def redistort(
     """
     if cache is None:
         return None, None, "Press **Simulate & Predict** first, then move the distortion sliders."
-    return _detect_stage(cache, add_noise, snr, phase0, broaden, baseline, threshold)
+    return _detect_stage(
+        cache, add_noise, snr, phase0, broaden, baseline, threshold, satellites, sat_j
+    )
 
 
 CONTRACT = (
@@ -1038,6 +1073,18 @@ def build_ui() -> gr.Blocks:
                         )
                         gr.Markdown("**Distortions**: each bounded to the model's trained range.")
                         with gr.Row():
+                            # Default ON: training applied satellites to every spectrum, so leaving
+                            # them off makes this tab's output cleaner than anything the model saw.
+                            sim_satellites = gr.Checkbox(
+                                value=True,
+                                label="¹³C satellites",
+                                info="Applied to every training spectrum; on by default for parity.",
+                                elem_id="sim-satellites",
+                            )
+                            sim_sat_j = gr.Slider(
+                                40.0, 220.0, value=130.0, step=5.0, label="¹³C satellite ¹J (Hz)"
+                            )
+                        with gr.Row():
                             sim_add_noise = gr.Checkbox(value=False, label="Add noise")
                             sim_snr = gr.Slider(
                                 2.0, 5.0, value=3.0, step=0.1, label="Noise SNR (log10)"
@@ -1115,6 +1162,9 @@ def build_ui() -> gr.Blocks:
             outputs=[sim_matrix, sim_widths],
             api_name="resize_spin_matrix",
         )
+        # Order must match the tail of `simulate_and_detect` / `redistort`: the distortion sliders,
+        # then threshold, then the two satellite controls (appended last so the pre-existing
+        # positional call sites keep binding).
         _distortions = [
             sim_add_noise,
             sim_snr,
@@ -1122,6 +1172,8 @@ def build_ui() -> gr.Blocks:
             sim_broaden,
             sim_baseline,
             sim_threshold,
+            sim_satellites,
+            sim_sat_j,
         ]
         sim_btn.click(
             simulate_to_state,
@@ -1160,6 +1212,8 @@ def build_ui() -> gr.Blocks:
             (sim_broaden.release, "broaden"),
             (sim_baseline.release, "baseline"),
             (sim_threshold.release, "threshold"),
+            (sim_satellites.change, "satellites"),
+            (sim_sat_j.release, "sat_j"),
         ]
         for _trigger, _name in _live_triggers:
             _trigger(
