@@ -17,7 +17,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-DISTORTION = (True, 3.0, 2.0, 0.0, 0.0, 0.3)  # noise on, snr, phase0, broaden, baseline, threshold
+#: noise on, snr, phase0, broaden, baseline, threshold, satellites, satellite J.
+#: Satellites are OFF here deliberately: these tests pin pre-existing spectra, and the GUI's
+#: default-on parity setting would change every one of them. Parity has its own test.
+DISTORTION = (True, 3.0, 2.0, 0.0, 0.0, 0.3, False, 130.0)
 
 
 @pytest.fixture
@@ -116,7 +119,7 @@ def test_redistorting_never_reruns_the_spin_dynamics(
     assert calls["n"] == 1
 
     for phase0 in (0.0, 2.0, 4.0, 6.0, 8.0):
-        app._detect_stage(cache, True, 3.0, phase0, 0.0, 0.0, 0.3)
+        app._detect_stage(cache, True, 3.0, phase0, 0.0, 0.0, 0.3, False, 130.0)
 
     assert calls["n"] == 1, "a distortion change re-ran the simulation"
 
@@ -127,9 +130,9 @@ def test_distortion_actually_changes_the_spectrum(app_module, patch_model, args)
     app = patch_model
     cache = app._simulate_stage(*args)
 
-    clean = app._distorted_amplitudes(cache, False, 3.0, 0.0, 0.0, 0.0)
-    noisy = app._distorted_amplitudes(cache, True, 2.0, 0.0, 0.0, 0.0)
-    phased = app._distorted_amplitudes(cache, False, 3.0, 8.0, 0.0, 0.0)
+    clean = app._distorted_amplitudes(cache, False, 3.0, 0.0, 0.0, 0.0, False, 130.0)
+    noisy = app._distorted_amplitudes(cache, True, 2.0, 0.0, 0.0, 0.0, False, 130.0)
+    phased = app._distorted_amplitudes(cache, False, 3.0, 8.0, 0.0, 0.0, False, 130.0)
 
     assert not np.allclose(clean, noisy)
     assert not np.allclose(clean, phased)
@@ -145,8 +148,8 @@ def test_the_cache_is_not_mutated_by_distorting(app_module, patch_model, args) -
     app = patch_model
     cache = app._simulate_stage(*args)
 
-    first = app._distorted_amplitudes(cache, False, 3.0, 6.0, 0.0, 0.0)
-    second = app._distorted_amplitudes(cache, False, 3.0, 6.0, 0.0, 0.0)
+    first = app._distorted_amplitudes(cache, False, 3.0, 6.0, 0.0, 0.0, False, 130.0)
+    second = app._distorted_amplitudes(cache, False, 3.0, 6.0, 0.0, 0.0, False, 130.0)
     assert np.allclose(first, second)
 
 
@@ -164,7 +167,7 @@ def test_the_no_distortion_path_hands_back_a_copy(app_module, patch_model, args)
     app = patch_model
     cache = app._simulate_stage(*args)
 
-    out = app._distorted_amplitudes(cache, False, 3.0, 0.0, 0.0, 0.0)  # neutral: no distortion
+    out = app._distorted_amplitudes(cache, False, 3.0, 0.0, 0.0, 0.0, False, 130.0)  # neutral: no distortion
 
     assert not np.shares_memory(out, cache["spectrum"])
 
@@ -182,3 +185,31 @@ def test_simulate_stage_reports_bad_input_without_raising(app_module, patch_mode
     zero_width = [list(row) for row in widths]
     zero_width[0][3] = 0.0  # FWHM is the last column: system | δ | n H | FWHM
     assert isinstance(app._simulate_stage(grid, zero_width), str)
+
+
+@pytest.mark.unit
+def test_satellites_are_on_by_default_for_training_parity(app_module) -> None:
+    """The GUI must apply 13C satellites unless the user turns them off.
+
+    Training applied them to *every* spectrum: `augment_distortions` calls
+    `add_13C_satellites_with_variability` unconditionally -- no coin toss, no custom-values path.
+    But `distort` treats them as opt-in, applying them only when a parameter is supplied, which is
+    the inverse of training semantics. So parity depends entirely on the caller asserting it, and
+    nothing checked that it did. Before this, the Simulate tab omitted satellites altogether and
+    produced spectra systematically cleaner than anything the model was trained on.
+
+    Asserted at the kwargs layer rather than on the spectrum: this is a statement about what the
+    app *requests*, and `distort` already has its own tests for what satellites do to a signal.
+    """
+    on = app_module._simulate_distort_kwargs(False, 3.0, 0.0, 0.0, 0.0, True, 130.0)
+    assert on["sat_j_hz"] == 130.0
+    assert on["sat_intensity"] == 0.01, "intensity should sit mid-range of the trained 0.005-0.015"
+
+    off = app_module._simulate_distort_kwargs(False, 3.0, 0.0, 0.0, 0.0, False, 130.0)
+    assert "sat_j_hz" not in off and "sat_intensity" not in off
+
+    # The wired default is what actually decides parity for a user who touches nothing.
+    demo = app_module.build_ui()
+    boxes = [b for b in demo.blocks.values() if getattr(b, "elem_id", None) == "sim-satellites"]
+    assert len(boxes) == 1, "expected exactly one satellites checkbox"
+    assert boxes[0].value is True, "satellites must default ON to match training"

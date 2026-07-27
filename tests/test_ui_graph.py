@@ -15,15 +15,18 @@ import inspect
 
 import pytest
 
-#: Unchanged across the matrix rebuild by coincidence, not by stasis: the shift textbox, the two
+#: 56 -> 60 when the 13C-satellite controls landed: a checkbox, a J slider, their Row, and the
+#: Row the noise checkbox moved into. Was unchanged across the matrix rebuild by coincidence,
+#: not by stasis: the shift textbox, the two
 #: number boxes and their row went away, and a spin-count slider, two dataframes and a hint line
 #: arrived. `gr.State` holds the simulation cache but is not itself a Block.
-N_COMPONENTS = 56
+N_COMPONENTS = 60
 #: load_example · _spec_report ×2 · predict_ui · preset_grid · resize_spin_matrix ·
-#: simulate_to_state · redistort ×6 · invalidate_cache ×2. Gradio derives an endpoint id for every
+#: simulate_to_state · redistort x8 (the two 13C-satellite controls joined the live triggers) ·
+#: invalidate_cache x2. Gradio derives an endpoint id for every
 #: re-distort handlers are named one per control — `api_name=False` becomes the literal "false",
 #: "false_1", ..., which is the auto-derived surface these tests exist to prevent.
-N_EVENTS = 15
+N_EVENTS = 17
 
 #: Label of the Simulate tab's line-broadening slider, addressed by the OOD-copy guard below.
 BROADEN_LABEL = "Broadening FWHM (Hz; 0 = off)"
