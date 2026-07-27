@@ -290,7 +290,7 @@ def test_a_broken_cell_leaves_the_width_table_alone(app_module) -> None:
 @pytest.mark.unit
 def test_a_cleared_cache_prompts_instead_of_rendering(app_module) -> None:
     """The prompt is what the user sees after an edit, so it has to name the next action."""
-    table, fig, msg = app_module.redistort(None, False, 3.0, 6.0, 0.0, 0.0, 0.3)
+    table, fig, msg = app_module.redistort(None, False, 3.0, 6.0, 0.0, 0.0, 0.3, False, 130.0)
 
     assert (table, fig) == (None, None)
     assert "Simulate & Predict" in msg
