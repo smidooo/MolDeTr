@@ -21,6 +21,7 @@ pytest.importorskip("playwright")
 pytest.importorskip("axe_playwright_python")
 from axe_playwright_python.sync_playwright import Axe  # noqa: E402
 from playwright.sync_api import Page, expect  # noqa: E402
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError  # noqa: E402
 
 pytestmark = pytest.mark.browser
 
@@ -79,11 +80,25 @@ def _violations(page: Page) -> list[dict]:
 
 
 def _format(violations: list[dict]) -> str:
-    return "\n".join(
-        f"  [{v['impact']}] {v['id']}: {v['help']} ({len(v['nodes'])} node(s))"
-        f"\n    first: {v['nodes'][0]['html'][:160]}"
-        for v in violations
-    )
+    """Render violations so CI output alone identifies the offending element.
+
+    Printing only ``nodes[0]['html'][:160]`` is not enough: Gradio emits nodes like
+    ``<button class="svelte-11gaq1">`` whose first 160 characters carry no identifying
+    information, and dropping ``target`` throws away the one field that says *which* button. The
+    2026-07-27 ``button-name`` flake had to be diagnosed from the uploaded Playwright trace because
+    of that, so every node's ``target`` and ``failureSummary`` are reported here.
+    """
+    lines = []
+    for v in violations:
+        lines.append(f"  [{v['impact']}] {v['id']}: {v['help']} ({len(v['nodes'])} node(s))")
+        for n in v["nodes"]:
+            target = " ".join(str(t) for t in n.get("target", [])) or "(no target)"
+            lines.append(f"    target: {target}")
+            lines.append(f"      html: {n.get('html', '')[:200]}")
+            summary = (n.get("failureSummary") or "").replace("\n", " ")
+            if summary:
+                lines.append(f"      why:  {summary[:300]}")
+    return "\n".join(lines)
 
 
 def _wait_for_download_buttons_to_settle(page: Page) -> None:
@@ -108,6 +123,42 @@ def _wait_for_download_buttons_to_settle(page: Page) -> None:
         ".filter(b => b.textContent.includes('Download'))"
         ".every(b => getComputedStyle(b).opacity === '1')"
     )
+
+
+_ALL_BUTTONS_NAMED_JS = (
+    "() => [...document.querySelectorAll('button')]"
+    ".filter(b => b.getClientRects().length > 0)"
+    ".every(b => (b.textContent || '').trim()"
+    " || b.getAttribute('aria-label')"
+    " || b.getAttribute('aria-labelledby')"
+    " || b.getAttribute('title'))"
+)
+
+
+def _wait_for_buttons_to_have_accessible_names(page: Page, timeout: float | None = None) -> None:
+    """Block until every rendered ``<button>`` has an accessible name.
+
+    This asserts exactly the precondition ``button-name`` is about to check, so it cannot mask a
+    real defect: a permanently nameless button makes this time out — and the timeout names it —
+    instead of producing a bare assertion failure.
+
+    Needed because the Simulate tab had no settle at all. ``expect(#sim-matrix).to_be_visible()``
+    resolves the instant the panel's ``display`` flips, and axe skips ``display:none`` subtrees, so
+    the click that reveals the tab is also the first moment its nodes enter axe's scope — while
+    Gradio's tab strip is mid-re-measurement. That re-measurement (``Walkthrough-*.js``) awaits a
+    tick and a ``requestAnimationFrame`` and re-runs on every ResizeObserver fire, and it toggles an
+    icon-only overflow button that upstream ships with no ``aria-label``. Under WebKit the
+    Space Grotesk webfont lands late, tab widths change, and that nameless button is transiently
+    rendered — which is what turned an unrelated docs-only PR red on 2026-07-27 (confirmed from the
+    run's Playwright trace: ``<button class="svelte-11gaq1">`` wrapping a three-circle SVG).
+
+    ``getClientRects().length`` is the visibility test rather than ``offsetParent``, because the
+    latter is null for ``position: fixed`` elements that are genuinely visible.
+
+    Do NOT substitute :func:`_wait_for_download_buttons_to_settle` here: its filter matches no
+    button on Simulate, and ``[].every(...)`` is vacuously true, so it returns immediately.
+    """
+    page.wait_for_function(_ALL_BUTTONS_NAMED_JS, timeout=timeout)
 
 
 def test_node_filter_matches_the_widget_it_documents() -> None:
@@ -154,10 +205,32 @@ def test_results_state_has_no_serious_axe_violations(page: Page, served_app_url:
     assert not violations, "axe found blocking violations after Detect:\n" + _format(violations)
 
 
+def test_button_name_settle_is_not_vacuous(page: Page, served_app_url: str) -> None:
+    """The settle must actually fail on a nameless button, or it guards nothing.
+
+    Its predecessor on this tab did guard nothing: ``_wait_for_download_buttons_to_settle`` filters
+    to buttons containing "Download", matches zero on Simulate, and ``[].every(...)`` is vacuously
+    true. A settle that cannot fail is indistinguishable from no settle, and the Simulate scan is
+    exactly where that cost a red CI run on an unrelated PR. So inject the defect and prove the
+    wait rejects it.
+    """
+    page.goto(served_app_url)
+    page.get_by_role("tab", name="Simulate").click()
+    expect(page.locator("#sim-matrix")).to_be_visible()
+    _wait_for_buttons_to_have_accessible_names(page)  # settled: passes
+
+    page.evaluate("() => document.body.appendChild(document.createElement('button'))")
+    with pytest.raises(PlaywrightTimeoutError):
+        _wait_for_buttons_to_have_accessible_names(page, timeout=1_500)
+
+
 def test_simulate_tab_has_no_serious_axe_violations(page: Page, served_app_url: str) -> None:
     page.goto(served_app_url)
     page.get_by_role("tab", name="Simulate").click()
     expect(page.locator("#sim-matrix")).to_be_visible()
+    # `to_be_visible` only proves the panel's display flipped; the tab strip is still
+    # re-measuring at that point. See the helper for what that costs.
+    _wait_for_buttons_to_have_accessible_names(page)
 
     violations = _violations(page)
     assert not violations, "axe found blocking violations on Simulate:\n" + _format(violations)
