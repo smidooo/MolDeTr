@@ -13,6 +13,53 @@ import pytest
 
 
 @pytest.mark.unit
+def test_spins_sharing_a_shift_are_one_group_even_across_spin_systems(app_module) -> None:
+    """Grouping is by shift, not by coupling block — and that is the deliberate choice.
+
+    A review suggested keying on `coupling_blocks` so that two protons at the same δ in independent
+    systems stay two 1H multiplets. Measuring the spectra rejected it. Ground truth here is compared
+    against a detector that sees only the spectrum, and co-located protons produce a single peak
+    carrying their combined area:
+
+        3 equivalent uncoupled protons at 3.8 (a methoxy)  -> 1 peak, area 3.00
+        2 coupled + 1 free, all at 3.5                     -> 1 peak, area 3.00
+
+    Block-based grouping reports three 1H multiplets for the first and 2H + 1H for the second, where
+    the spectrum shows one 3H line in both. That is strictly worse, so the shift-based grouping
+    stands.
+
+    Known limitation, kept here so it is not rediscovered as a bug: when co-located spins have
+    *different* multiplet structure — a doublet overlapping a singlet at the same δ — one merged
+    group with a single max J describes them poorly. Blocking does not fix that case well either
+    (it would be right there and wrong above), so it is left alone until the UI can produce it.
+    """
+    methoxy = app_module._build_gt_groups([3.8, 3.8, 3.8], np.zeros((3, 3)))
+    assert [(g["shift_ppm"], g["proton_count"]) for g in methoxy] == [(3.8, 3)]
+
+    j = np.zeros((3, 3))
+    j[0, 1] = j[1, 0] = 12.0  # spins 0 and 1 are one coupled system; spin 2 is independent
+    mixed = app_module._build_gt_groups([3.5, 3.5, 3.5], j)
+    assert [(g["shift_ppm"], g["proton_count"]) for g in mixed] == [(3.5, 3)]
+
+
+@pytest.mark.unit
+def test_a_coupling_written_below_the_diagonal_is_not_read(app_module) -> None:
+    """GT must read the same half of the matrix as `simulate` and `coupling_blocks` do.
+
+    All three now take the upper triangle as the contract. If GT scanned whole rows instead, a
+    matrix editor that fills only above the diagonal would give a ground-truth J for a coupling the
+    simulated spectrum does not contain — the GT column would describe a different spin system from
+    the one plotted beside it.
+    """
+    below_only = np.zeros((2, 2))
+    below_only[1, 0] = 8.0
+
+    groups = app_module._build_gt_groups([7.5, 6.9], below_only)
+
+    assert [g["max_j_hz"] for g in groups] == [None, None]
+
+
+@pytest.mark.unit
 def test_each_group_reports_its_own_largest_coupling(app_module) -> None:
     """Two groups with different couplings must not report the same J."""
     shifts = [7.5, 6.9, 1.2]
