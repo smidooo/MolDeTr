@@ -25,6 +25,9 @@ N_COMPONENTS = 56
 #: "false_1", ..., which is the auto-derived surface these tests exist to prevent.
 N_EVENTS = 15
 
+#: Label of the Simulate tab's line-broadening slider, addressed by the OOD-copy guard below.
+BROADEN_LABEL = "Broadening FWHM (Hz; 0 = off)"
+
 # elem_ids the CSS and the browser tests address by name. `md-check`/`md-plot` carry no CSS rule of
 # their own (see the L7 exclusion list) but are still selector anchors for the e2e suite.
 EXPECTED_ELEM_IDS = {
@@ -187,3 +190,23 @@ def test_the_matrix_edit_handler_clears_the_cache_and_rebuilds_the_widths(demo):
     # The width table clears the cache too, and must not be wired to rewrite itself.
     width_edit = next(d for d in demo.fns.values() if d.api_name == "invalidate_on_width_edit")
     assert {c._id for c in width_edit.outputs} <= state_ids
+
+
+def test_broadening_slider_does_not_claim_it_is_out_of_distribution(demo):
+    """The broadening slider must not tell users the model never saw line broadening.
+
+    It did, until 2026-07-27. That claim came from reading `augment_distortions` in its current
+    state, where `toss_coin = 0.99` is hardcoded and the shim/broadening branches are dead — but
+    that literal postdates the shipped weights. The checkpoint was last written 2024-10-14; the pin
+    landed 2024-12-01, and at the weights' date the line still read `np.random.uniform(0, 1)`, so
+    training applied broadening on roughly a third of its spectra.
+
+    Guarding the copy rather than the wording: any future text that reasserts "trained without line
+    broadening" is wrong for the shipped checkpoint, and nothing else in the suite would catch it.
+    """
+    sliders = [b for b in demo.blocks.values() if getattr(b, "label", None) == BROADEN_LABEL]
+    assert len(sliders) == 1, f"expected exactly one {BROADEN_LABEL!r} slider, got {len(sliders)}"
+    info = (getattr(sliders[0], "info", None) or "").lower()
+    assert info, "the broadening slider should explain its relation to the training distribution"
+    for phrase in ("without line broadening", "never saw", "outside the model's training"):
+        assert phrase not in info, f"broadening slider still claims OOD via {phrase!r}: {info}"
