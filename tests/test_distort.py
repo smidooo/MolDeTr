@@ -33,7 +33,10 @@ def _ppm() -> np.ndarray:
 _EFFECTS = [
     ("noise_snr_log10", 3.0),
     ("phase0_deg", 5.0),
-    ("phase1", 1.0),
+    # 0.5, not 1.0: on the 8 ppm _ppm() axis the enforced bound is exactly 8/8 = 1.0, so 1.0 passes
+    # only because _check_range is inclusive. Widening the fixture would then break these two
+    # unrelated parametrized tests. 0.5 keeps margin and still perturbs the spectrum.
+    ("phase1", 0.5),
     ("baseline", True),
     ("baseline", 0.05),
     ("sat_j_hz", 130.0),
@@ -141,18 +144,18 @@ def test_phase1_outside_trained_range_raises() -> None:
 
 
 def test_phase1_bound_follows_the_window_width() -> None:
-    """The bound is 8/ppm_width, not a constant -- a narrower window means a tighter bound.
+    """The bound is 8/ppm_width, so the deg/ppm coefficient SHRINKS as the window grows.
 
-    The model's own grid is 1200 Hz at 80 MHz = 15 ppm, where the trained bound is 8/15 = 0.533
-    deg/ppm. The same value is comfortably in range on the wider 8 ppm axis, so a hardcoded
-    constant would be wrong in one direction or the other.
+    What training capped is the total first-order swing across the window (bound * width = 8
+    degrees), not the coefficient. So the model's own 15 ppm grid allows 8/15 = 0.533 deg/ppm while
+    the narrower 8 ppm axis allows a full 1.0 -- a hardcoded constant would be wrong on one of them.
     """
     spec = _spectrum()
-    narrow = np.linspace(14.5, -0.5, N)  # 15 ppm, the model window -> bound 0.5333
-    distort(spec, narrow, phase1=0.53)  # just inside; must not raise
+    model_window = np.linspace(14.5, -0.5, N)  # 15 ppm, the model grid -> bound 0.5333
+    distort(spec, model_window, phase1=0.53)  # just inside; must not raise
     with pytest.raises(ValueError, match="phase1"):
-        distort(spec, narrow, phase1=0.54)  # just outside
-    distort(spec, _ppm(), phase1=0.54)  # same value, wider window -> fine
+        distort(spec, model_window, phase1=0.54)  # just outside
+    distort(spec, _ppm(), phase1=0.54)  # same value, narrower 8 ppm window (bound 1.0) -> fine
 
 
 def test_noise_realises_requested_snr() -> None:

@@ -49,9 +49,10 @@ _FWHM_PER_SIGMA: float = 2.0 * np.sqrt(2.0 * np.log(2.0))
 # Trained parameter ranges (mirrors data_augmentation defaults / the paper).
 _SNR_LOG10_RANGE = (2.0, 5.0)
 _PHASE0_ABS_MAX = 8.0
-# First-order phase was drawn from uniform(-factor/ppm_width, +factor/ppm_width), so its trained
-# bound depends on the window and cannot be a constant: 8/15 = 0.533 deg/ppm on the model's own
-# 15 ppm grid, but wider on a wider window. Mirrors add_phase_distortion's phase_1_factor default.
+# First-order phase was drawn from uniform(-factor/ppm_width, +factor/ppm_width), so what training
+# actually capped is the TOTAL first-order swing across the window: bound * ppm_width = 8 degrees,
+# whatever the window. The deg/ppm coefficient therefore SHRINKS as the window grows -- 0.533 on the
+# model's own 15 ppm grid, 1.0 on an 8 ppm window. Mirrors add_phase_distortion's phase_1_factor.
 _PHASE1_FACTOR = 8.0
 _SAT_J_RANGE = (40.0, 220.0)
 _SAT_INTENSITY_RANGE = (0.005, 0.015)
@@ -76,20 +77,23 @@ def _validate(
     sat_j_hz: float | None,
     sat_intensity: float | None,
     broaden_hz: float | None,
+    *,
     phase1: float | None = None,
     ppm_width: float | None = None,
 ) -> None:
     """Validate every supplied (non-``None``) parameter against its trained range.
 
     ``phase1`` needs ``ppm_width`` because its trained bound is ``+-8/ppm_width`` rather than a
-    fixed number; it is skipped when the width is unknown or degenerate.
+    fixed number; it is skipped when the width is unknown or degenerate. Keyword-only so the two
+    late additions cannot be silently mis-ordered against ``distort``'s own signature, where
+    ``phase1`` sits before ``sat_j_hz``.
     """
     if noise_snr_log10 is not None:
         _check_range("noise_snr_log10", noise_snr_log10, *_SNR_LOG10_RANGE)
     if phase0_deg is not None:
         _check_range("phase0_deg", phase0_deg, -_PHASE0_ABS_MAX, _PHASE0_ABS_MAX)
-    if phase1 is not None and ppm_width:
-        bound = _PHASE1_FACTOR / abs(ppm_width)
+    if phase1 is not None and ppm_width is not None and ppm_width > 0.0:
+        bound = _PHASE1_FACTOR / ppm_width
         _check_range("phase1", phase1, -bound, bound)
     if sat_j_hz is not None:
         _check_range("sat_j_hz", sat_j_hz, *_SAT_J_RANGE)
@@ -202,9 +206,9 @@ def distort(
     phase0_deg:
         Zeroth-order phase in degrees, |.| <= 8.
     phase1:
-        First-order (frequency-dependent) phase coefficient in deg/ppm. Trained range is
-        ``|.| <= 8/ppm_width`` -- 0.533 on the model's own 15 ppm window -- so the bound is taken
-        from ``ppm_axis`` rather than fixed.
+        First-order (frequency-dependent) phase coefficient in deg/ppm. Training capped the total
+        swing across the window at 8 degrees, so the coefficient bound is ``|.| <= 8/ppm_width``
+        (0.533 on the model's own 15 ppm window) and is read from ``ppm_axis`` rather than fixed.
     baseline:
         ``None``/``False`` = off; ``True`` = default tilt; a float = tilt magnitude.
     sat_j_hz:
@@ -229,8 +233,11 @@ def distort(
         sat_j_hz,
         sat_intensity,
         broaden_hz,
-        phase1,
-        abs(float(ppm[0]) - float(ppm[-1])) if ppm.size >= 2 else None,
+        phase1=phase1,
+        # Width from the array endpoints, not from _apply_phase's ppm_right/ppm_left arguments:
+        # every real caller supplies a descending axis, which makes those two names the reverse of
+        # their contents. abs() keeps the bound on the symmetric interval training sampled.
+        ppm_width=abs(float(ppm[0]) - float(ppm[-1])) if ppm.size >= 2 else None,
     )
 
     out = np.array(spectrum, dtype=np.complex128, copy=True)

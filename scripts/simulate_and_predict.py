@@ -2,7 +2,7 @@
 
 This ties three verified building blocks into one closed loop against the released checkpoint:
 
-1. :func:`moldetr.simulate.simulate` -- exact spin-Hamiltonian ¹H NMR simulation of a named
+1. :func:`moldetr.simulate.simulate_systems` -- exact spin-Hamiltonian ¹H NMR simulation of a named
    *phenotype* (a small, hand-specified spin system with a known ground-truth grouping);
 2. :func:`moldetr.distort.distort` -- optional, deterministic, per-effect training-time distortions
    (noise, phase, baseline, ¹³C satellites, line broadening), each bounded to its trained range;
@@ -118,7 +118,8 @@ PHENOTYPES: dict[str, Phenotype] = {
 def build_coupling_matrix(n_spins: int, pairs: list[tuple[int, int, float]]) -> NDArray[np.float64]:
     """Build a symmetric ``n_spins x n_spins`` Hz coupling matrix from ``(i, j, J)`` pairs.
 
-    ``simulate`` reads only the upper triangle, but the matrix is filled symmetrically for clarity.
+    ``simulate_systems``/``coupling_blocks`` read only the upper triangle, but the matrix is filled
+    symmetrically for clarity.
     """
     matrix = np.zeros((n_spins, n_spins), dtype=np.float64)
     for i, j, j_hz in pairs:
@@ -144,10 +145,13 @@ def simulate_phenotype(
         raise KeyError(f"unknown phenotype {name!r}; choose from {sorted(PHENOTYPES)}")
     pheno = PHENOTYPES[name]
     couplings = build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
-    # simulate_systems, not simulate: a phenotype is several independent spin systems in one
-    # window, and simulate collapses every width to a single mean across all of them. Simulating
-    # the blocks apart keeps each group's own line width and sums them in per-proton space, so
-    # relative integrals across groups are right by construction.
+    # simulate_systems, not simulate: when a phenotype has several independent spin systems with
+    # DIFFERENT line widths, simulate collapses them to one mean width across the whole matrix.
+    # Simulating the blocks apart keeps each its own width and sums in per-proton space, so
+    # relative integrals across groups are right by construction. This also aligns the script with
+    # app.py. For the three phenotypes shipped here it is a numeric no-op (ethyl and aromatic_ax
+    # are each ONE coupled block; methoxy_singlet's widths are all equal) -- output is unchanged to
+    # 3e-16, so the paper-comparable results do not move. It is a guarantee for future phenotypes.
     spectrum, ppm_axis = simulate_systems(
         pheno["shifts_ppm"],
         couplings,
@@ -327,7 +331,12 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument("--checkpoint", default=DEFAULT_CHECKPOINT)
     ap.add_argument("--snr", type=float, default=None, help="noise_snr_log10 (2.0-5.0)")
     ap.add_argument("--phase0", type=float, default=None, help="phase0_deg (|.| <= 8)")
-    ap.add_argument("--phase1", type=float, default=None, help="first-order phase coefficient")
+    ap.add_argument(
+        "--phase1",
+        type=float,
+        default=None,
+        help="first-order phase in deg/ppm (|.| <= 8/window = 0.533 on this 15 ppm grid)",
+    )
     ap.add_argument("--baseline", type=float, default=None, help="baseline tilt magnitude")
     ap.add_argument("--sat-j", type=float, default=None, help="13C-satellite J in Hz (40-220)")
     ap.add_argument(
@@ -351,7 +360,12 @@ def main() -> None:
             "(Zenodo DOI 10.5281/zenodo.21217102)."
         )
     distort_kwargs = _distort_kwargs_from_args(args)
-    amplitudes, _ppm_axis, gt_groups = simulate_phenotype(args.phenotype, distort_kwargs)
+    try:
+        amplitudes, _ppm_axis, gt_groups = simulate_phenotype(args.phenotype, distort_kwargs)
+    except ValueError as exc:
+        # An out-of-range distortion knob is user error; exit like the missing-checkpoint path
+        # above rather than dumping a traceback.
+        raise SystemExit(str(exc)) from exc
     preds = predict(amplitudes, args.checkpoint, threshold=args.threshold)
     matched = match_to_gt(gt_groups, preds)
     print_comparison(args.phenotype, matched, distort_kwargs, len(preds))
