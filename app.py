@@ -730,7 +730,14 @@ def _detect_stage(
     label = cache["label"]
     gt_groups = cache["gt_groups"]
     preds = decode_predictions(
-        run(_get_model(), amplitudes),
+        # Skip the in-model noise floor when the user has already added calibrated noise here.
+        # The floor (0.005 * max) exists to drag a perfectly clean FFT-resampled spectrum back
+        # in-distribution; once "Add noise" is on, that job is done and the floor only masks the
+        # slider. The two are directly comparable -- distort's std is max/(2*SNR) -- and they are
+        # equal only at the slider's 2.0 minimum, so at the 3.0 default the requested noise sits
+        # 10x under the floor and at 5.0 it is 1000x under. That is why the slider felt inert.
+        # Detect (and predict.py) deliberately keep the floor: they feed the frozen decode.
+        run(_get_model(), amplitudes, noise_frac=0.0 if add_noise else 0.005),
         load_extrema(EXTREMA),
         sp.POINTS_PER_HZ,
         ppm_left=sp.LEFT_PPM,
@@ -1049,9 +1056,9 @@ def build_ui() -> gr.Blocks:
                             step=0.1,
                             label="Broadening FWHM (Hz; 0 = off)",
                             info=(
-                                "⚠ Outside the model's training distribution: the shipped model was "
-                                "trained without line broadening, so enabling this feeds it an effect "
-                                "it never saw and detection may degrade."
+                                "Within the model's training distribution: the shipped checkpoint "
+                                "saw added line broadening on roughly a third of its training "
+                                "spectra."
                             ),
                         )
                         sim_baseline = gr.Slider(
