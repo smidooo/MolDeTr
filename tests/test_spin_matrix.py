@@ -365,3 +365,53 @@ def test_extra_columns_are_reported_rather_than_dropped(app_module) -> None:
     """`n` comes from the row count, so surplus columns used to vanish without comment."""
     with pytest.raises(ValueError, match="row 1"):
         app_module._matrix_to_system([["A", 1.0, 7.0, 5.0], ["B", 2.0, 0.0, 5.0]])
+
+
+@pytest.mark.unit
+def test_every_phenotype_ground_truth_matches_the_apps_own_derivation(app_module) -> None:
+    """The hand-written GT in `PHENOTYPES` must agree with what the app derives from the matrix.
+
+    These are the only two places ground truth exists, and they are reached by different paths: the
+    CLI returns `pheno["gt_groups"]` verbatim, while the Simulate tab throws it away and re-derives
+    from the edited grid via `_build_gt_groups`. So a wrong hand-written entry is invisible in the
+    GUI and wrong in the CLI, with nothing to reconcile them -- which is exactly the gap this test
+    closes, now that there are 25 Table S2 presets rather than 3 hand-checked ones.
+
+    Comparison is order-insensitive on groups: `_build_gt_groups` orders by first appearance and the
+    literals are written top-down, but that is incidental, not contract.
+    """
+    import simulate_and_predict as sp
+
+    def key(groups):
+        return sorted(
+            (round(g["shift_ppm"], 6), g["proton_count"], g["max_j_hz"]) for g in groups
+        )
+
+    for name, pheno in sp.PHENOTYPES.items():
+        matrix = sp.build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
+        derived = app_module._build_gt_groups(pheno["shifts_ppm"], matrix)
+        assert key(pheno["gt_groups"]) == key(derived), (
+            f"{name}: declared ground truth disagrees with the app's derivation\n"
+            f"  declared: {key(pheno['gt_groups'])}\n"
+            f"  derived : {key(derived)}"
+        )
+
+
+@pytest.mark.unit
+def test_every_phenotype_fits_the_editor_and_the_simulator(app_module) -> None:
+    """No preset may exceed the grid cap or the exact-diagonalisation block cap.
+
+    `MAX_MATRIX_SPINS` bounds the editor; `simulate_systems` raises above `MAX_BLOCK_SPINS` because
+    the Hamiltonian is 2**n. A preset that violates either is unreachable in the GUI or raises on
+    use, and with 25 of them nobody is going to click through each one.
+    """
+    from moldetr.simulate import MAX_BLOCK_SPINS, coupling_blocks
+
+    import simulate_and_predict as sp
+
+    for name, pheno in sp.PHENOTYPES.items():
+        n = len(pheno["shifts_ppm"])
+        assert n <= app_module.MAX_MATRIX_SPINS, f"{name}: {n} spins exceeds the editor cap"
+        matrix = sp.build_coupling_matrix(n, pheno["couplings"])
+        for block in coupling_blocks(matrix):
+            assert len(block) <= MAX_BLOCK_SPINS, f"{name}: block of {len(block)} spins"

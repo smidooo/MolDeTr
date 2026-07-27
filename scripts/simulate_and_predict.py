@@ -30,7 +30,7 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any, NamedTuple, TypedDict
 
 import numpy as np
 from numpy.typing import NDArray
@@ -110,6 +110,219 @@ PHENOTYPES: dict[str, Phenotype] = {
         ],
     },
 }
+
+
+# --- The paper's Table S2 building blocks ------------------------------------
+#
+# Table S2 of the SI ("Modular spin system building blocks categorized by coupling regimes") lists
+# 25 blocks: 11 strongly coupled, 9 weakly coupled, 5 uncoupled. They are added here as presets so
+# the Simulate tab can demonstrate every regime the model was trained on, not just the three
+# hand-written phenotypes above (which are kept unchanged -- they are the entry points the e2e and
+# app tests address by name).
+#
+# Coupling regime is set by |Delta delta / J|: strongly coupled blocks (AB, ABX, ...) are given
+# shifts a fraction of J apart so second-order roof-topping appears; weakly coupled ones (AX, AMX,
+# ...) are given well-separated shifts. Every J is inside the trained 0.01-20 Hz range and every
+# line width inside 0.3-2.2 Hz (``generate_coupling``/``generate_width`` in the reference).
+#
+# Example molecules follow the ACS proof corrections, NOT the pre-proof SI source: allyl chloride is
+# A2MXY (not A2MX2), the AA'BB' example is 1-bromo-2-chloroethane (1,2-dibromoethane is A4 by
+# symmetry), 1-bromo-2-chloropropane carries its CH3, and the A3 example is nitromethane (acetone is
+# A6). Restated here rather than quoted.
+
+
+class _Group(NamedTuple):
+    """One magnetically equivalent proton group: its shift, how many protons, and its line width."""
+
+    shift_ppm: float
+    n_protons: int
+    width_hz: float
+
+
+class _Pair(NamedTuple):
+    """A coupling between two groups.
+
+    ``j_alt`` is for the AA'BB' / AA'XX' family, where the two members of each group are not
+    equivalent to both members of the partner group: the reference alternates J and J' by index
+    parity (``generate_coupling_matrix_for_AAXX_like``). Leave it ``None`` for the ordinary case
+    where every spin of one group couples to every spin of the other with the same J.
+    """
+
+    group_i: int
+    group_j: int
+    j_hz: float
+    j_alt_hz: float | None = None
+
+
+def _expand(description: str, groups: list[_Group], pairs: list[_Pair]) -> Phenotype:
+    """Turn a group-level topology into the per-spin ``Phenotype`` the simulator wants.
+
+    Written as an expansion rather than 25 hand-written literals because the per-spin form has a
+    trap: a group of N equivalent protons needs **N rows at the same shift**, not one row labelled
+    ``proton_count = N``. The reference falls into exactly that hole -- its equivalent-spin classes
+    size their matrices by ``len(nspins)`` instead of ``sum(nspins)``, so ``A6`` simulates a single
+    spin -- and ``app._build_gt_groups`` recovers proton counts by counting rows at each shift, so
+    the short form would silently report 1H where the label says 6H.
+    """
+    shifts: list[float] = []
+    widths: list[float] = []
+    starts: list[int] = []
+    for group in groups:
+        starts.append(len(shifts))
+        shifts.extend([group.shift_ppm] * group.n_protons)
+        widths.extend([group.width_hz] * group.n_protons)
+
+    couplings: list[tuple[int, int, float]] = []
+    for pair in pairs:
+        lo, hi = groups[pair.group_i], groups[pair.group_j]
+        for a in range(starts[pair.group_i], starts[pair.group_i] + lo.n_protons):
+            for b in range(starts[pair.group_j], starts[pair.group_j] + hi.n_protons):
+                alternating = pair.j_alt_hz is not None and (a % 2) != (b % 2)
+                couplings.append((a, b, pair.j_alt_hz if alternating else pair.j_hz))
+
+    gt_groups: list[GTGroup] = []
+    for index, group in enumerate(groups):
+        js = [
+            j
+            for pair in pairs
+            if index in (pair.group_i, pair.group_j)
+            for j in (pair.j_hz, pair.j_alt_hz)
+            if j is not None
+        ]
+        gt_groups.append(
+            {
+                "shift_ppm": group.shift_ppm,
+                "proton_count": group.n_protons,
+                "max_j_hz": max(js) if js else None,
+            }
+        )
+    return {
+        "description": description,
+        "shifts_ppm": shifts,
+        "couplings": couplings,
+        "widths_hz": widths,
+        "gt_groups": gt_groups,
+    }
+
+
+#: ``key -> (description, groups, couplings)``. Group indices in the pairs refer to the group list.
+_TABLE_S2: dict[str, tuple[str, list[_Group], list[_Pair]]] = {
+    # -- Uncoupled: a single group, no partner. -------------------------------
+    "A": ("A - one isolated proton (CHCl3)", [_Group(7.26, 1, 0.8)], []),
+    "A2": ("A2 - two equivalent protons (CH2Cl2)", [_Group(5.30, 2, 0.8)], []),
+    "A3": ("A3 - three equivalent protons (nitromethane CH3NO2)", [_Group(4.33, 3, 0.8)], []),
+    "A4": ("A4 - four equivalent protons (1,2-dibromoethane)", [_Group(3.66, 4, 0.9)], []),
+    "A6": ("A6 - six equivalent protons (benzene)", [_Group(7.36, 6, 0.7)], []),
+    # -- Weakly coupled: |Delta delta / J| large, first-order multiplets. ------
+    "AX": (
+        "AX - two 1H doublets, well separated",
+        [_Group(7.60, 1, 0.8), _Group(6.40, 1, 0.8)],
+        [_Pair(0, 1, 8.0)],
+    ),
+    "A2X": (
+        "A2X - 2H + 1H, well separated",
+        [_Group(4.20, 2, 0.9), _Group(6.80, 1, 0.9)],
+        [_Pair(0, 1, 7.0)],
+    ),
+    "A3X": (
+        "A3X - 3H + 1H, well separated",
+        [_Group(1.40, 3, 0.9), _Group(4.90, 1, 0.9)],
+        [_Pair(0, 1, 6.5)],
+    ),
+    "A2X2": (
+        "A2X2 - two 2H groups, well separated",
+        [_Group(3.70, 2, 1.0), _Group(2.60, 2, 1.0)],
+        [_Pair(0, 1, 6.8)],
+    ),
+    "A3X2": (
+        "A3X2 - ethanol CH3-CH2 (3H triplet + 2H quartet)",
+        [_Group(1.22, 3, 0.9), _Group(3.66, 2, 0.9)],
+        [_Pair(0, 1, 7.0)],
+    ),
+    "AMX": (
+        "AMX - three mutually coupled 1H, all well separated",
+        [_Group(7.40, 1, 0.8), _Group(6.30, 1, 0.8), _Group(5.20, 1, 0.8)],
+        [_Pair(0, 1, 10.0), _Pair(1, 2, 6.0), _Pair(0, 2, 2.0)],
+    ),
+    "AM2X": (
+        "AM2X - 1H + 2H + 1H, all well separated",
+        [_Group(6.90, 1, 0.9), _Group(4.10, 2, 0.9), _Group(2.30, 1, 0.9)],
+        [_Pair(0, 1, 7.5), _Pair(1, 2, 6.0), _Pair(0, 2, 1.5)],
+    ),
+    "AA'XX'": (
+        "AA'XX' - two 2H groups, non-equivalent partners (J != J')",
+        [_Group(3.80, 2, 1.0), _Group(2.70, 2, 1.0)],
+        [_Pair(0, 1, 8.0, 5.0)],
+    ),
+    "AA'MM'X": (
+        "AA'MM'X - 2H + 2H + 1H, well separated",
+        [_Group(4.00, 2, 1.0), _Group(2.90, 2, 1.0), _Group(6.70, 1, 0.9)],
+        [_Pair(0, 1, 8.0, 5.0), _Pair(0, 2, 6.0), _Pair(1, 2, 1.2)],
+    ),
+    # -- Strongly coupled: shifts a fraction of J apart -> roof-topping. -------
+    "AB": (
+        "AB - two 1H only ~0.05 ppm apart (strong coupling)",
+        [_Group(7.55, 1, 0.7), _Group(7.50, 1, 0.7)],
+        [_Pair(0, 1, 8.0)],
+    ),
+    "A2B": (
+        "A2B - 2H + 1H, strongly coupled",
+        [_Group(3.60, 2, 0.9), _Group(3.55, 1, 0.9)],
+        [_Pair(0, 1, 7.0)],
+    ),
+    "A3B": (
+        "A3B - 3H + 1H, strongly coupled",
+        [_Group(1.30, 3, 0.9), _Group(1.24, 1, 0.9)],
+        [_Pair(0, 1, 6.5)],
+    ),
+    "A2B2": (
+        "A2B2 - two 2H groups, strongly coupled",
+        [_Group(2.85, 2, 1.0), _Group(2.78, 2, 1.0)],
+        [_Pair(0, 1, 6.8)],
+    ),
+    "A3B2": (
+        "A3B2 - 3H + 2H, strongly coupled",
+        [_Group(1.28, 3, 0.9), _Group(1.35, 2, 0.9)],
+        [_Pair(0, 1, 7.0)],
+    ),
+    "AB2": (
+        "AB2 - 1H + 2H, strongly coupled",
+        [_Group(7.20, 1, 0.8), _Group(7.14, 2, 0.8)],
+        [_Pair(0, 1, 7.5)],
+    ),
+    "ABX": (
+        "ABX - 1-bromo-2-chloropropane CH2 pair + CH (BrCH2CHClCH3)",
+        [_Group(3.70, 1, 0.8), _Group(3.62, 1, 0.8), _Group(4.20, 1, 0.8)],
+        [_Pair(0, 1, 10.5), _Pair(0, 2, 6.5), _Pair(1, 2, 4.0)],
+    ),
+    "ABC": (
+        "ABC - vanillin's three aromatic protons, all strongly coupled",
+        [_Group(7.44, 1, 0.7), _Group(7.40, 1, 0.7), _Group(7.05, 1, 0.7)],
+        [_Pair(0, 1, 8.1), _Pair(1, 2, 2.0), _Pair(0, 2, 1.8)],
+    ),
+    "AA'BB'": (
+        "AA'BB' - 1-bromo-2-chloroethane (BrCH2CH2Cl), J != J'",
+        [_Group(3.62, 2, 1.0), _Group(3.55, 2, 1.0)],
+        [_Pair(0, 1, 8.0, 5.5)],
+    ),
+    "AA'BB'C": (
+        "AA'BB'C - cinnamic-acid-like aromatic ring, strongly coupled",
+        [_Group(7.42, 2, 0.8), _Group(7.36, 2, 0.8), _Group(7.30, 1, 0.8)],
+        [_Pair(0, 1, 7.8, 1.4), _Pair(0, 2, 1.2), _Pair(1, 2, 7.4)],
+    ),
+    "AA'BB'X": (
+        "AA'BB'X - 2H + 2H strongly coupled, plus a separated 1H",
+        [_Group(7.20, 2, 0.8), _Group(7.14, 2, 0.8), _Group(4.60, 1, 0.9)],
+        [_Pair(0, 1, 7.8, 1.4), _Pair(0, 2, 6.0), _Pair(1, 2, 1.0)],
+    ),
+}
+
+PHENOTYPES.update(
+    {
+        key: _expand(description, groups, pairs)
+        for key, (description, groups, pairs) in _TABLE_S2.items()
+    }
+)
 
 
 # --- Simulation + prediction -------------------------------------------------
