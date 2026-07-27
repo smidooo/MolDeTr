@@ -93,7 +93,11 @@ def main() -> None:
         default=None,
         help="save an annotated spectrum plot (default prediction.png)",
     )
-    ap.add_argument("--seed", type=int, default=42, help="RNG seed for reproducibility")
+    # Default 0, not 42: it now feeds the injected-noise RandomState, whose default is 0. Keeping
+    # 42 here would have silently changed this CLI's shipped output the moment --seed became real.
+    ap.add_argument(
+        "--seed", type=int, default=0, help="RNG seed, including the injected noise (default 0)"
+    )
     args = ap.parse_args()
     set_seed(args.seed)
 
@@ -111,7 +115,11 @@ def main() -> None:
     except ValueError as exc:
         raise SystemExit(str(exc)) from exc
     model = load_checkpoint(build_model(), args.checkpoint)
-    output = run(model, amplitudes)
+    # --seed must reach the noise injection: normalize_spectrum builds its own
+    # RandomState(noise_seed), which set_seed's global seeding cannot touch. Without this the flag
+    # changed nothing about the injected noise -- --seed 42 and --seed 999 gave identical output.
+    # Default output is unchanged: the flag's default was moved to 0 to match the noise default.
+    output = run(model, amplitudes, noise_seed=args.seed)
     ppm_left = args.ppm_left if args.ppm_left is not None else cal.get("ppm_left")
     ppm_right = args.ppm_right if args.ppm_right is not None else cal.get("ppm_right")
     predictions = decode_predictions(
