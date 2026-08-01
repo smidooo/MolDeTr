@@ -48,8 +48,14 @@ def test_build_hamiltonian_is_public_and_infers_spin_count() -> None:
 
     assert hamiltonian.shape == (4, 4), "2 spins -> a 2**2 product space"
     assert fx.shape == (4, 4)
-    # H is Hermitian for a real shift/coupling system; a transposed-coupling bug breaks this.
-    assert np.allclose(hamiltonian, hamiltonian.conj().T)
+
+    # Three shifts must give a 2**3 space off the same call shape -- that is the inference.
+    # (There was an `allclose(H, H.conj().T)` assertion here, commented as catching a
+    # transposed-coupling bug. It cannot: only the i<j triangle is read, so H is Hermitian by
+    # construction for *every* input, including couplings[1,0]=999. It was removed rather than
+    # left to reassure a future reader that a case is covered when it is not.)
+    bigger, _ = build_hamiltonian(np.array([10.0, 55.0, 120.0]), np.zeros((3, 3)))
+    assert bigger.shape == (8, 8), "3 spins -> a 2**3 product space, read off the shifts"
 
 
 @pytest.mark.unit
@@ -175,6 +181,14 @@ def test_lowering_operators_are_public_and_correctly_embedded() -> None:
     # The two spins must differ; embedding on the wrong axis would make them identical.
     assert not np.array_equal(operators[0], operators[1])
 
+    # Everything above also holds for the *raising* operator I+, so none of it checks the one
+    # thing the name promises. Direction lives in the position of the nonzeros: I- is strictly
+    # lower-triangular (row > col), I+ is its transpose. Verified against a sabotaged I+ build.
+    for op in operators:
+        assert all(row > col for row, col in np.argwhere(op != 0)), (
+            "lowering operators must be strictly lower-triangular; this is I+ (raising)"
+        )
+
 
 @pytest.mark.unit
 def test_transitions_is_public() -> None:
@@ -192,6 +206,19 @@ def test_transitions_is_public() -> None:
     # An AX system with J = 7 Hz gives four lines around the two shifts.
     assert freqs.size == 4
 
+    # Everything above passes on a *decoupled* pair too -- it also yields four lines, as two
+    # degenerate pairs at 100/100/140/140 -- and on freqs*2. So assert the physics, not the count:
+    order = np.argsort(freqs)
+    lines, amps = freqs[order], intensities[order]
+    assert lines[1] - lines[0] == pytest.approx(7.0), (
+        f"the doublet splitting must recover J = 7 Hz; got {lines} (a decoupled system gives "
+        "two degenerate pairs, which the line count alone cannot distinguish)"
+    )
+    assert lines[3] - lines[2] == pytest.approx(7.0)
+    # Second-order intensity asymmetry: the inner lines of an AB pair lean toward each other.
+    assert amps[1] > amps[0], f"expected the roof effect on the inner lines, got {amps}"
+    assert amps[2] > amps[3]
+
 
 @pytest.mark.unit
 def test_the_borrowed_private_names_still_exist() -> None:
@@ -202,7 +229,10 @@ def test_the_borrowed_private_names_still_exist() -> None:
     """
     import moldetr.simulate as simulate
 
-    for name in ("_IM", "_build_hamiltonian", "_embed"):
+    # `_lorentzian_sum` is the fourth: nmrsynth's tests/test_lineshape.py imports it to check its
+    # own lineshape against this one. It was missing from this guard, so renaming it would have
+    # broken the downstream suite with no tripwire on either side.
+    for name in ("_IM", "_build_hamiltonian", "_embed", "_lorentzian_sum"):
         assert hasattr(simulate, name), f"downstream still borrows {name}"
 
 
