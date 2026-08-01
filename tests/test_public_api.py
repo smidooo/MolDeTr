@@ -288,3 +288,70 @@ def test_torch_and_fastai_are_optional_dependencies() -> None:
     model_extra = " ".join(config["project"]["optional-dependencies"]["model"])
     assert "torch" in model_extra
     assert "fastai" in model_extra
+
+
+@pytest.mark.unit
+def test_every_extra_backing_a_network_command_provides_the_model_stack() -> None:
+    """The other half of the contract: an extra that needs the network must *declare* it.
+
+    Asserting only "torch is in the model extra" leaves the sufficiency half untested, and that is
+    the half that broke: ``app`` and ``dev`` self-reference ``moldetr[model]`` while ``eval`` did
+    not, even though ``scripts/evaluate_synthetic.py`` -- the script the extra exists for --
+    imports torch at module scope and the README states all three already include it.
+    """
+    with (REPO / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+
+    extras = config["project"]["optional-dependencies"]
+    for name in ("app", "dev", "eval"):
+        assert "moldetr[model]" in " ".join(extras[name]), (
+            f"the {name!r} extra backs a documented command that loads the checkpoint, so it "
+            "must pull in the model extra or that command fails on a clean install"
+        )
+
+
+#: Mimics a real missing dependency: ``ModuleNotFoundError`` with ``.name`` set, exactly as the
+#: import machinery raises it, so the CLI's handler is exercised the way a user would trigger it.
+_CLI_WITHOUT_TORCH = textwrap.dedent(
+    """
+    import importlib.abc, sys
+
+    class Blocker(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path, target=None):
+            root = fullname.split(".")[0]
+            if root in ("torch", "fastai"):
+                raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
+            return None
+
+    sys.meta_path.insert(0, Blocker())
+
+    # Prove the blocker actually bites, so a silently-ineffective probe cannot pass.
+    try:
+        import torch
+    except ModuleNotFoundError:
+        pass
+    else:
+        raise AssertionError("the import blocker did nothing; this test proves nothing")
+
+    from moldetr.cli import main
+    main(["predict", "--demo"])
+    """
+)
+
+
+@pytest.mark.unit
+def test_cli_names_the_remedy_when_the_model_stack_is_missing() -> None:
+    """PyTorch became an extra in v1.1.0, so this failure is newly reachable by a documented path.
+
+    The remedy lives only in the README; a user who pip-installs and runs the entry point sees a
+    bare traceback. The error has to carry the fix.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", _CLI_WITHOUT_TORCH], capture_output=True, text=True, cwd=REPO
+    )
+
+    assert result.returncode != 0, "predict cannot succeed without the deep-learning stack"
+    combined = result.stdout + result.stderr
+    assert "moldetr[model]" in combined, (
+        f"the failure must name the fix, not only the missing module:\n{combined}"
+    )

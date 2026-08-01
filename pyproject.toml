@@ -44,6 +44,7 @@ model = [
 ]
 # Extra deps used only by the evaluation / plotting scripts in scripts/.
 eval = [
+    "moldetr[model]",  # evaluate_synthetic.py loads the checkpoint, so it needs the network
     "pandas>=1.5",
     "scikit-learn>=1.1",
     "seaborn>=0.12",

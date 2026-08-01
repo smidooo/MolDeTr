@@ -60,6 +60,25 @@ def _usage() -> str:
     )
 
 
+def _model_stack_hint(cmd: str, exc: ImportError) -> str:
+    """Turn a bare missing-torch traceback into the line that fixes it.
+
+    PyTorch became an optional extra in v1.1.0, so this failure is newly reachable by a documented
+    path. The remedy lives in the README, which a user running the installed entry point never sees.
+    """
+    return (
+        f"`moldetr {cmd}` needs the deep-learning stack, which is not installed.\n"
+        "    pip install 'moldetr[model]'\n"
+        "PyTorch became an optional extra in v1.1.0 (see README > Install).\n"
+        f"original error: {exc}"
+    )
+
+
+def _is_model_stack_missing(exc: ImportError) -> bool:
+    """True when ``exc`` is torch/fastai being absent, rather than a broken import inside them."""
+    return (exc.name or "").split(".")[0] in ("torch", "fastai")
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ("-h", "--help", "help"):
@@ -70,8 +89,13 @@ def main(argv: list[str] | None = None) -> None:
         if rest and rest[0] in ("-h", "--help"):
             print(APP_USAGE)  # never fall through: launch_app() blocks until the server stops
             return
-        app = importlib.import_module("app")
-        app.launch_app()  # single launch path -> same theme/CSS as `python app.py`
+        try:
+            app = importlib.import_module("app")
+            app.launch_app()  # single launch path -> same theme/CSS as `python app.py`
+        except ImportError as exc:
+            if not _is_model_stack_missing(exc):
+                raise
+            raise SystemExit(_model_stack_hint("app", exc)) from exc
         return
     if cmd not in COMMANDS:
         print(f"moldetr: unknown command '{cmd}'\n\n{_usage()}", file=sys.stderr)
@@ -83,6 +107,10 @@ def main(argv: list[str] | None = None) -> None:
             runpy.run_path(str(_REPO / HYDRA_COMMANDS[cmd]), run_name="__main__")
         else:
             importlib.import_module(COMMANDS[cmd]).main()
+    except ImportError as exc:
+        if not _is_model_stack_missing(exc):
+            raise
+        raise SystemExit(_model_stack_hint(cmd, exc)) from exc
     finally:
         sys.argv = saved_argv
 
