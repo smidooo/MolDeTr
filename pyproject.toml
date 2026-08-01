@@ -95,6 +95,14 @@ target-version = "py310"
 select = ["E", "F", "W"]
 ignore = ["E501", "E741", "W605", "E402", "F403", "F405", "E731", "E722", "F811", "F841"]
 
+[tool.ruff.format]
+# The training-era augmentation pipeline is historical evidence, not live code to tidy. It is the
+# public twin of the private repo's `ds/dataloader/data_augumentation.py`, and the provenance work
+# that dates the shipped weights reads the two side by side. `ruff format` would rewrite ~270 lines
+# of it and destroy that correspondence for no behavioural gain, so it is excluded. Editors that
+# name the file explicitly still need `--force-exclude` to honour this.
+exclude = ["moldetr/dataloader/data_augmentation.py"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # Markers keep the heavy/opt-in suites out of the default run. `model` needs the 974 MB checkpoint

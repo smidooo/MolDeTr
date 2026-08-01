@@ -11,17 +11,14 @@ Distortion math is **not** reimplemented here -- ``distort`` simply calls the fi
 
 Licensing boundary
 ------------------
-MolDeTr is Apache-2.0. The shim / field-inhomogeneity distortion
-(:class:`moldetr.dataloader.shimming.ShimSim`, wrapped by
-``data_augmentation.add_shim_distortions``) is GPL-derived (adapted from SHIMpanzee) and is
-**deliberately not exposed here**: this module wraps only the five Apache-licensed ``add_*``
-effects and never touches the shim path.
+MolDeTr is Apache-2.0. The shim / field-inhomogeneity simulator was GPL-derived (adapted from
+SHIMpanzee) and has been **removed** from this distribution -- see ``THIRD_PARTY.md``.
+``data_augmentation.add_shim_distortions`` survives as a symbol that raises
+:class:`NotImplementedError` explaining the removal.
 
-Note: ``data_augmentation`` imports ``ShimSim`` lazily -- inside ``add_shim_distortions`` itself,
-the only function that uses it -- so importing ``data_augmentation`` (and therefore ``moldetr.distort``)
-no longer transitively loads the GPL ``moldetr.dataloader.shimming`` module. ``distort`` neither imports
-``shimming``/``ShimSim`` nor calls ``add_shim_distortions``; the GPL code is reached only if a caller
-explicitly invokes the shim path.
+This module is unaffected, and always was: it wraps only the five Apache-licensed ``add_*``
+effects, and never imported ``shimming`` nor called ``add_shim_distortions``. That is asserted
+rather than asserted-in-prose -- see ``tests/test_licensing.py``.
 """
 
 from __future__ import annotations
