@@ -1,8 +1,11 @@
 """Deterministic-run helpers.
 
 ``set_seed`` seeds Python, NumPy, and PyTorch (CPU + CUDA) so any run touching the stochastic
-augmentation pipeline (``moldetr/dataloader/data_augmentation.py``, ``shimming.py``) is
-reproducible. Matches the seed (42) used for the article's evaluation.
+augmentation pipeline (``moldetr/dataloader/data_augmentation.py``) is reproducible. Matches the
+seed (42) used for the article's evaluation.
+
+The shim branch of that pipeline is not reachable in this distribution: its GPL-derived simulator
+was removed (``THIRD_PARTY.md``), so ``add_shim_distortions`` raises.
 """
 
 from __future__ import annotations
