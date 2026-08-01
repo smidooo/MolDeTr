@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [1.1.0] - 2026-08-01
+
 ### Added
 - **Public spin-physics API.** `moldetr.simulate` now exports `build_hamiltonian()`,
   `lowering_operators()` and `transitions()`. Downstream simulation code previously had to reach for the
