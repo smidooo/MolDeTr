@@ -25,6 +25,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # `tomllib` landed in 3.11; this package supports 3.10, so use the backport there.
+    import tomli as tomllib
+
 REPO = Path(__file__).resolve().parent.parent
 
 
@@ -121,8 +126,6 @@ def test_py_typed_marker_ships_with_the_package() -> None:
 @pytest.mark.unit
 def test_py_typed_is_declared_as_package_data() -> None:
     """Present in the tree but missing from package-data means it is absent from the wheel."""
-    import tomllib
-
     with (REPO / "pyproject.toml").open("rb") as handle:
         config = tomllib.load(handle)
 
@@ -183,8 +186,6 @@ def test_simulation_and_distortion_import_without_torch() -> None:
 @pytest.mark.unit
 def test_torch_and_fastai_are_optional_dependencies() -> None:
     """They belong to the ``model`` extra, not to the base install."""
-    import tomllib
-
     with (REPO / "pyproject.toml").open("rb") as handle:
         config = tomllib.load(handle)
 

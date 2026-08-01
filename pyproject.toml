@@ -61,6 +61,10 @@ dev = [
     "ruff>=0.1",
     "mypy>=1.0",
     "hypothesis>=6.0",  # property-based tests (tests/test_properties.py)
+    # tests/test_public_api.py reads pyproject.toml to assert the packaging contract. `tomllib` is
+    # 3.11+ and this package supports 3.10, so the backport keeps that coverage on the oldest
+    # supported interpreter instead of skipping it exactly where a packaging slip is likeliest.
+    "tomli>=2.0; python_version < '3.11'",
 ]
 # Opt-in Playwright browser e2e (tests/e2e/, run with `-m browser`; needs `playwright install chromium`).
 browser = [
