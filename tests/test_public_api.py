@@ -70,6 +70,98 @@ def test_build_hamiltonian_matches_the_private_implementation() -> None:
 
 
 @pytest.mark.unit
+def test_build_hamiltonian_rejects_couplings_it_would_silently_ignore() -> None:
+    """Only ``i < j`` is read, so an unmirrored lower triangle must not pass as valid input.
+
+    Filling the lower triangle instead of the upper one is a plausible convention, and before this
+    guard it produced a *decoupled* Hamiltonian with no error: an AX pair came back as two singlets
+    at 100/140 Hz rather than the four lines at 96.196/103.196/136.804/143.804.
+    """
+    from moldetr.simulate import build_hamiltonian
+
+    shifts = np.array([100.0, 140.0], dtype=float)
+    lower_only = np.array([[0.0, 0.0], [7.0, 0.0]], dtype=float)
+
+    with pytest.raises(ValueError, match="lower triangle"):
+        build_hamiltonian(shifts, lower_only)
+
+
+@pytest.mark.unit
+def test_build_hamiltonian_rejects_asymmetric_couplings() -> None:
+    """A lower entry that contradicts its mirror is a bug, not a convention: the upper one wins."""
+    from moldetr.simulate import build_hamiltonian
+
+    shifts = np.array([100.0, 140.0], dtype=float)
+    contradictory = np.array([[0.0, 7.0], [-99.0, 0.0]], dtype=float)
+
+    with pytest.raises(ValueError, match="lower triangle"):
+        build_hamiltonian(shifts, contradictory)
+
+
+@pytest.mark.unit
+def test_build_hamiltonian_accepts_both_documented_coupling_conventions() -> None:
+    """Regression guard on the fix above: symmetric and upper-triangular must both stay valid.
+
+    ``simulate`` and ``coupling_blocks`` both accept an upper-triangular matrix -- the natural
+    output of an editor whose contract is "fill the upper triangle" -- so a symmetry check that
+    rejected it would break the module's own documented convention.
+    """
+    from moldetr.simulate import build_hamiltonian
+
+    shifts = np.array([100.0, 140.0], dtype=float)
+    symmetric = np.array([[0.0, 7.0], [7.0, 0.0]], dtype=float)
+    upper_only = np.array([[0.0, 7.0], [0.0, 0.0]], dtype=float)
+
+    assert np.array_equal(
+        build_hamiltonian(shifts, symmetric)[0], build_hamiltonian(shifts, upper_only)[0]
+    )
+
+
+@pytest.mark.unit
+def test_build_hamiltonian_rejects_the_empty_system() -> None:
+    """Zero spins passed the shape check and returned a 0-d scalar where an array is declared."""
+    from moldetr.simulate import build_hamiltonian
+
+    with pytest.raises(ValueError, match="at least one spin"):
+        build_hamiltonian(np.zeros(0), np.zeros((0, 0)))
+
+
+@pytest.mark.unit
+def test_build_hamiltonian_honours_the_declared_block_ceiling() -> None:
+    """``MAX_BLOCK_SPINS`` is the module's own limit; the public entry point ignored it.
+
+    The body eagerly builds ``3n`` matrices of ``4**n`` complex128, so one spin past the ceiling
+    is hundreds of megabytes -- the check has to happen before allocation, not after.
+    """
+    from moldetr.simulate import MAX_BLOCK_SPINS, build_hamiltonian
+
+    n = MAX_BLOCK_SPINS + 1
+    with pytest.raises(ValueError, match="MAX_BLOCK_SPINS|too large|at most"):
+        build_hamiltonian(np.arange(n) * 10.0, np.zeros((n, n)))
+
+
+@pytest.mark.unit
+def test_lowering_operators_rejects_a_non_positive_spin_count() -> None:
+    """``lowering_operators(-3)`` returned ``[]``, which propagates as an all-zero spectrum."""
+    from moldetr.simulate import lowering_operators
+
+    with pytest.raises(ValueError, match="at least one spin"):
+        lowering_operators(-3)
+
+
+@pytest.mark.unit
+def test_transitions_rejects_an_fx_that_does_not_match_the_hamiltonian() -> None:
+    """Frequencies come from ``H``, so a mismatched ``F_x`` yields right lines, wrong intensities."""
+    from moldetr.simulate import build_hamiltonian, transitions
+
+    hamiltonian, _ = build_hamiltonian(np.array([100.0, 140.0]), np.array([[0.0, 7.0], [7.0, 0.0]]))
+    _, wrong_fx = build_hamiltonian(np.array([10.0, 20.0, 30.0]), np.zeros((3, 3)))
+
+    with pytest.raises(ValueError, match="same shape|shape"):
+        transitions(hamiltonian, wrong_fx)
+
+
+@pytest.mark.unit
 def test_lowering_operators_are_public_and_correctly_embedded() -> None:
     """``I-`` on each spin of the product space — the ``_IM`` + ``_embed`` pair, made public."""
     from moldetr.simulate import lowering_operators
