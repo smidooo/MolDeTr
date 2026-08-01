@@ -109,6 +109,26 @@ include = ["moldetr*"]
     "src/cuda/*",
 ]
 
+[tool.mypy]
+# `py.typed` tells every downstream type checker to trust this package's annotations, and until now
+# nothing verified them: there was no mypy config and no CI step. This gate closes part of that.
+#
+# It is deliberately NARROWER than py.typed promises, and saying so is the point. Strict checking
+# of the whole package is 381 errors, concentrated in the torch/fastai-facing modules where the
+# untyped dependencies make `Any` unavoidable; exempting one surfaces the next. Gated here is the
+# pure-NumPy/SciPy half -- the surface the private `nmrsynth` generator actually imports, and the
+# one whose annotations a downstream can act on. The rest remains unverified; that is a known gap,
+# not a claim of coverage.
+strict = true
+files = ["moldetr/simulate.py", "moldetr/distort.py"]
+
+[[tool.mypy.overrides]]
+# Reached as an import from moldetr.distort. It is the training-era augmentation pipeline, kept as
+# historical evidence and excluded from `ruff format` for the same reason; annotating it would
+# rewrite the file this repository preserves for provenance comparison.
+module = "moldetr.dataloader.data_augmentation"
+ignore_errors = true
+
 [tool.ruff]
 line-length = 100
 target-version = "py310"
