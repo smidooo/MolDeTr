@@ -17,9 +17,15 @@ the attribution is owed for that release whether or not the file is present toda
 from __future__ import annotations
 
 import importlib
+import sys
 from pathlib import Path
 
 import pytest
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # `tomllib` landed in 3.11; this package supports 3.10, so use the backport there.
+    import tomli as tomllib
 
 REPO = Path(__file__).resolve().parent.parent
 
@@ -141,3 +147,40 @@ def test_third_party_notice_attributes_shimpanzee() -> None:
         "attribution needs to say where the code came from, not just name it"
     )
     assert "GPL" in text
+    # "GNU General Public License" without a version is under-specified: GPLv2 and GPLv3 differ in
+    # their patent and termination terms, and Apache-2.0 is one-way compatible into v3 only.
+    assert "GPL-3.0" in text, "name the GPL version; upstream is GPL-3.0-or-later"
+    for holder in ("Bas van Meerten", "Wouter Franssen"):
+        assert holder in text, f"attribution needs the copyright holder: {holder}"
+
+
+@pytest.mark.unit
+def test_third_party_notice_covers_the_code_that_actually_ships() -> None:
+    """The file is titled "third-party code in this distribution" and listed only the removed one.
+
+    The deformable-attention sources under ``moldetr/model/ops/src/`` and ``moldetr/matcher`` carry
+    SenseTime and Facebook copyright headers and *do* ship in the wheel. Their in-file notices are
+    intact, so attribution is preserved where it legally matters -- but a document that presents
+    itself as an enumeration reads as exhaustive, and this one was not.
+    """
+    text = (REPO / "THIRD_PARTY.md").read_text(encoding="utf-8")
+
+    for owed in ("Deformable DETR", "SenseTime", "DETR", "Facebook"):
+        assert owed in text, f"{owed} code ships in this distribution and is not recorded"
+
+
+@pytest.mark.unit
+def test_third_party_notice_is_declared_so_it_ships() -> None:
+    """Present in the tree but undeclared means absent from the wheel -- LICENSE shipped alone.
+
+    A notice that reaches only people who browse the repository is not much of a notice; the wheel
+    is what most consumers actually install.
+    """
+    with (REPO / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+
+    declared = config["tool"]["setuptools"].get("license-files", [])
+    assert "THIRD_PARTY.md" in declared, (
+        "THIRD_PARTY.md must be declared in [tool.setuptools] license-files or it is not "
+        "installed; the v1.1.0 wheel carried only dist-info/licenses/LICENSE"
+    )

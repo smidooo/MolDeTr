@@ -87,6 +87,12 @@ Data = "https://doi.org/10.5281/zenodo.21217101"
 [project.scripts]
 moldetr = "moldetr.cli:main"
 
+[tool.setuptools]
+# Without this, only LICENSE reaches the wheel: THIRD_PARTY.md sits at the repo root, so it is
+# neither package-data nor picked up by the default license-file globs. A third-party notice that
+# reaches only people browsing the repository does not reach the people who install the package.
+license-files = ["LICENSE", "THIRD_PARTY.md"]
+
 [tool.setuptools.packages.find]
 include = ["moldetr*"]
 

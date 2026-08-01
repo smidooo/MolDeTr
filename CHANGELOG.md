@@ -6,7 +6,54 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-Nothing yet.
+Findings from the post-release code review of #21, the review MolDeTr's own contributing rules ask
+for on >100-LOC diffs touching the distort hub. It was skipped before v1.1.0 shipped.
+
+### Fixed
+- **The `eval` extra now provides the network.** Moving torch behind a `model` extra added
+  `moldetr[model]` to `app` and `dev` but not to `eval`, so the documented
+  `pip install -e ".[eval]"` → `python scripts/evaluate_synthetic.py` failed on a clean install
+  with `ModuleNotFoundError: torch`. Conda users were unaffected (`environment.yml` carries
+  pytorch); the break was confined to the pip path.
+- **`moldetr predict` / `moldetr app` now name the remedy** when the deep-learning stack is
+  absent, instead of raising a bare `ModuleNotFoundError` whose fix appears only in the README.
+- **Input validation on the public spin-physics API.** `build_hamiltonian()` rejects a coupling
+  matrix whose lower triangle is not mirrored above the diagonal — only `i<j` is read, so such a
+  matrix silently produced a *decoupled* Hamiltonian (an AX pair came back as two singlets). Also
+  rejects the empty system (which returned a 0-d scalar where `NDArray[complex128]` is declared),
+  a spin count past `MAX_BLOCK_SPINS`, `lowering_operators(n<1)`, and an `fx` whose shape does not
+  match the Hamiltonian. Symmetric and upper-triangular matrices both remain valid; `simulate`,
+  `simulate_systems` and `coupling_blocks` are deliberately unchanged, since their shared
+  upper-triangle convention is pinned by `tests/test_simulate_blocks.py`.
+- **`set_seed()` imports torch before seeding.** It previously seeded Python and NumPy first, so a
+  torch-free install got a half-reseeded process plus an exception.
+- **`scripts/quick_validation.py`'s config gate can fail.** `check_config_imports()` wrapped a bare
+  `print` in `try`/`except` — nothing was imported, so it reported PASS unconditionally while its
+  docstring claimed it checked that the config loads. CI runs this script as a gate.
+
+### Changed
+- **`THIRD_PARTY.md` records the code that actually ships.** It listed only the removed GPL file
+  while omitting Deformable DETR (© 2020 SenseTime) and DETR (© Facebook), whose sources ship in
+  the wheel and carry their own headers. It now also names the GPL version (GPL-3.0-or-later) and
+  the SHIMpanzee copyright holders, and is declared in `license-files` so it reaches the wheel —
+  v1.1.0 shipped `LICENSE` alone.
+- **Corrected two docstrings that described the wrong mechanism.** `add_shim_distortions` claimed
+  the `toss_coin` branch "fails loudly rather than silently altering the augmentation
+  distribution"; that branch is statically unreachable (`toss_coin` is pinned to `0.99`), so it is
+  the pin, not the removal, that alters the distribution. `reproducibility.py` gave the raise as
+  the *reason* for unreachability. Neither the pin nor any behaviour was changed. `[four-skills]`
+
+### Tests
+- Public-API tests now assert behaviour rather than shape. Executed against deliberately broken
+  builds, the previous assertions passed for: `lowering_operators` returning the *raising*
+  operator, `transitions` returning `freqs*2`, and a fully decoupled system. They now pin the
+  J-splitting, the roof effect, and the strictly-lower-triangular structure of `I⁻`.
+- Removed a Hermitian assertion that could not fail — only `i<j` is read, so `H` is Hermitian by
+  construction for every input — along with its comment claiming it caught transposed couplings.
+- The licence re-introduction guard matches the shim *implementation* rather than the filename
+  `shimming.py`, closing the "vendored copy under a new name" case its own docstring named.
+- The packaging contract test asserts sufficiency (every extra backing a network command declares
+  `moldetr[model]`), not just that torch lives in the `model` extra. `[four-skills]`
 
 ## [1.1.0] - 2026-08-01
 

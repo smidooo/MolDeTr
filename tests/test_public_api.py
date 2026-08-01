@@ -369,6 +369,56 @@ _CLI_WITHOUT_TORCH = textwrap.dedent(
 )
 
 
+_SET_SEED_WITHOUT_TORCH = textwrap.dedent(
+    """
+    import importlib.abc, sys
+    import numpy as np
+
+    class Blocker(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path, target=None):
+            if fullname.split(".")[0] in ("torch", "fastai"):
+                raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
+            return None
+
+    sys.meta_path.insert(0, Blocker())
+    try:
+        import torch
+    except ModuleNotFoundError:
+        pass
+    else:
+        raise AssertionError("the import blocker did nothing; this test proves nothing")
+
+    np.random.seed(1234)
+    before = np.random.get_state()[1][:8].tolist()
+
+    from moldetr.reproducibility import set_seed
+    try:
+        set_seed(42)
+    except ImportError:
+        pass
+
+    after = np.random.get_state()[1][:8].tolist()
+    print("SAME" if before == after else f"MUTATED {before} -> {after}")
+    """
+)
+
+
+@pytest.mark.unit
+def test_set_seed_leaves_the_global_rng_alone_when_it_cannot_finish() -> None:
+    """It fails either way on a base install; it must not half-seed the process on the way out.
+
+    ``set_seed`` seeded Python and NumPy and only *then* imported torch, so a torch-free install
+    got a partially-reseeded global RNG plus an exception -- the caller cannot tell how far it got.
+    """
+    result = subprocess.run(
+        [sys.executable, "-c", _SET_SEED_WITHOUT_TORCH], capture_output=True, text=True, cwd=REPO
+    )
+
+    assert "SAME" in result.stdout, (
+        f"set_seed mutated the global RNG before failing:\n{result.stdout}{result.stderr}"
+    )
+
+
 @pytest.mark.unit
 def test_cli_names_the_remedy_when_the_model_stack_is_missing() -> None:
     """PyTorch became an extra in v1.1.0, so this failure is newly reachable by a documented path.

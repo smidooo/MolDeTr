@@ -8,7 +8,8 @@ third-party code that has been part of it, and what was done about it.
 | | |
 |---|---|
 | **Upstream** | [SHIMpanzee](https://github.com/smeerten/shimpanzee) |
-| **Licence** | GNU General Public License |
+| **Copyright** | © 2016–2017 Bas van Meerten and Wouter Franssen |
+| **Licence** | **GPL-3.0-or-later** (upstream `LICENSE.md` is GPL v3, 29 June 2007; its headers read "either version 3 of the License, or (at your option) any later version"). GitHub reports `NOASSERTION` for that repository only because the licence lives in `LICENSE.md` rather than `LICENSE` — a detection artefact, not an absence. |
 | **Relationship** | adapted, not copied verbatim — the file's own header read *"Minimal SHIMpanzee code to simulate collate / modifed from https://github.com/smeerten/shimpanzee under GNU GPL licence"* |
 | **What it provided** | `ShimSim`, a field-inhomogeneity (shim) simulator |
 | **Status** | **removed** after v1.0.0. Present in the v1.0.0 release and its Zenodo archive; absent from every release after it. |
@@ -41,6 +42,21 @@ SHIMpanzee upstream, under its own licence.
   `AttributeError`, and the branch fails loudly instead of silently changing the distribution.
 - `tests/test_licensing.py` enforces all of the above, so an accidental re-introduction — a merge
   from an older branch, a restored file — fails the suite instead of going unnoticed.
+
+## Deformable DETR and DETR — Apache-2.0 — **shipped**
+
+| | |
+|---|---|
+| **Upstream** | [Deformable DETR](https://github.com/fundamentalvision/Deformable-DETR), itself modified from [Deformable-Convolution-V2-PyTorch](https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0); and [DETR](https://github.com/facebookresearch/detr) |
+| **Copyright** | © 2020 SenseTime. All Rights Reserved. · © Facebook, Inc. and its affiliates. All Rights Reserved. |
+| **Licence** | Apache License 2.0 — the same licence this repository ships under, so no boundary is crossed |
+| **Where** | the deformable-attention op sources `moldetr/model/ops/src/**` (`ms_deform_attn.h`, `vision.cpp`, `cpu/*`, `cuda/*`) and the Hungarian matcher `moldetr/matcher/matcher.py` |
+| **Status** | **present and distributed**, including in the wheel |
+
+Each of those files retains its own copyright and licence header, which is what Apache-2.0
+§4(a)–(b) asks for; they are recorded here as well because this document is titled *third-party
+code in this distribution* and would otherwise read as though the removed GPL file were the only
+entry. It is the largest body of third-party code here, not the smallest.
 
 ## Attribution
 
