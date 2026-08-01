@@ -23,8 +23,6 @@ classifiers = [
 # Loosely pinned for portability; see requirements-lock-linux64.txt for the
 # exact CUDA-11.7 conda environment used to train the released checkpoint.
 dependencies = [
-    "torch>=1.13",
-    "fastai>=2.7,<2.8",  # fastai 2.8.x + fastcore 2.x drops L.starmap -> learner.load() crashes; 2.7.x pins fastcore<2
     "hydra-core>=1.2",
     "omegaconf>=2.2",
     "numpy>=1.23",
@@ -35,6 +33,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# The deep-learning stack. Everything that loads the checkpoint or runs the network needs it:
+# moldetr.inference, .model, .learner, .loss, .matcher, .metrics and the two torch-backed
+# dataloader modules. The spin-physics half (moldetr.simulate, moldetr.distort) is pure
+# NumPy/SciPy and deliberately does NOT, so downstream simulation code can install this package
+# without pulling several hundred megabytes it will never call. Asserted in tests/test_public_api.py.
+model = [
+    "torch>=1.13",
+    "fastai>=2.7,<2.8",  # fastai 2.8.x + fastcore 2.x drops L.starmap -> learner.load() crashes; 2.7.x pins fastcore<2
+]
 # Extra deps used only by the evaluation / plotting scripts in scripts/.
 eval = [
     "pandas>=1.5",
@@ -43,10 +50,12 @@ eval = [
     "cmcrameri>=1.5",
 ]
 app = [
+    "moldetr[model]",  # the GUI runs inference, so it needs the network
     "gradio>=6.0,<7",
     "plotly>=5",  # interactive spectrum in the Gradio GUI (plotting.spectrum_figure)
 ]
 dev = [
+    "moldetr[model]",  # the suite exercises the network (tests/conftest.py imports torch)
     "pytest>=7.0",
     "pytest-cov>=5.0",  # coverage: `pytest --cov=app --cov=app_ui --cov=moldetr`
     "ruff>=0.1",
@@ -77,6 +86,9 @@ moldetr = "moldetr.cli:main"
 include = ["moldetr*"]
 
 [tool.setuptools.package-data]
+# PEP 561: without this marker, type checkers treat the installed package as untyped and every
+# downstream needs an `ignore_missing_imports` override, which hides real errors alongside the noise.
+"moldetr" = ["py.typed"]
 # Ship the deformable-attention op sources so the CUDA extension can be built.
 "moldetr.model.ops" = [
     "make.sh",

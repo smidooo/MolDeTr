@@ -235,6 +235,14 @@ If you prefer pip: `pip install -e ".[app]"` (add `dev` for the tests, `eval` fo
 For **bit-exact** reproduction of the training environment (CUDA 11.7, linux-64), use the explicit lockfile:
 `conda create --name moldetr --file requirements-lock-linux64.txt`.
 
+> [!IMPORTANT]
+> **PyTorch is an extra, not a base dependency** (since v1.1.0). A bare `pip install -e .` gives you the
+> spin-physics half — `moldetr.simulate` and `moldetr.distort`, pure NumPy/SciPy — without pulling several
+> hundred megabytes of deep-learning stack you may never call. **Anything that loads the checkpoint or runs
+> the network needs `pip install -e ".[model]"`**, including `moldetr predict`, `moldetr app` and
+> `scripts/evaluate_*.py`. The `app`, `dev` and `eval` extras already include it, so the commands on this
+> page are unaffected.
+
 **CPU-only:** remove the `pytorch-cuda` line from `environment.yml` first (or install CPU PyTorch with pip).
 Inference then uses the pure-PyTorch fallback of the deformable-attention op: no CUDA, no compilation.
 
@@ -293,8 +301,9 @@ Add `--input your_window.npz` for your own data. The `--plot` flag writes the an
 when the input file carries `ground_truth` annotations (the ROI examples do), they are overlaid as dashed
 reference lines.
 
-After `pip install -e .` these are also available as one command: `moldetr predict …`, `moldetr app`,
-`moldetr reproduce`, `moldetr download-weights` (run `moldetr --help` for the full list).
+After `pip install -e ".[model]"` these are also available as one command: `moldetr predict …`, `moldetr app`,
+`moldetr reproduce`, `moldetr download-weights` (run `moldetr --help` for the full list). The `model` extra
+is what supplies PyTorch — see the note under [Install](#install).
 
 ### Graphical interface
 A [Gradio](https://gradio.app) app: load a spectrum, get the assignment table and the annotated plot.
