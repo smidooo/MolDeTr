@@ -64,6 +64,14 @@ The model was trained on ~5 million simulated Lorentzian spectra with these rang
 
 Inputs far outside these ranges are out of distribution and degrade accuracy.
 
+> [!NOTE]
+> **The shim branch is described here but not distributed.** Training applied field-inhomogeneity
+> (shim) distortion to roughly half of all samples and line broadening to roughly a third — the row
+> above is a statement about how the shipped weights were trained, and it stands. What this
+> repository cannot do is *re-apply* the shim branch: its simulator was GPL-derived and was removed
+> so that no GPL source ships under Apache-2.0 (see [`THIRD_PARTY.md`](../THIRD_PARTY.md)).
+> `moldetr.distort` reproduces the other five effects, including line broadening, unchanged.
+
 ## About the coupling constants
 
 > [!IMPORTANT]

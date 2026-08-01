@@ -104,6 +104,61 @@ def _transitions(
     return np.asarray(freqs, dtype=float), np.asarray(amps, dtype=float)
 
 
+# --- public spin-physics API ----------------------------------------------------------------------
+#
+# The three functions below expose the primitives above under names that carry a compatibility
+# promise. They exist because downstream packages were reaching for `_IM`, `_build_hamiltonian` and
+# `_embed` directly -- private names that a rename here would break silently at a distance.
+#
+# The private originals are deliberately kept: they are what the shipped model was built on, and
+# callers migrate on their own schedule. These wrappers add no behaviour, only a stable surface.
+
+
+def build_hamiltonian(
+    shifts_hz: NDArray[np.float64], couplings_hz: NDArray[np.float64]
+) -> tuple[NDArray[np.complex128], NDArray[np.complex128]]:
+    """Return ``(H, F_x)`` in Hz for a coupled spin system.
+
+    ``H = Σ ν_i Iz_i + Σ_{i<j} J_ij (I_i · I_j)``. The spin count is read off ``shifts_hz`` rather
+    than passed separately, since a mismatch between the two is a bug with no useful meaning.
+
+    Args:
+        shifts_hz: chemical shifts, one per spin, in Hz.
+        couplings_hz: symmetric ``(n, n)`` scalar-coupling matrix in Hz; the diagonal is ignored.
+    """
+    shifts = np.asarray(shifts_hz, dtype=float)
+    couplings = np.asarray(couplings_hz, dtype=float)
+    n_spins = int(shifts.size)
+    if couplings.shape != (n_spins, n_spins):
+        raise ValueError(
+            f"couplings_hz must be ({n_spins}, {n_spins}) to match {n_spins} shifts, "
+            f"got {couplings.shape}"
+        )
+    return _build_hamiltonian(shifts, couplings, n_spins)
+
+
+def lowering_operators(n_spins: int) -> list[NDArray[np.complex128]]:
+    """Return ``I⁻`` for each spin, embedded in the full ``2**n_spins`` product space.
+
+    Useful for resolving a transition's intensity *per spin* -- something
+    :func:`transitions` cannot give, because it sums over spins before returning.
+    """
+    return [_embed(_IM, i, n_spins) for i in range(n_spins)]
+
+
+def transitions(
+    hamiltonian: NDArray[np.complex128],
+    fx: NDArray[np.complex128],
+    min_intensity: float = 1e-9,
+) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    """Single-quantum transition frequencies (Hz, > 0) and intensities ``|⟨j|F_x|i⟩|²``.
+
+    Intensities are **already summed over spins**; use :func:`lowering_operators` if the per-spin
+    contributions are needed.
+    """
+    return _transitions(hamiltonian, fx, min_intensity)
+
+
 def _lorentzian_sum(
     hz_axis: NDArray[np.float64],
     freqs: NDArray[np.float64],

@@ -7,6 +7,10 @@ env/
 .env
 .ipynb_checkpoints/
 
+# setuptools build residue (`uv build` / `python -m build`)
+build/
+dist/
+
 # test / coverage artefacts
 .pytest_cache/
 .coverage

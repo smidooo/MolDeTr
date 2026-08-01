@@ -1,0 +1,54 @@
+# Third-party code in this distribution
+
+This repository is distributed under the Apache License 2.0 (`LICENSE`). This file records
+third-party code that has been part of it, and what was done about it.
+
+## `moldetr/dataloader/shimming.py` — GPL — **removed**
+
+| | |
+|---|---|
+| **Upstream** | [SHIMpanzee](https://github.com/smeerten/shimpanzee) |
+| **Licence** | GNU General Public License |
+| **Relationship** | adapted, not copied verbatim — the file's own header read *"Minimal SHIMpanzee code to simulate collate / modifed from https://github.com/smeerten/shimpanzee under GNU GPL licence"* |
+| **What it provided** | `ShimSim`, a field-inhomogeneity (shim) simulator |
+| **Status** | **removed** after v1.0.0. Present in the v1.0.0 release and its Zenodo archive; absent from every release after it. |
+
+### Why it was removed
+
+The file was GPL-derived and the repository as a whole is labelled Apache-2.0. Making the import
+lazy — which this repository did — limits how far the GPL code reaches at *runtime*, but licensing
+attaches to distribution, not to import. The file was present in every clone and every archive.
+
+Rather than continue shipping GPL source under an Apache-2.0 label, the simulator was removed.
+
+### What it costs, stated plainly
+
+The shim branch was **roughly 50 %** of the 2024 training distribution. Removing the simulator
+means this repository can no longer *re-apply* that branch, so full reproduction of the training-data
+augmentation pipeline is **out of scope for the public release**.
+
+This is a statement about reproduction, not about the model. The shipped weights **were** trained
+with shim distortion (~50 % of samples) and line broadening (~35 %); `docs/SCOPE.md` documents the
+ranges and they are unchanged. Anyone needing the shim simulator itself should obtain it from
+SHIMpanzee upstream, under its own licence.
+
+### What remains
+
+- `moldetr.distort` is unaffected. It wraps only the five Apache-licensed `add_*` effects —
+  noise, phase, baseline, ¹³C satellites and line broadening — and never reached the shim path.
+- `moldetr.dataloader.data_augmentation.add_shim_distortions` still exists as a symbol and raises
+  `NotImplementedError` pointing at this file, so callers get an explanation rather than an
+  `AttributeError`, and the branch fails loudly instead of silently changing the distribution.
+- `tests/test_licensing.py` enforces all of the above, so an accidental re-introduction — a merge
+  from an older branch, a restored file — fails the suite instead of going unnoticed.
+
+## Attribution
+
+The SHIMpanzee attribution above is retained deliberately. Version 1.0.0 of this software did
+distribute the adapted file, and the credit is owed for that release regardless of its removal
+from later ones.
+
+## Status
+
+This document records what was done. It is not a legal opinion, and no part of this repository's
+licensing has been reviewed by anyone qualified to give one.

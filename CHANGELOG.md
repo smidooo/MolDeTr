@@ -7,6 +7,22 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Public spin-physics API.** `moldetr.simulate` now exports `build_hamiltonian()`,
+  `lowering_operators()` and `transitions()`. Downstream simulation code previously had to reach for the
+  private `_IM` / `_build_hamiltonian` / `_embed`, which carry no compatibility promise — a rename here
+  would have broken it silently at a distance. `build_hamiltonian()` infers the spin count from the shifts
+  and raises on a coupling matrix that disagrees. The private originals are unchanged and still exported.
+- **`py.typed` (PEP 561).** Type checkers now see the package as typed, so downstreams no longer need an
+  `ignore_missing_imports` override that suppresses real errors alongside the noise. Declared as
+  package-data, so it actually ships in the wheel.
+- **The paper's 25 Table S2 spin-system presets** in the Simulate dropdown — 11 strongly coupled, 9 weakly
+  coupled, 5 uncoupled — replacing a choice of three hand-written phenotypes with the regimes the model was
+  actually trained on. Built as a group-level table plus an expander, because the per-spin form has a trap:
+  N equivalent protons need N rows at the same shift, not one row labelled `proton_count = N`. Example
+  molecules follow the ACS proof corrections, not the pre-proof SI source.
+- **¹³C satellites on the Simulate tab, on by default.** Training applied satellites to *every* spectrum,
+  unconditionally; the tab applied none and offered no control, so its output was systematically cleaner
+  than anything the model was trained on. Adds a checkbox and a J slider bounded to the trained 40–220 Hz.
 - **Simulate tab.** Pick a built-in spin-system phenotype, edit its per-spin shifts, coupling and line
   width, optionally apply training-range distortions (noise / phase / broadening / baseline), then detect
   and compare against ground truth in one round trip.
@@ -24,7 +40,26 @@ All notable changes to this project are documented here. The format is based on
 - **`design/` brand docs are now committed.** `BRAND.md` was declared the source of truth while being
   gitignored, so nothing could check it. It ships with the repo (images excepted) and the sync test reads it.
 
+- **Animated demo + docs site.** An animated Gradio demo GIF in the README, a GitHub Pages landing page
+  (`docs/index.md`), and a `.github/` PR template + CODEOWNERS.
+- **Comprehensive test & validation suite (313 tests, ~11 perspectives).** A weight-free CI lane now
+  exercises the full DETR build + forward pass on CPU, a one-step training update (finite gradients), the
+  metrics, transforms/normalization (order-invariant coupling embedding + `Normalize` round-trip), config
+  parsing, and seeded reproducibility — plus property-based (Hypothesis) and robustness fuzzing,
+  schema/data-contract guards for the 13-ROI test set, and matcher/loss integration checks. CPU/GPU-parity
+  goldens (`tests/reference_outputs/*.npy`) put the deformable-attention op under CI (no GPU needed to
+  compare). Heavy/opt-in tiers are gated by pytest markers
+  (`unit`/`e2e`/`browser`/`model`/`data`/`network`), a `[notebooks]` extra (nbmake) executes the Colab
+  notebooks end-to-end, and `CONTRIBUTING.md` documents how to run each tier.
+
 ### Changed
+- **PyTorch and fastai are now an optional `model` extra, not base dependencies.** The spin-physics half
+  (`moldetr.simulate`, `moldetr.distort`) is pure NumPy/SciPy, so simulation-only consumers no longer
+  install several hundred megabytes they never call. **This is user-visible:** a bare `pip install -e .`
+  no longer provides inference — anything that loads the checkpoint or runs the network needs
+  `pip install -e ".[model]"`. The `app`, `dev` and `eval` extras self-reference `moldetr[model]`, so every
+  documented command is unaffected, and CI already installs CPU PyTorch explicitly. The import-graph
+  property this relies on already held; only the dependency declaration was wrong.
 - **Public copy reads plainer.** A language pass over the README, both notebook narratives, and the
   GUI microcopy: em-dashes replaced with ordinary punctuation, rhetorical lead-ins dropped, captions
   tightened. Numbers, DOIs, links, and CSS selectors are unchanged, and UI strings pinned by tests
@@ -52,6 +87,31 @@ All notable changes to this project are documented here. The format is based on
   with the suffix decided by registration order.
 
 ### Fixed
+- **The "trained without line broadening" warning was false, and is gone.** The Simulate tab told users
+  broadening was outside the training distribution, and `REQUIREMENTS.md` carried the same error as a hard
+  constraint. Both came from reading `augment_distortions` in its *current* state, where `toss_coin = 0.99`
+  is hardcoded and the shim and broadening branches are dead — but that literal postdates the shipped
+  weights by seven weeks. Dated from primary sources: the checkpoint was last written 2024-10-14, the pin
+  landed 2024-12-01, and at the commit current on the weights' date the line still drew at random. Training
+  therefore applied shim (~50 %) and line broadening (~35 %); the slider is *in* distribution and
+  `docs/SCOPE.md`'s range table was right all along. A test now guards the copy, since nothing else in the
+  suite asserts on component info text.
+- **`--seed` and the noise floor are reachable.** `run()` accepted `noise_seed` but neither took nor
+  forwarded `noise_frac`, so every production caller was pinned to 0.005 and `docs/SCOPE.md`'s advice to
+  "set `noise_frac=0`" described an affordance no supported call path offered. The Simulate tab also now
+  skips the floor once the user has ticked "Add noise", where it only masked the slider.
+- **First-order phase is range-checked against its window-derived trained bound**, rather than against a
+  constant that did not depend on the window.
+- **The training-distribution table stated two ranges incorrectly.** Baseline distortion is bounded by 1×
+  the noise, not 5×: `add_baseline_distortion` draws from ±`min_peak/sino*base_scale` = 0.5/SNR while
+  `add_noise` uses a std of 0.5/SNR on the peak-normalised spectrum — the same number. The first-order
+  phase range was restated in the units it is actually bounded in.
+- **WebKit a11y flake on the Simulate tab.** The scan had no settle beyond `to_be_visible()`, which resolves
+  the instant the panel display flips, so a docs-only PR went red on a critical button-name violation. The
+  offender was named from the failing run's Playwright trace rather than inferred: Gradio's icon-only tab
+  overflow toggle, which upstream ships with no `aria-label`, transiently rendered while a late webfont
+  changed tab widths. The new wait asserts exactly axe's precondition, so a permanently nameless button
+  still fails instead of being masked — proven by a test that injects one.
 - **`moldetr evaluate-synthetic` works again.** The dispatcher imported the script as
   `scripts.evaluate_synthetic`, and `@hydra.main(config_path="../conf")` only resolves that relative
   path when the task function's module is `__main__`, so every invocation through the console script
@@ -104,26 +164,6 @@ All notable changes to this project are documented here. The format is based on
   **model** repo (`huggingface.co/smidooo/moldetr`) is live, and the interactive demo runs on Colab. The
   software DOI (`10.5281/zenodo.21214876`) is unchanged.
 
-### Added
-- **Animated demo + docs site.** An animated Gradio demo GIF in the README, a GitHub Pages landing page
-  (`docs/index.md`), and a `.github/` PR template + CODEOWNERS.
-- **Comprehensive test & validation suite (313 tests, ~11 perspectives).** A weight-free CI lane now
-  exercises the full DETR build + forward pass on CPU, a one-step training update (finite gradients), the
-  metrics, transforms/normalization (order-invariant coupling embedding + `Normalize` round-trip), config
-  parsing, and seeded reproducibility — plus property-based (Hypothesis) and robustness fuzzing,
-  schema/data-contract guards for the 13-ROI test set, and matcher/loss integration checks. CPU/GPU-parity
-  goldens (`tests/reference_outputs/*.npy`) put the deformable-attention op under CI (no GPU needed to
-  compare). Heavy/opt-in tiers are gated by pytest markers
-  (`unit`/`e2e`/`browser`/`model`/`data`/`network`), a `[notebooks]` extra (nbmake) executes the Colab
-  notebooks end-to-end, and `CONTRIBUTING.md` documents how to run each tier.
-
-### Removed
-- **Matplotlib banner + molecule-figure generators.** Dropped `scripts/gen_banner.py`,
-  `scripts/gen_molecule_figure.py`, and the `[figures]` / `rdkit` extra. The README banner and diagrams now
-  ship as design-tool assets, so the generators — which produced an off-brand matplotlib banner and would
-  overwrite the shipped assets if run — are no longer needed.
-
-### Fixed
 - **Four latent bugs the new suite surfaced.** (1) `metrics/multiplet_metrics.py` referenced
   `fastai.metrics.accuracy_multi`/`.accuracy` with only `import fastai`, which raises `AttributeError` at
   call time on current fastai — a training-time crash; it now imports `fastai.metrics` explicitly. (2) The
@@ -134,6 +174,24 @@ All notable changes to this project are documented here. The format is based on
 - **CI lane honours the `network` marker.** The fast selector is
   `-m "not e2e and not browser and not network"`, matching the marker's documented "skipped in the default
   CI lane" contract (previously a future `network`-marked test would have run in CI against its own contract).
+
+### Removed
+- **`moldetr/dataloader/shimming.py` — the GPL-derived shim simulator.** It was adapted from
+  [SHIMpanzee](https://github.com/smeerten/shimpanzee) under the GNU GPL and sat inside a repository
+  labelled Apache-2.0 that ships only `LICENSE`. Making the import lazy limited how far the GPL code
+  reached at runtime, but licensing attaches to distribution, not to import — the file was in every clone
+  and every archive. **What it costs, stated plainly:** the shim branch was ~50 % of the 2024 training
+  distribution, so re-applying it is now out of scope for the public release. That is a statement about
+  reproduction, not about the model — the shipped weights *were* trained with it, and `docs/SCOPE.md`'s
+  ranges are deliberately unchanged. `add_shim_distortions` keeps its signature and raises
+  `NotImplementedError` pointing at the new `THIRD_PARTY.md`, which retains the SHIMpanzee attribution
+  because v1.0.0 did ship the file. `moldetr.distort` is unaffected and always was — it wraps only the five
+  Apache-licensed `add_*` effects, which `tests/test_licensing.py` now asserts rather than merely
+  documenting.
+- **Matplotlib banner + molecule-figure generators.** Dropped `scripts/gen_banner.py`,
+  `scripts/gen_molecule_figure.py`, and the `[figures]` / `rdkit` extra. The README banner and diagrams now
+  ship as design-tool assets, so the generators — which produced an off-brand matplotlib banner and would
+  overwrite the shipped assets if run — are no longer needed.
 
 ## [1.0.0] - 2026-07-15
 

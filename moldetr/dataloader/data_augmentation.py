@@ -6,7 +6,7 @@ from typing import Callable
 
 import numpy as np
 from matplotlib import pyplot as plt
-from scipy.signal import fftconvolve, hilbert
+from scipy.signal import fftconvolve
 
 DataAugmentationPartial = Callable[[np.ndarray], np.ndarray]
 
@@ -194,132 +194,24 @@ def add_shim_distortions(
         Z2LIM: float = 5.0,
         plotting_enabled: bool = False  # Add plotting flag with default value
 ):
-    # Lazy import: ShimSim is GPL-derived (adapted from SHIMpanzee, GNU GPL). Importing it
-    # inside the only function that uses it keeps ``import moldetr.dataloader.data_augmentation``
-    # -- and thus ``moldetr.distort`` (which wraps only the Apache-2.0 add_* effects) -- free of
-    # any transitive GPL import. See the licensing-boundary note in moldetr/distort.py.
-    from moldetr.dataloader.shimming import ShimSim
+    """GPL-derived shim simulation -- REMOVED from this Apache-2.0 distribution.
 
-    # Original Spectrum
-    if plotting_enabled:
-        # Assuming 'measure_fwhm' function is defined and will be used here to measure FWHM and peak characteristics
-        fwhm, peak_x, peak_y, left_half_max_x, right_half_max_x = measure_fwhm(np.arange(spectrum.size),
-                                                                               np.real(spectrum))
-        print(f"FWHM: {fwhm}, Peak at: {peak_x}, Peak height: {peak_y}")
-        print(f"Left half-max at: {left_half_max_x}, Right half-max at: {right_half_max_x}")
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(spectrum), label='Real Part', color='blue')
-        plt.plot(np.imag(spectrum), label='Imaginary Part', color='red', linestyle='--')
-        plt.title('Original Spectrum')
-        plt.legend()
-        plt.show()
+    The field-inhomogeneity simulator this wrapped (``ShimSim``) was adapted from SHIMpanzee
+    under the GNU GPL and could not ship under Apache-2.0; see ``THIRD_PARTY.md``. The public
+    symbol is kept deliberately: callers who imported it get an explanation instead of an
+    ``AttributeError``, and the ``toss_coin`` branch in :func:`augment_distortions` fails loudly
+    rather than silently altering the augmentation distribution.
 
-    # Inverse Fourier Transform to get fid
-    fid = np.fft.ifft(np.fft.ifftshift(spectrum))
-    if plotting_enabled:
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(fid), label='Real Part', color='blue')
-        plt.plot(np.imag(fid), label='Imaginary Part', color='red', linestyle='--')
-        plt.title('FID after IFFT')
-        plt.legend()
-        plt.show()
-
-    # Upsampling
-    fid_upsampled = np.zeros(fid.size * upsampling_factor, dtype=np.complex128)
-    fid_upsampled[:fid.size // 2] = fid[:fid.size // 2]
-    fid_upsampled[-fid.size // 2:] = fid[-fid.size // 2:]
-    fid_upsampled[0] = fid_upsampled[0] * 0.5
-    length_upsampled = len(fid_upsampled)
-    if plotting_enabled:
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(fid_upsampled), label='Real Part', color='blue')
-        plt.title('FID Upsampled')
-        plt.legend()
-        plt.show()
-
-        # ShimSim and simulate
-    sim = ShimSim(npoints=length_upsampled, sw=sweep_width)
-    sim.startGame()
-
-    distortion_value = np.random.uniform(-1, 1, 4)
-    sim.simulate(z1=distortion_value[0] * Z1LIM, z2=distortion_value[1] * Z2LIM, x1=distortion_value[2] * X1LIM,
-                 y1=distortion_value[3] * Y1LIM)
-    sample = {'shim spectrum': sim.spectrum, 'trial': distortion_value,
-              'fwhm': sim.fwhm * (length_upsampled / sweep_width),
-              'peak_max': sim.peak_max, 'fidSurface': sim.fidSurface}
-
-    shim_spectrum = sample['shim spectrum']
-
-    if plotting_enabled:
-        # Original Shim Spectrum zoomed in around the peak
-        plt.figure(figsize=(30, 10))
-        plt.plot(shim_spectrum, label='Shim Spectrum')
-        plt.xlim(shim_spectrum.size // 2 - 100, shim_spectrum.size // 2 + 100)
-        plt.title('Shim Spectrum Zoomed In')
-        plt.legend()
-        plt.show()
-
-    # Apply Hilbert transform and take the complex conjugate
-    complex_shim_spectrum = np.conj(hilbert(shim_spectrum))
-    if plotting_enabled:
-        # Complex Shim Spectrum zoomed in around the peak
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(complex_shim_spectrum), label='Real Part')
-        plt.plot(np.imag(complex_shim_spectrum), label='Imaginary Part', linestyle='--')
-        plt.xlim(len(complex_shim_spectrum) // 2 - 100, len(complex_shim_spectrum) // 2 + 100)
-        plt.title('Complex Shim Spectrum (Magnitude) Zoomed In')
-        plt.legend()
-        plt.show()
-
-    # Perform IFFT and IFFT shift
-    complex_shim_fid = np.fft.ifft(np.fft.ifftshift(complex_shim_spectrum))
-    complex_shim_fid[0] = complex_shim_fid[0] * 0.5
-
-    # Multiply with fid_upsampled
-    multiplied_time_signal = fid_upsampled * complex_shim_fid
-    if plotting_enabled:
-        # Original multiplied time-domain signal
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(multiplied_time_signal), label='Real Part - Original')
-        plt.plot(np.imag(multiplied_time_signal), label='Imaginary Part - Original', linestyle='--')
-        plt.title('Original Multiplied Time-domain Signal')
-        plt.legend()
-        plt.show()
-
-    # Apply FFT to the multiplied time-domain FID to get the spectrum
-    full_spectrum = np.fft.fftshift(np.fft.fft(multiplied_time_signal))
-
-    # "Downsample" by selecting every fourth point from the full spectrum
-    # This is actually decimating the spectrum data for visualization
-    decimated_spectrum = full_spectrum[::4]
-    if plotting_enabled:
-        # Plot the magnitude of the full and decimated spectra for comparison
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(spectrum) / np.max(np.real(spectrum)), label='Real Part of Original Spectrum')
-        plt.plot(np.real(decimated_spectrum) / np.max(np.real(decimated_spectrum)),
-                 label='Real Part of Decimated Spectrum', linestyle='--')
-        plt.title('Comparison of Full and Decimated Spectra')
-        plt.legend()
-        plt.show()
-
-        # Optional: Plot real and imaginary parts of the decimated spectrum
-        plt.figure(figsize=(30, 10))
-        plt.plot(np.real(decimated_spectrum), label='Real Part - Decimated')
-        plt.plot(np.imag(decimated_spectrum), label='Imaginary Part - Decimated', linestyle='--')
-        plt.title('Decimated Spectrum (Real and Imaginary Parts)')
-        plt.legend()
-        plt.show()
-
-        # Assuming 'measure_fwhm' function is defined and will be used here to measure FWHM and peak characteristics
-        fwhm, peak_x, peak_y, left_half_max_x, right_half_max_x = measure_fwhm(np.arange(decimated_spectrum.size),
-                                                                               np.real(decimated_spectrum))
-        print(f"FWHM: {fwhm}, Peak at: {peak_x}, Peak height: {peak_y}")
-        print(f"Left half-max at: {left_half_max_x}, Right half-max at: {right_half_max_x}")
-
-    # Reset simulation for the next sweep width iteration
-    sim.reset()
-
-    return decimated_spectrum
+    The shipped model *was* trained with this branch active (~50 % of samples, alongside ~35 %
+    line broadening). Reproducing that branch is out of scope for the public release -- it is
+    not a statement about how the model was trained.
+    """
+    raise NotImplementedError(
+        "add_shim_distortions is unavailable in the public MolDeTr distribution: its field-"
+        "inhomogeneity simulator (ShimSim) was GPL-derived and could not ship under Apache-2.0. "
+        "See THIRD_PARTY.md for what was removed and why. Reproducing the shim branch of the "
+        "2024 training distribution is out of scope for the public release."
+    )
 
 
 def augment_distortions(
