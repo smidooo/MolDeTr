@@ -52,7 +52,13 @@ eval = [
 ]
 app = [
     "moldetr[model]",  # the GUI runs inference, so it needs the network
-    "gradio>=6.0,<7",
+    # Floor is 6.21, not 6.0: gradio's icon-only tab-overflow button shipped with no accessible
+    # name until gradio-app/gradio#13639 (released in 6.21.0), which axe reports as a critical
+    # `button-name` violation on our own Simulate tab. CI installs unconstrained and so has picked
+    # the fix up incidentally since 2026-07-29 -- this makes it a guarantee. Note the floor is
+    # still not *tested*: CI resolves the newest 6.x, so 6.21 itself is declared-but-unexercised.
+    # Closing that needs a floor-pinned CI leg, the same lesson `[tool.mypy]` below records for numpy.
+    "gradio>=6.21,<7",
     "plotly>=5",  # interactive spectrum in the Gradio GUI (plotting.spectrum_figure)
 ]
 dev = [
