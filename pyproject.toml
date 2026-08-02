@@ -116,11 +116,28 @@ include = ["moldetr*"]
 # It is deliberately NARROWER than py.typed promises, and saying so is the point. Strict checking
 # of the whole package is 381 errors, concentrated in the torch/fastai-facing modules where the
 # untyped dependencies make `Any` unavoidable; exempting one surfaces the next. Gated here is the
-# pure-NumPy/SciPy half -- the surface the private `nmrsynth` generator actually imports, and the
-# one whose annotations a downstream can act on. The rest remains unverified; that is a known gap,
-# not a claim of coverage.
+# pure-NumPy half -- the surface a private downstream consumer actually imports, and the one whose
+# annotations a downstream can act on. The rest remains unverified; that is a known gap, not a
+# claim of coverage.
+#
+# Gated: simulate.py, distort.py, validation.py. Deliberately NOT gated, each checked and each
+# left out for a stated reason rather than forgotten:
+#   labels.py (10 errors), postprocess.py (11), config.py (8) -- never annotated at all; adding
+#     them is annotation work, not a config change, and doing it under the same commit that
+#     widens the gate would hide one in the other.
+#   reproducibility.py -- imports torch, so it cannot be checked against the dependency floor
+#     without the whole model extra. Its one non-import error is numpy stub typing, not a defect:
+#     `np.random.get_state()` is declared to return `dict[str, Any]` but returns the legacy tuple
+#     at runtime, which is what line 40 indexes.
+#   plotstyle.py -- matplotlib-facing, same `Any` problem as the torch modules.
+#
+# Every candidate is verified against the FLOOR, not against what happens to be installed:
+# python 3.10 with numpy 2.2.6 (what CI resolves for its oldest leg) *and* 3.12 with numpy 2.5.1.
+# Checking only the newest numpy is what shipped a py.typed contract that was wrong for this
+# package's own declared `numpy>=1.23` -- see the v1.1.0 CI failure where every 3.10 leg went red
+# on `Missing type arguments for generic type "ndarray"` while every 3.11 leg passed.
 strict = true
-files = ["moldetr/simulate.py", "moldetr/distort.py"]
+files = ["moldetr/simulate.py", "moldetr/distort.py", "moldetr/validation.py"]
 
 [[tool.mypy.overrides]]
 # Reached as an import from moldetr.distort. It is the training-era augmentation pipeline, kept as
