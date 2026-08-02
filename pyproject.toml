@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moldetr"
-version = "1.1.0"
+version = "1.1.1"
 description = "1D Deformable DETR for automated detection of NMR multiplets in 1H spectra (MolDeTr)"
 readme = "README.md"
 requires-python = ">=3.10"

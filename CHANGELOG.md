@@ -6,8 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-Findings from the post-release code review of #21, the review MolDeTr's own contributing rules ask
-for on >100-LOC diffs touching the distort hub. It was skipped before v1.1.0 shipped.
+Nothing yet.
+
+## [1.1.1] - 2026-08-02
+
+Findings from the post-release code review of #21 — the review `CLAUDE.md` asks for on >100-LOC
+diffs touching the distort hub, which was skipped before v1.1.0 shipped — and from a second,
+adversarial review of the branch that fixed them. No change to the shipped checkpoint, to
+`moldetr.distort`'s behaviour, or to any number the paper reports.
 
 ### Fixed
 - **The `eval` extra now provides the network.** Moving torch behind a `model` extra added
