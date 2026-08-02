@@ -1,10 +1,11 @@
 """The public contract downstream packages are allowed to depend on.
 
-Three properties, each of which a downstream consumer (the private ``nmrsynth`` generator) was
-previously forced to work around:
+Three properties, each of which a private downstream consumer was previously forced to work
+around:
 
-1. **A public transitions API.** ``nmrsynth.compat._engine`` reached into ``moldetr.simulate`` for
-   ``_IM``, ``_build_hamiltonian`` and ``_embed`` because no public equivalent existed. Private
+1. **A public transitions API.** That consumer's compatibility layer reached into
+   ``moldetr.simulate`` for ``_IM``, ``_build_hamiltonian`` and ``_embed`` because no public
+   equivalent existed. Private
    names carry no compatibility promise, so a rename here would break it silently at a distance.
 2. **``py.typed``.** Without it, type checkers treat this package as untyped and downstreams need a
    per-module ``ignore_missing_imports`` override, which suppresses real errors alongside the noise.
@@ -244,14 +245,14 @@ def test_transitions_is_public() -> None:
 def test_the_borrowed_private_names_still_exist() -> None:
     """Removing them would break the very downstream this change exists to unblock.
 
-    The public API is additive: ``nmrsynth`` migrates on its own schedule, and until it does the
-    private names must keep working.
+    The public API is additive: the downstream migrates on its own schedule, and until it does
+    the private names must keep working.
     """
     import moldetr.simulate as simulate
 
-    # `_lorentzian_sum` is the fourth: nmrsynth's tests/test_lineshape.py imports it to check its
-    # own lineshape against this one. It was missing from this guard, so renaming it would have
-    # broken the downstream suite with no tripwire on either side.
+    # `_lorentzian_sum` is the fourth: the downstream's own lineshape tests import it to check
+    # their implementation against this one. It was missing from this guard, so renaming it would
+    # have broken that suite with no tripwire on either side.
     for name in ("_IM", "_build_hamiltonian", "_embed", "_lorentzian_sum"):
         assert hasattr(simulate, name), f"downstream still borrows {name}"
 

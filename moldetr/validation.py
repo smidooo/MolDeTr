@@ -18,20 +18,23 @@ from __future__ import annotations
 import warnings
 
 import numpy as np
+from numpy.typing import ArrayLike, NDArray
 
 INPUT_LENGTH = 6144
 POINTS_PER_HZ = 5.12
 WINDOW_HZ = INPUT_LENGTH / POINTS_PER_HZ  # 1200.0 Hz
 
 
-def validate_spectrum(amplitudes, points_per_hz: float | None = None, warn: bool = True):
+def validate_spectrum(
+    amplitudes: ArrayLike, points_per_hz: float | None = None, warn: bool = True
+) -> NDArray[np.float64]:
     """Return the spectrum as a real 1-D float array, or raise if it breaks the contract.
 
     Raises ``ValueError`` for the hard requirements (length, finiteness). When ``warn`` is set,
     emits a :class:`UserWarning` for recoverable issues (complex input, wrong digital resolution)
     instead of failing. ``points_per_hz`` is the caller's known sampling density, if any.
     """
-    a = np.asarray(amplitudes)
+    a: NDArray[np.float64] = np.asarray(amplitudes)
     if a.ndim != 1:
         a = a.ravel()
 
