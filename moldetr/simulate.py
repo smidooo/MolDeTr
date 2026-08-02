@@ -487,7 +487,7 @@ def simulate(
             )
         amps = amps * (n_spins / total)
 
-    ppm_axis = np.linspace(float(left_ppm), float(right_ppm), n_points)
+    ppm_axis = np.linspace(float(left_ppm), float(right_ppm), n_points, dtype=np.float64)
     hz_axis = ppm_axis * float(base_freq_mhz)
     spectrum = _lorentzian_sum(hz_axis, freqs, amps, gamma)
 
