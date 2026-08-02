@@ -104,6 +104,66 @@ def _transitions(
     return np.asarray(freqs, dtype=float), np.asarray(amps, dtype=float)
 
 
+def _validated_couplings(
+    couplings_hz: NDArray[np.float64] | Sequence[Sequence[float]], n_spins: int
+) -> NDArray[np.float64]:
+    """Check a coupling matrix against the convention this module reads: the upper triangle.
+
+    ``_build_hamiltonian`` and :func:`coupling_blocks` both read only ``i < j``. A matrix whose
+    lower triangle carries couplings that are *not* mirrored above the diagonal is therefore read
+    as decoupled -- silently, and with a physically plausible spectrum as the result, which is the
+    worst way for this to fail. Symmetric and upper-triangular matrices are both valid conventions
+    and both stay accepted; anything else is rejected here rather than quietly ignored.
+
+    **Deliberately not applied to** :func:`coupling_blocks`, :func:`simulate` or
+    :func:`simulate_systems`. ``tests/test_simulate_blocks.py`` pins that blocking and simulation
+    ignore the lower triangle *identically*, which is what makes the upper triangle a usable
+    contract for a matrix editor; raising there would break that pairing and change behaviour on
+    the path that produced the paper's numbers. This guard covers only the public spin-physics API
+    added in v1.1.0, which has no such history and whose docstring already promised symmetry.
+    """
+    couplings = np.asarray(couplings_hz, dtype=float)
+    if couplings.shape != (n_spins, n_spins):
+        raise ValueError(
+            f"couplings_hz must be ({n_spins}, {n_spins}) to match {n_spins} shifts, "
+            f"got {couplings.shape}"
+        )
+    if np.any(np.tril(couplings, -1) != 0.0) and not np.allclose(couplings, couplings.T):
+        raise ValueError(
+            "couplings_hz has entries in its lower triangle that are not mirrored above the "
+            "diagonal. Only the upper triangle is read, so those couplings would be silently "
+            "ignored and the system would come out decoupled. Pass a symmetric matrix, or fill "
+            "the upper triangle only."
+        )
+    return couplings
+
+
+def _validated_spin_count(n_spins: int) -> int:
+    """Bound a spin count to what this module can actually build.
+
+    :func:`build_hamiltonian` eagerly builds ``3n`` matrices of ``4**n`` complex128 via ``_embed``,
+    so an unchecked count fails as an out-of-memory error rather than a diagnosable one.
+    ``MAX_BLOCK_SPINS`` is the ceiling this module already states and :func:`simulate_systems`
+    already enforces.
+
+    Applied to :func:`build_hamiltonian` and :func:`lowering_operators` only. :func:`simulate` and
+    :func:`transitions` do **not** share it -- that is a gap, not a design, and it is recorded in
+    the changelog rather than papered over here. Note also that the ceiling is a responsiveness
+    bound, not a memory-safety one: ``n = 10`` still permits roughly half a gigabyte of operators.
+    """
+    if n_spins < 1:
+        raise ValueError(f"a spin system needs at least one spin, got {n_spins}.")
+    if n_spins > MAX_BLOCK_SPINS:
+        # `2**n_spins` is written, not evaluated: an absurd count is exactly what this guard is for,
+        # and rendering it would produce a several-thousand-digit message (or trip CPython's
+        # integer-to-string limit and raise from inside the diagnostic).
+        raise ValueError(
+            f"n_spins={n_spins} exceeds MAX_BLOCK_SPINS={MAX_BLOCK_SPINS}; the product space "
+            f"would be 2**{n_spins} states."
+        )
+    return n_spins
+
+
 # --- public spin-physics API ----------------------------------------------------------------------
 #
 # The three functions below expose the primitives above under names that carry a compatibility
@@ -124,16 +184,13 @@ def build_hamiltonian(
 
     Args:
         shifts_hz: chemical shifts, one per spin, in Hz.
-        couplings_hz: symmetric ``(n, n)`` scalar-coupling matrix in Hz; the diagonal is ignored.
+        couplings_hz: ``(n, n)`` scalar-coupling matrix in Hz. Only the upper triangle is read, so
+            pass it symmetric or upper-triangular; a lower triangle that is not mirrored above the
+            diagonal raises rather than being ignored. The diagonal is ignored either way.
     """
     shifts = np.asarray(shifts_hz, dtype=float)
-    couplings = np.asarray(couplings_hz, dtype=float)
-    n_spins = int(shifts.size)
-    if couplings.shape != (n_spins, n_spins):
-        raise ValueError(
-            f"couplings_hz must be ({n_spins}, {n_spins}) to match {n_spins} shifts, "
-            f"got {couplings.shape}"
-        )
+    n_spins = _validated_spin_count(int(shifts.size))
+    couplings = _validated_couplings(couplings_hz, n_spins)
     return _build_hamiltonian(shifts, couplings, n_spins)
 
 
@@ -142,8 +199,12 @@ def lowering_operators(n_spins: int) -> list[NDArray[np.complex128]]:
 
     Useful for resolving a transition's intensity *per spin* -- something
     :func:`transitions` cannot give, because it sums over spins before returning.
+
+    Spin 0 is the most-significant Kronecker factor, and the single-spin basis is
+    ``(|alpha>, |beta>) = (m = +1/2, m = -1/2)``. A caller building its own operators to combine
+    with these needs both conventions, or it gets a silently permuted result.
     """
-    return [_embed(_IM, i, n_spins) for i in range(n_spins)]
+    return [_embed(_IM, i, n_spins) for i in range(_validated_spin_count(n_spins))]
 
 
 def transitions(
@@ -155,7 +216,18 @@ def transitions(
 
     Intensities are **already summed over spins**; use :func:`lowering_operators` if the per-spin
     contributions are needed.
+
+    ``min_intensity`` is an absolute threshold on ``|<j|F_x|i>|**2``, not a fraction of the
+    strongest line.
     """
+    hamiltonian = np.asarray(hamiltonian)
+    fx = np.asarray(fx)
+    if fx.shape != hamiltonian.shape:
+        raise ValueError(
+            f"fx must have the same shape as hamiltonian {hamiltonian.shape}, got {fx.shape}. "
+            "Frequencies come from the Hamiltonian alone, so a mismatched F_x returns correct "
+            "line positions with wrong intensities -- the most deceptive way for this to fail."
+        )
     return _transitions(hamiltonian, fx, min_intensity)
 
 
@@ -423,7 +495,7 @@ def simulate(
             )
         amps = amps * (n_spins / total)
 
-    ppm_axis = np.linspace(float(left_ppm), float(right_ppm), n_points)
+    ppm_axis = np.linspace(float(left_ppm), float(right_ppm), n_points, dtype=np.float64)
     hz_axis = ppm_axis * float(base_freq_mhz)
     spectrum = _lorentzian_sum(hz_axis, freqs, amps, gamma)
 

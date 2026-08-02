@@ -38,6 +38,47 @@ def test_quick_validation_passes():
     assert "gating checks passed" in r.stdout
 
 
+#: Makes ``moldetr.config`` unimportable, then runs the script. Note this also breaks the
+#: ``module_imports`` gate, so the assertion below has to name ``config_imports`` specifically --
+#: a bare "exit code is non-zero" would pass for the wrong reason.
+_CONFIG_IMPORT_SABOTAGE = """
+import importlib.abc, runpy, sys
+
+class Blocker(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path, target=None):
+        if fullname == "moldetr.config":
+            raise ModuleNotFoundError("No module named 'moldetr.config'", name=fullname)
+        return None
+
+sys.meta_path.insert(0, Blocker())
+runpy.run_path("scripts/quick_validation.py", run_name="__main__")
+"""
+
+
+@pytest.mark.unit
+def test_quick_validation_config_gate_can_actually_fail():
+    """A gate that cannot fail is not a gate, and CI runs this script as one.
+
+    ``check_config_imports`` used to wrap a bare ``print`` in ``try``/``except``: nothing was
+    imported, so the handler was unreachable and the gate reported PASS unconditionally -- while
+    its docstring said it checked that the config loads.
+    """
+    env = {**os.environ, "MPLBACKEND": "Agg"}
+    r = subprocess.run(
+        [sys.executable, "-c", _CONFIG_IMPORT_SABOTAGE],
+        cwd=str(REPO),
+        env=env,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+
+    assert "[FAIL] config_imports" in r.stdout, (
+        "with moldetr.config unimportable the config gate must report FAIL; got:\n" + r.stdout
+    )
+    assert r.returncode != 0
+
+
 @pytest.mark.unit
 def test_aggregate_reproduces_paper_medians():
     r = _run("scripts/aggregate_experimental.py")

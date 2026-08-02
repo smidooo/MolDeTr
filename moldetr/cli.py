@@ -14,6 +14,7 @@ launches the Gradio UI), so ``moldetr <cmd> --help`` shows that command's own op
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import runpy
 import sys
 from pathlib import Path
@@ -60,6 +61,51 @@ def _usage() -> str:
     )
 
 
+#: Which extra supplies what. ``app`` needs gradio *before* torch -- ``app.py`` imports gradio at
+#: module scope -- and ``moldetr[model]`` would not install it.
+_EXTRA_PACKAGES: dict[str, tuple[str, ...]] = {
+    "app": ("gradio", "plotly", "torch", "fastai"),
+    "model": ("torch", "fastai"),
+}
+
+
+def _model_stack_hint(cmd: str, extra: str, exc: ImportError) -> str:
+    """Turn a bare missing-dependency traceback into the line that fixes it.
+
+    PyTorch became an optional extra in v1.1.0, so this failure is newly reachable by a documented
+    path. The remedy lives in the README, which a user running the installed entry point never sees.
+    """
+    return (
+        f"`moldetr {cmd}` needs the '{extra}' extra, which is not installed.\n"
+        f"    pip install 'moldetr[{extra}]'\n"
+        "PyTorch became an optional extra in v1.1.0 (see README > Install).\n"
+        f"original error: {exc}"
+    )
+
+
+def _missing_extra(cmd: str, exc: ImportError) -> str | None:
+    """The extra that would supply the genuinely-absent package behind ``exc``, or ``None``.
+
+    Absence is *proven* with ``find_spec``, never inferred from ``exc.name``. The import machinery
+    sets ``name`` to the innermost module it failed on, so a ``DLL load failed while importing _C``
+    inside a perfectly-installed torch arrives as ``name='torch._C'`` and roots at ``torch``.
+    Reading that as "not installed" sends the user to a ``Requirement already satisfied`` -- and
+    because the hint is raised as ``SystemExit``, which discards the traceback, it also takes away
+    the one thing that would have located the real fault. ``find_spec`` locates a package without
+    executing it, so an installed-but-broken one returns ``None`` here and keeps its traceback.
+    """
+    extra = "app" if cmd == "app" else "model"
+    root = (exc.name or "").split(".")[0]
+    if root not in _EXTRA_PACKAGES[extra]:
+        return None
+    try:
+        if importlib.util.find_spec(root) is not None:
+            return None  # present, just broken -- not our story to tell
+    except (ImportError, ValueError):
+        pass  # not even locatable (a missing parent package): treat as absent
+    return extra
+
+
 def main(argv: list[str] | None = None) -> None:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ("-h", "--help", "help"):
@@ -70,8 +116,14 @@ def main(argv: list[str] | None = None) -> None:
         if rest and rest[0] in ("-h", "--help"):
             print(APP_USAGE)  # never fall through: launch_app() blocks until the server stops
             return
-        app = importlib.import_module("app")
-        app.launch_app()  # single launch path -> same theme/CSS as `python app.py`
+        try:
+            app = importlib.import_module("app")
+        except ImportError as exc:
+            extra = _missing_extra("app", exc)
+            if extra is None:
+                raise
+            raise SystemExit(_model_stack_hint("app", extra, exc)) from exc
+        app.launch_app()  # outside the try: a runtime ImportError here keeps its traceback
         return
     if cmd not in COMMANDS:
         print(f"moldetr: unknown command '{cmd}'\n\n{_usage()}", file=sys.stderr)
@@ -83,6 +135,14 @@ def main(argv: list[str] | None = None) -> None:
             runpy.run_path(str(_REPO / HYDRA_COMMANDS[cmd]), run_name="__main__")
         else:
             importlib.import_module(COMMANDS[cmd]).main()
+    except ImportError as exc:
+        # Wider than the app branch on purpose: `runpy.run_path` cannot separate importing a Hydra
+        # script from running it. `_missing_extra` carries the weight -- a runtime ImportError from
+        # an installed package is not classified as absence, so it propagates with its traceback.
+        extra = _missing_extra(cmd, exc)
+        if extra is None:
+            raise
+        raise SystemExit(_model_stack_hint(cmd, extra, exc)) from exc
     finally:
         sys.argv = saved_argv
 

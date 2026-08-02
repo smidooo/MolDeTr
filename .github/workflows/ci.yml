@@ -29,6 +29,10 @@ jobs:
       - name: Lint
         # app.py + app_ui/ are the GUI hub and were previously unlinted in CI entirely.
         run: ruff check moldetr scripts tests app.py app_ui
+      - name: Type check
+        # Scope and rationale live in pyproject's [tool.mypy]: this covers the pure-NumPy public
+        # surface that py.typed's promise is actually actionable for, not the whole package.
+        run: mypy
       - name: Smoke test
         run: python scripts/quick_validation.py
       - name: Unit + scripts tests (no in-process server)

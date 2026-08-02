@@ -23,7 +23,10 @@ rather than asserted-in-prose -- see ``tests/test_licensing.py``.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
+from numpy.typing import NDArray
 from scipy.signal import hilbert  # type: ignore[import-untyped]  # scipy ships no type stubs
 
 from moldetr.dataloader.data_augmentation import (
@@ -121,8 +124,8 @@ def _validate(
 
 
 def _apply_satellites(
-    out: np.ndarray, sat_j_hz: float | None, sat_intensity: float | None
-) -> np.ndarray:
+    out: NDArray[Any], sat_j_hz: float | None, sat_intensity: float | None
+) -> NDArray[Any]:
     """Add deterministic 13C satellites by collapsing each random range to a single value.
 
     ``add_13C_satellites_with_variability`` has no ``use_custom_values`` path -- it always draws
@@ -143,8 +146,8 @@ def _apply_satellites(
 
 
 def _apply_phase(
-    out: np.ndarray, ppm: np.ndarray, phase0_deg: float | None, phase1: float | None
-) -> np.ndarray:
+    out: NDArray[Any], ppm: NDArray[Any], phase0_deg: float | None, phase1: float | None
+) -> NDArray[Any]:
     """Apply a deterministic phase distortion, defaulting the unset order to 0.0.
 
     The custom path only triggers when BOTH ``phase_0_custom`` and ``phase_1_custom`` are not
@@ -172,7 +175,7 @@ def _apply_phase(
     return np.asarray(result, dtype=np.complex128)
 
 
-def _apply_baseline(out: np.ndarray, ppm: np.ndarray, baseline: bool | float) -> np.ndarray:
+def _apply_baseline(out: NDArray[Any], ppm: NDArray[Any], baseline: bool | float) -> NDArray[Any]:
     """Apply a deterministic linear baseline tilt (``+mag`` at one end, ``-mag`` at the other)."""
     magnitude = _BASELINE_DEFAULT if baseline is True else float(baseline)
     result = add_baseline_distortion(
@@ -189,8 +192,8 @@ def _apply_baseline(out: np.ndarray, ppm: np.ndarray, baseline: bool | float) ->
 
 
 def distort(
-    spectrum: np.ndarray,
-    ppm_axis: np.ndarray,
+    spectrum: NDArray[Any],
+    ppm_axis: NDArray[Any],
     *,
     noise_snr_log10: float | None = None,
     phase0_deg: float | None = None,
@@ -200,7 +203,7 @@ def distort(
     sat_intensity: float | None = None,
     broaden_hz: float | None = None,
     seed: int = 0,
-) -> np.ndarray:
+) -> NDArray[Any]:
     """Apply the paper's training-time distortions deterministically, one effect at a time.
 
     Every effect is off unless its parameter is not ``None`` (baseline: not ``None``/``False``).
