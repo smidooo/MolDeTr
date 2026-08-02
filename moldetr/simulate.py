@@ -141,17 +141,25 @@ def _validated_couplings(
 def _validated_spin_count(n_spins: int) -> int:
     """Bound a spin count to what this module can actually build.
 
-    ``_embed`` allocates ``3n`` matrices of ``4**n`` complex128, so an unchecked count fails as an
-    out-of-memory error rather than a diagnosable one. ``MAX_BLOCK_SPINS`` is the ceiling this
-    module already states and :func:`simulate_systems` already enforces; the public entry points
-    share it rather than each inventing their own.
+    :func:`build_hamiltonian` eagerly builds ``3n`` matrices of ``4**n`` complex128 via ``_embed``,
+    so an unchecked count fails as an out-of-memory error rather than a diagnosable one.
+    ``MAX_BLOCK_SPINS`` is the ceiling this module already states and :func:`simulate_systems`
+    already enforces.
+
+    Applied to :func:`build_hamiltonian` and :func:`lowering_operators` only. :func:`simulate` and
+    :func:`transitions` do **not** share it -- that is a gap, not a design, and it is recorded in
+    the changelog rather than papered over here. Note also that the ceiling is a responsiveness
+    bound, not a memory-safety one: ``n = 10`` still permits roughly half a gigabyte of operators.
     """
     if n_spins < 1:
         raise ValueError(f"a spin system needs at least one spin, got {n_spins}.")
     if n_spins > MAX_BLOCK_SPINS:
+        # `2**n_spins` is written, not evaluated: an absurd count is exactly what this guard is for,
+        # and rendering it would produce a several-thousand-digit message (or trip CPython's
+        # integer-to-string limit and raise from inside the diagnostic).
         raise ValueError(
             f"n_spins={n_spins} exceeds MAX_BLOCK_SPINS={MAX_BLOCK_SPINS}; the product space "
-            f"would be {2**n_spins} states."
+            f"would be 2**{n_spins} states."
         )
     return n_spins
 

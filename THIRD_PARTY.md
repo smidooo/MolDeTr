@@ -9,7 +9,7 @@ third-party code that has been part of it, and what was done about it.
 |---|---|
 | **Upstream** | [SHIMpanzee](https://github.com/smeerten/shimpanzee) |
 | **Copyright** | © 2016–2017 Bas van Meerten and Wouter Franssen |
-| **Licence** | **GPL-3.0-or-later** (upstream `LICENSE.md` is GPL v3, 29 June 2007; its headers read "either version 3 of the License, or (at your option) any later version"). GitHub reports `NOASSERTION` for that repository only because the licence lives in `LICENSE.md` rather than `LICENSE` — a detection artefact, not an absence. |
+| **Licence** | **GPL-3.0-or-later** (upstream `LICENSE.md` is GPL v3, 29 June 2007; its headers read "either version 3 of the License, or (at your option) any later version"). GitHub reports `NOASSERTION` for that repository because its `LICENSE.md` is a Markdown-reformatted copy of the GPL — `====` underline headings, `&copy;`, HTML entities — which its licence detector does not match by content. A detection artefact, not an absence. |
 | **Relationship** | adapted, not copied verbatim — the file's own header read *"Minimal SHIMpanzee code to simulate collate / modifed from https://github.com/smeerten/shimpanzee under GNU GPL licence"* |
 | **What it provided** | `ShimSim`, a field-inhomogeneity (shim) simulator |
 | **Status** | **removed** after v1.0.0. Present in the v1.0.0 release and its Zenodo archive; absent from every release after it. |
@@ -38,8 +38,10 @@ SHIMpanzee upstream, under its own licence.
 - `moldetr.distort` is unaffected. It wraps only the five Apache-licensed `add_*` effects —
   noise, phase, baseline, ¹³C satellites and line broadening — and never reached the shim path.
 - `moldetr.dataloader.data_augmentation.add_shim_distortions` still exists as a symbol and raises
-  `NotImplementedError` pointing at this file, so callers get an explanation rather than an
-  `AttributeError`, and the branch fails loudly instead of silently changing the distribution.
+  `NotImplementedError` pointing at this file, so a caller who invokes it directly gets an
+  explanation rather than an `AttributeError`. Note the `toss_coin` branch inside
+  `augment_distortions` that used to call it is unreachable in this tree — `toss_coin` is pinned to
+  `0.99` — so the raise makes no promise about the augmentation distribution one way or the other.
 - `tests/test_licensing.py` enforces all of the above, so an accidental re-introduction — a merge
   from an older branch, a restored file — fails the suite instead of going unnoticed.
 
@@ -48,9 +50,9 @@ SHIMpanzee upstream, under its own licence.
 | | |
 |---|---|
 | **Upstream** | [Deformable DETR](https://github.com/fundamentalvision/Deformable-DETR), itself modified from [Deformable-Convolution-V2-PyTorch](https://github.com/chengdazhi/Deformable-Convolution-V2-PyTorch/tree/pytorch_1.0.0); and [DETR](https://github.com/facebookresearch/detr) |
-| **Copyright** | © 2020 SenseTime. All Rights Reserved. · © Facebook, Inc. and its affiliates. All Rights Reserved. |
+| **Copyright** | © 2020 SenseTime. All Rights Reserved. · © Facebook, Inc. and its affiliates. All Rights Reserved. · © 2018 Microsoft (via [DCN](https://github.com/msracver/Deformable-ConvNets), from which the CUDA kernels descend — see the header of `ms_deform_im2col_cuda.cuh`) |
 | **Licence** | Apache License 2.0 — the same licence this repository ships under, so no boundary is crossed |
-| **Where** | the deformable-attention op sources `moldetr/model/ops/src/**` (`ms_deform_attn.h`, `vision.cpp`, `cpu/*`, `cuda/*`) and the Hungarian matcher `moldetr/matcher/matcher.py` |
+| **Where** | all of `moldetr/model/ops/**` — both the native sources (`src/ms_deform_attn.h`, `src/vision.cpp`, `src/cpu/*`, `src/cuda/*`) and the Python modules that wrap them (`functions/*.py`, `modules/*.py`, `setup.py`) — plus the Hungarian matcher `moldetr/matcher/matcher.py` |
 | **Status** | **present and distributed**, including in the wheel |
 
 Each of those files retains its own copyright and licence header, which is what Apache-2.0

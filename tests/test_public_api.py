@@ -147,6 +147,26 @@ def test_build_hamiltonian_honours_the_declared_block_ceiling() -> None:
 
 
 @pytest.mark.unit
+def test_the_ceiling_error_stays_readable_for_an_absurd_spin_count() -> None:
+    """The guard exists to make this failure diagnosable, so its own message must not blow up.
+
+    ``2**n_spins`` interpolated into the message is an ``n_spins``-bit integer rendered in decimal.
+    For 6144 -- this project's own spectrum length, and exactly what a caller passing a spectrum
+    where shifts belong would produce -- that is an 1850-digit number, and past ~14285 it trips
+    CPython's integer-to-string limit and raises a *different* ValueError from inside the
+    formatting.
+    """
+    from moldetr.simulate import lowering_operators
+
+    with pytest.raises(ValueError) as excinfo:
+        lowering_operators(6144)
+
+    message = str(excinfo.value)
+    assert len(message) < 200, f"the diagnostic is {len(message)} characters long: {message[:120]}…"
+    assert "6144" in message, "it still has to say what was actually passed"
+
+
+@pytest.mark.unit
 def test_lowering_operators_rejects_a_non_positive_spin_count() -> None:
     """``lowering_operators(-3)`` returned ``[]``, which propagates as an all-zero spectrum."""
     from moldetr.simulate import lowering_operators
@@ -434,4 +454,65 @@ def test_cli_names_the_remedy_when_the_model_stack_is_missing() -> None:
     combined = result.stdout + result.stderr
     assert "moldetr[model]" in combined, (
         f"the failure must name the fix, not only the missing module:\n{combined}"
+    )
+
+
+@pytest.mark.unit
+def test_a_broken_but_installed_torch_is_not_reported_as_missing() -> None:
+    """``ImportError.name`` reports the *innermost* failure, so it cannot tell the two apart.
+
+    A ``DLL load failed while importing _C`` inside an installed torch -- the most common way this
+    stack breaks on Windows, which CI runs -- arrives as ``name='torch._C'`` and roots at
+    ``torch``. Inferring absence from that sends a user to ``pip install``, which answers
+    "Requirement already satisfied", after the hint has replaced the traceback that would have
+    shown them the real line. Absence has to be proven, not inferred.
+    """
+    from moldetr.cli import _missing_extra
+
+    broken = ModuleNotFoundError("DLL load failed while importing _C", name="torch._C")
+
+    assert _missing_extra("predict", broken) is None, (
+        "torch is installed in this environment, so this must fall through to the real traceback"
+    )
+
+
+#: `moldetr app` needs gradio *before* it needs torch (``app.py`` imports gradio at module scope),
+#: and gradio comes from the ``app`` extra -- ``moldetr[model]`` would not install it.
+_CLI_APP_WITHOUT_GRADIO = textwrap.dedent(
+    """
+    import importlib.abc, sys
+
+    class Blocker(importlib.abc.MetaPathFinder):
+        def find_spec(self, fullname, path, target=None):
+            if fullname.split(".")[0] in ("gradio", "plotly", "torch", "fastai"):
+                raise ModuleNotFoundError(f"No module named {fullname!r}", name=fullname)
+            return None
+
+    sys.meta_path.insert(0, Blocker())
+
+    # Prove the blocker actually bites, so a silently-ineffective probe cannot pass.
+    try:
+        import gradio
+    except ModuleNotFoundError:
+        pass
+    else:
+        raise AssertionError("the import blocker did nothing; this test proves nothing")
+
+    from moldetr.cli import main
+    main(["app"])
+    """
+)
+
+
+@pytest.mark.unit
+def test_cli_app_names_the_app_extra_not_the_model_extra() -> None:
+    """The GUI's first missing import is gradio, and ``moldetr[model]`` does not provide it."""
+    result = subprocess.run(
+        [sys.executable, "-c", _CLI_APP_WITHOUT_GRADIO], capture_output=True, text=True, cwd=REPO
+    )
+
+    assert result.returncode != 0, "the app cannot launch without gradio"
+    combined = result.stdout + result.stderr
+    assert "moldetr[app]" in combined, (
+        f"`moldetr app` must point at the extra that actually supplies gradio:\n{combined}"
     )

@@ -15,8 +15,20 @@ for on >100-LOC diffs touching the distort hub. It was skipped before v1.1.0 shi
   `pip install -e ".[eval]"` → `python scripts/evaluate_synthetic.py` failed on a clean install
   with `ModuleNotFoundError: torch`. Conda users were unaffected (`environment.yml` carries
   pytorch); the break was confined to the pip path.
-- **`moldetr predict` / `moldetr app` now name the remedy** when the deep-learning stack is
-  absent, instead of raising a bare `ModuleNotFoundError` whose fix appears only in the README.
+- **`moldetr predict` / `moldetr app` now name the remedy** when a needed extra is absent, instead
+  of raising a bare `ModuleNotFoundError` whose fix appears only in the README — and they name the
+  *right* extra: `moldetr app` reaches `gradio` before it reaches torch, so it points at
+  `moldetr[app]`, which `moldetr[model]` would not have installed.
+- **Absence is proven rather than inferred.** `ImportError.name` reports the innermost module the
+  import machinery failed on, so a `DLL load failed while importing _C` inside a perfectly good
+  torch arrives as `name='torch._C'` and roots at `torch`. Reading that as "not installed" sent
+  the user to a `Requirement already satisfied` *and*, because the hint is raised as `SystemExit`,
+  discarded the traceback that would have located the real fault. `find_spec` is now used to
+  confirm the package is genuinely missing; an installed-but-broken one keeps its traceback.
+- **The ceiling error stays readable.** `MAX_BLOCK_SPINS` rejection interpolated `2**n_spins` into
+  its message: passing a 6144-point spectrum where shifts belong produced an 1850-digit number,
+  and past ~14285 it tripped CPython's integer-to-string limit and raised from inside the
+  diagnostic. It now writes `2**n` rather than evaluating it.
 - **Input validation on the public spin-physics API.** `build_hamiltonian()` rejects a coupling
   matrix whose lower triangle is not mirrored above the diagonal — only `i<j` is read, so such a
   matrix silently produced a *decoupled* Hamiltonian (an AX pair came back as two singlets). Also
@@ -32,6 +44,11 @@ for on >100-LOC diffs touching the distort hub. It was skipped before v1.1.0 shi
   docstring claimed it checked that the config loads. CI runs this script as a gate.
 
 ### Changed
+- **`lowering_operators` now shares the `MAX_BLOCK_SPINS` ceiling.** `n < 1` and
+  `n > MAX_BLOCK_SPINS` both raise where they previously returned `[]` and an oversized list
+  respectively. This narrows a function released in v1.1.0 within the same cycle. `simulate` and
+  `transitions` do **not** share the ceiling — recorded as a gap in `_validated_spin_count`'s
+  docstring rather than silently implied.
 - **`THIRD_PARTY.md` records the code that actually ships.** It listed only the removed GPL file
   while omitting Deformable DETR (© 2020 SenseTime) and DETR (© Facebook), whose sources ship in
   the wheel and carry their own headers. It now also names the GPL version (GPL-3.0-or-later) and
