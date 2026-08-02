@@ -44,6 +44,7 @@ model = [
 ]
 # Extra deps used only by the evaluation / plotting scripts in scripts/.
 eval = [
+    "moldetr[model]",  # evaluate_synthetic.py loads the checkpoint, so it needs the network
     "pandas>=1.5",
     "scikit-learn>=1.1",
     "seaborn>=0.12",
@@ -86,6 +87,12 @@ Data = "https://doi.org/10.5281/zenodo.21217101"
 [project.scripts]
 moldetr = "moldetr.cli:main"
 
+[tool.setuptools]
+# Without this, only LICENSE reaches the wheel: THIRD_PARTY.md sits at the repo root, so it is
+# neither package-data nor picked up by the default license-file globs. A third-party notice that
+# reaches only people browsing the repository does not reach the people who install the package.
+license-files = ["LICENSE", "THIRD_PARTY.md"]
+
 [tool.setuptools.packages.find]
 include = ["moldetr*"]
 
@@ -101,6 +108,26 @@ include = ["moldetr*"]
     "src/cpu/*",
     "src/cuda/*",
 ]
+
+[tool.mypy]
+# `py.typed` tells every downstream type checker to trust this package's annotations, and until now
+# nothing verified them: there was no mypy config and no CI step. This gate closes part of that.
+#
+# It is deliberately NARROWER than py.typed promises, and saying so is the point. Strict checking
+# of the whole package is 381 errors, concentrated in the torch/fastai-facing modules where the
+# untyped dependencies make `Any` unavoidable; exempting one surfaces the next. Gated here is the
+# pure-NumPy/SciPy half -- the surface the private `nmrsynth` generator actually imports, and the
+# one whose annotations a downstream can act on. The rest remains unverified; that is a known gap,
+# not a claim of coverage.
+strict = true
+files = ["moldetr/simulate.py", "moldetr/distort.py"]
+
+[[tool.mypy.overrides]]
+# Reached as an import from moldetr.distort. It is the training-era augmentation pipeline, kept as
+# historical evidence and excluded from `ruff format` for the same reason; annotating it would
+# rewrite the file this repository preserves for provenance comparison.
+module = "moldetr.dataloader.data_augmentation"
+ignore_errors = true
 
 [tool.ruff]
 line-length = 100

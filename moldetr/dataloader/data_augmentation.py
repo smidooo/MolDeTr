@@ -199,8 +199,14 @@ def add_shim_distortions(
     The field-inhomogeneity simulator this wrapped (``ShimSim``) was adapted from SHIMpanzee
     under the GNU GPL and could not ship under Apache-2.0; see ``THIRD_PARTY.md``. The public
     symbol is kept deliberately: callers who imported it get an explanation instead of an
-    ``AttributeError``, and the ``toss_coin`` branch in :func:`augment_distortions` fails loudly
-    rather than silently altering the augmentation distribution.
+    ``AttributeError``.
+
+    The ``toss_coin`` branch in :func:`augment_distortions` that used to call this is
+    **unreachable** in the current tree: ``toss_coin`` is pinned to the literal ``0.99``, so
+    neither the shim branch (``< 0.5``) nor the line-broadening branch (``>= .6 and < 0.95``)
+    runs -- control always reaches ``else: pass``. This raise therefore cannot fire from that
+    path. It is the pin -- which postdates the shipped weights, see ``docs/SCOPE.md`` -- and not
+    the removal that alters the distribution relative to those weights.
 
     The shipped model *was* trained with this branch active (~50 % of samples, alongside ~35 %
     line broadening). Reproducing that branch is out of scope for the public release -- it is

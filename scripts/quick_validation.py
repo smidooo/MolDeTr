@@ -7,6 +7,7 @@ No model weights or spectral data are required (both live on Zenodo), so this
 runs on a fresh, data-less clone on any OS (CPU only).
 """
 
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -57,9 +58,21 @@ def check_structured_output() -> bool:
 
 
 def check_config_imports() -> bool:
-    """Check that config.py and Hydra config load correctly."""
+    """Check that config.py loads and MultipletConfig is still a frozen dataclass.
+
+    This used to wrap a bare ``print`` in ``try``/``except``: nothing was imported, so the handler
+    was unreachable and the gate reported PASS unconditionally -- including when the module it
+    claimed to check was missing. CI runs this script as a gate, so it now performs the import it
+    advertises, and checks the two properties the success line already claimed.
+    """
     print("\n2. Checking config imports ...")
     try:
+        from moldetr.config import MultipletConfig
+
+        if not dataclasses.is_dataclass(MultipletConfig):
+            raise TypeError("MultipletConfig is not a dataclass")
+        if not MultipletConfig.__dataclass_params__.frozen:  # type: ignore[attr-defined]
+            raise TypeError("MultipletConfig is no longer frozen")
         print("   OK  config.MultipletConfig (frozen dataclass)")
         return True
     except Exception as e:
