@@ -176,17 +176,24 @@ jobs:
         # job varies the gradio version, not the engine, so a second and third would buy another
         # copy of the same signal.
         #
-        # This step is a smoke check at the floor, NOT a gradio#13639 detector. Two independent
-        # measurements say so: run 30279602615 (2026-07-27) resolved gradio 6.20.0 -- 6.21.0 did
-        # not exist until 2026-07-29 -- and all three browser legs passed; and a direct probe of
-        # 6.20.0 vs 6.21.0 on a two-tab Blocks reports 0 `button-name` violations for BOTH. The
-        # cause is that the overflow control carries a `hide` class (`display:none`) until the
-        # strip really overflows, and axe skips `display:none` subtrees -- at 1280x720 our two tabs
-        # measure scrollWidth == clientWidth == 1216, so it never renders.
+        # This step now DOES detect gradio#13639, via
+        # `test_tab_overflow_control_has_an_accessible_name` in tests/e2e/test_browser_a11y.py.
+        # Nothing about the page's default state changed -- the control still carries a `hide`
+        # class (`display:none`) until the strip really overflows, and axe still skips
+        # `display:none` subtrees, so every *other* scan in this module remains blind to it. The
+        # test forces the strip narrow with `.tab-wrapper { max-width: 90px }` instead, which is
+        # what actually mounts the control.
         #
-        # To make it discriminating, a test would need `set_viewport_size({"width": 180, ...})`
-        # (measured: 6.20.0 -> 1 critical `button-name`, 6.21.0 -> 0) and must NOT sit behind
-        # `_wait_for_buttons_to_have_accessible_names`, which waits the button out by design.
+        # The viewport recipe this comment used to carry was wrong for THIS app and is recorded
+        # here so it is not tried again: at a 180px viewport `.tab-wrapper` still measures
+        # scrollWidth == clientWidth == 442, because the app's own layout floor holds the strip far
+        # wider than the 161px the two tabs need. It was measured on a bare two-tab Blocks, which
+        # has no such floor, and does not transfer.
+        #
+        # Measured directly against real gradio wheels, so the >=6.21 floor is evidenced at its
+        # exact boundary rather than inferred: with the strip forced narrow, the control renders on
+        # all three, and 6.20.0 -> aria-label null (critical `button-name`), 6.21.0 -> "More tabs",
+        # 6.22.0 -> "More tabs".
         run: >-
           pytest tests/e2e -m browser -q -rs
           --browser chromium

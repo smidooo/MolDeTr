@@ -58,8 +58,13 @@ app = [
     # the fix up incidentally since 2026-07-29 -- this makes it a guarantee. The floor itself is
     # exercised by the `gradio-floor` job in ci.yml, which pins `gradio==6.21.0` in the same
     # resolution as the extras -- the lesson `[tool.mypy]` below records for numpy, applied here.
-    # That job proves 6.21.0 works; it does NOT prove 6.20 fails. The floor's necessity rests on
-    # #13639 itself, because our a11y suite deliberately waits the transient button out.
+    # Necessity is now measured rather than argued: with the tab strip forced narrow, the overflow
+    # control renders on 6.20.0 with NO accessible name and on 6.21.0 as "More tabs" (probed
+    # against the real wheels). `test_tab_overflow_control_has_an_accessible_name` asserts it, so
+    # lowering this floor turns the suite red instead of silently reintroducing the defect.
+    # Note what CI does and does not do: it never installs 6.20.0, so it re-proves the fix is
+    # PRESENT at the pinned floor, not that 6.20 fails -- that half is the out-of-band measurement
+    # above.
     "gradio>=6.21,<7",
     "plotly>=5",  # interactive spectrum in the Gradio GUI (plotting.spectrum_figure)
 ]
