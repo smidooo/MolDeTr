@@ -6,7 +6,28 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
-Nothing yet.
+### Changed
+- **The `gradio` floor is now `>=6.21,<7`, up from `>=6.0`** (#26). Gradio's icon-only tab-overflow
+  button shipped with no accessible name until gradio-app/gradio#13639, which landed in 6.21.0 and
+  which axe reports as a critical `button-name` violation. Installs that resolve gradio
+  unconstrained have picked the fix up incidentally since 2026-07-29; this makes it a requirement.
+  **If you pinned gradio below 6.21, `pip install -e ".[app]"` will now ask to upgrade it.**
+
+### Fixed
+- **`validate_spectrum` is annotated, so `py.typed` no longer over-promises** (#25). The function is
+  public and the package ships a `py.typed` marker, but neither its argument nor its return carried
+  an annotation — so every typed downstream consumer silently received `Any` while the marker
+  advertised otherwise. Verified against the declared dependency floor (Python 3.10 / numpy 2.2.6)
+  as well as 3.12 / numpy 2.5.1, because checking only the newest numpy is what previously shipped
+  a `py.typed` contract that was wrong for this package's own `numpy>=1.23`.
+
+### Tests
+- **The declared gradio floor is now asserted, not just installed** (#27 and follow-up). A
+  `gradio-floor` CI job pins `gradio==6.21.0` in the same resolution pass as the extras and runs the
+  unit, e2e and chromium-a11y tiers against it. Alongside it,
+  `test_tab_overflow_control_has_an_accessible_name` forces the tab strip to overflow and asserts
+  the control has an accessible name — the defect the floor exists to prevent, which no previous
+  scan could see because the control stays `display:none` until the tabs genuinely do not fit.
 
 ## [1.1.1] - 2026-08-02
 
