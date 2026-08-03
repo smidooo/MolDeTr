@@ -224,6 +224,97 @@ def test_button_name_settle_is_not_vacuous(page: Page, served_app_url: str) -> N
         _wait_for_buttons_to_have_accessible_names(page, timeout=1_500)
 
 
+# Gradio mounts its tab-overflow control only when the tabs cannot fit, and ships it as an
+# icon-only <button>. Until gradio-app/gradio#13639 (released in 6.21.0) that button carried no
+# accessible name at all, which axe reports as a critical `button-name`. `pyproject.toml` pins
+# `gradio>=6.21,<7` for exactly that reason; the two tests below are what make the pin an assertion
+# rather than a claim.
+#
+# Squeezing the VIEWPORT does not reach it. Measured on this app: at a 180px viewport
+# `.tab-wrapper` still reports `scrollWidth == clientWidth == 442`, because the app's own layout
+# floor keeps the strip far wider than the 161px the two tabs need -- so the control stays
+# unmounted, `getClientRects()` is empty, and axe skips the subtree exactly as it does at 1280px.
+# Constraining the strip itself is what actually overflows it. It is also the better lever: it
+# needs no ResizeObserver fire and does not depend on webfont timing, the documented flake source
+# on this tab.
+_FORCE_TAB_OVERFLOW_CSS = ".tab-wrapper { max-width: 90px !important; }"
+
+# The control lives in its own `<span class="overflow-menu">` beside the two `.tab-container`s (one
+# real, one the visually-hidden measurement duplicate). That span carries the `hide` class, which is
+# the `display:none` keeping the button out of axe's reach until the strip really overflows.
+#
+# The child combinator is load-bearing: once the strip overflows, gradio moves the tabs that no
+# longer fit into a sibling `<div class="overflow-dropdown">` *inside* the same span, so a
+# descendant match resolves to three buttons after overflow and one before. `> button` is exactly
+# the control in both states.
+#
+# Matched on `overflow-menu` because it is semantic and survives a rebuild -- the button's own
+# `svelte-11gaq1` is a build hash that changes between gradio versions. Deliberately NOT matched on
+# `aria-label`: that attribute is the thing under test, so any selector naming it would find nothing
+# in exactly the pre-6.21 DOM this exists to catch.
+_OVERFLOW_CONTROL = ".tab-wrapper .overflow-menu > button"
+
+
+def _button_name_violations(page: Page) -> list[dict]:
+    return [v for v in _violations(page) if v["id"] == "button-name"]
+
+
+def test_tab_overflow_control_has_an_accessible_name(page: Page, served_app_url: str) -> None:
+    """The assertion that makes the declared gradio floor testable.
+
+    Scoped to `button-name` rather than to every blocking violation: the CSS below is an artificial
+    layout, and gating the whole rule set on it would let an unrelated contrast or layout finding
+    fail a test whose subject is one attribute on one button.
+    """
+    page.goto(served_app_url)
+    page.wait_for_selector("#md-file")
+
+    control = page.locator(_OVERFLOW_CONTROL)
+    expect(control).to_have_count(1)
+    # Unmounted at the default viewport. This is *why* the other scans in this module cannot see
+    # the control, and asserting it here keeps the next step honest rather than decorative.
+    expect(control).to_be_hidden()
+
+    page.add_style_tag(content=_FORCE_TAB_OVERFLOW_CSS)
+    # Vacuity guard. Without it, a gradio that stops mounting the control -- or a renamed wrapper
+    # class -- would leave the scan below passing forever while testing nothing. That is the same
+    # failure shape as the vacuous `[].every(...)` settle documented above, which this module has
+    # already paid for once.
+    expect(control).to_be_visible()
+
+    violations = _button_name_violations(page)
+    assert not violations, (
+        "the tab-overflow control has no accessible name -- gradio#13639 has regressed, or the "
+        "installed gradio is below the declared >=6.21 floor:\n" + _format(violations)
+    )
+
+
+def test_the_overflow_name_scan_would_catch_a_nameless_control(
+    page: Page, served_app_url: str
+) -> None:
+    """Prove the scan above can fail, by reconstructing the pre-6.21 markup.
+
+    The test above passes on every version this repo supports, so on its own it can never
+    demonstrate that it discriminates -- and an assertion that has never been seen to fail is
+    indistinguishable from one that cannot. 6.21.0 added exactly one thing: the `aria-label`. The
+    control carries no text, no `title` and no `aria-labelledby`, so removing that attribute
+    reproduces the 6.20.0 DOM (`<button class="svelte-11gaq1">` wrapping the three-circle SVG,
+    matching the trace recorded in the settle helper above).
+    """
+    page.goto(served_app_url)
+    page.wait_for_selector("#md-file")
+    page.add_style_tag(content=_FORCE_TAB_OVERFLOW_CSS)
+
+    control = page.locator(_OVERFLOW_CONTROL)
+    expect(control).to_be_visible()
+    control.evaluate("el => el.removeAttribute('aria-label')")
+
+    assert _button_name_violations(page), (
+        "stripping the control's only accessible name produced no `button-name` violation, so the "
+        "test above cannot fail either -- the scan, not gradio, is what broke"
+    )
+
+
 def test_simulate_tab_has_no_serious_axe_violations(page: Page, served_app_url: str) -> None:
     page.goto(served_app_url)
     page.get_by_role("tab", name="Simulate").click()
