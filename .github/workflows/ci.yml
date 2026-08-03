@@ -90,8 +90,11 @@ jobs:
           MPLBACKEND: Agg
         # Without traces/video a red leg gives only a stack trace, which is near-useless for a
         # DOM failure you cannot reproduce locally.
+        # `-rs` because test_browser_a11y.py guards `axe_playwright_python` with importorskip and
+        # is the only module holding axe assertions: without it, losing all of them to a broken
+        # import shows up as the bare token `7 skipped` in a green step.
         run: >-
-          pytest tests/e2e -m browser -q
+          pytest tests/e2e -m browser -q -rs
           --browser ${{ matrix.browser }}
           --tracing retain-on-failure
           --video retain-on-failure
@@ -100,6 +103,100 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: playwright-traces-${{ matrix.browser }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  gradio-floor:
+    name: e2e + a11y at the declared gradio floor
+    # Every other job resolves gradio unconstrained and therefore only ever exercises the newest
+    # 6.x. That left `gradio>=6.21` in pyproject as a claim about a version CI never installed --
+    # the same shape as the `numpy>=1.23` floor whose annotations only checked against the newest.
+    # This job is the one place the declared floor is actually run.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install at the declared floor, resolved in one pass
+        # The pin sits in the SAME resolution as the extras, so pip solves `>=6.21,<7` and
+        # `==6.21.0` together. A follow-up `pip install gradio==...` instead re-resolves against an
+        # already-installed set: gradio still lands on 6.21.0, but its transitive deps can stay at
+        # whatever the newest gradio pulled in -- a floor leg testing 6.21 inside a 6.22-shaped
+        # environment. Hence the `pip check` below.
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,app,browser]" "gradio==6.21.0"
+          python -m playwright install --with-deps chromium
+      - name: Confirm the environment is internally consistent
+        # pip reports a conflicting install with an `ERROR:` line and still exits 0, which the
+        # default `bash -e` cannot catch. Pinning gradio is what makes the resolver backtrack on
+        # shared transitive deps in the first place, so this is the job where that matters most.
+        run: pip check
+      - name: Confirm the floor actually resolved
+        # Cheap insurance against a future edit relaxing the pin: without this the job degrades
+        # into a silent duplicate of `e2e` and nothing says so. Asserts `== 6.21.0` rather than a
+        # prefix so the pin above and this literal fail loudly the moment they diverge.
+        #
+        # Read `gradio.__version__`, not `importlib.metadata`: `__version__` reports what the
+        # imported package is, which is what the tests below actually exercise, whereas metadata
+        # describes the installed distribution and can diverge from it.
+        #
+        # The axe import is here because it is the one thing in this job that can fail SILENTLY.
+        # tests/e2e/test_browser_a11y.py:21 is the only module guarding `axe_playwright_python`
+        # and the only one holding axe assertions, so a broken import skips all of them while the
+        # other browser tests carry the step to exit 0 -- the job's stated purpose lost to the
+        # token `7 skipped`. `axe-playwright-python` is pinned open against a fast-moving
+        # `playwright`, so this is a matter of when, not whether.
+        run: |
+          python -c "import gradio,sys; v=gradio.__version__; print('gradio', v); sys.exit(0 if v == '6.21.0' else 1)"
+          python -c "from axe_playwright_python.sync_playwright import Axe; from playwright.sync_api import Page; print('axe + playwright import OK')"
+      - name: Unit tier at the floor
+        env:
+          MPLBACKEND: Agg
+        # The sharpest gradio-facing tier, and the one the two steps below miss. tests/conftest.py
+        # imports `app`, which imports gradio, so 13 modules reach it transitively -- and
+        # tests/test_ui_graph.py pins `len(demo.blocks)` and `len(demo.fns)`, reads the private
+        # `_id`, and exists to catch things like `api_name=False` serialising to the literal
+        # "false". That is where a gradio-minor divergence actually surfaces. No browser and no
+        # weights, so it is the cheapest step in the job.
+        run: pytest -q -rs -m "not e2e and not browser and not network"
+      - name: e2e at the floor
+        env:
+          MPLBACKEND: Agg
+        run: pytest -q -rs -m e2e
+      - name: chromium a11y at the floor
+        env:
+          MPLBACKEND: Agg
+        # Chromium only, as the cheapest representative engine. The `browser-e2e` matrix above runs
+        # three because engine differences in style timing and a11y-name computation are real; this
+        # job varies the gradio version, not the engine, so a second and third would buy another
+        # copy of the same signal.
+        #
+        # This step is a smoke check at the floor, NOT a gradio#13639 detector. Two independent
+        # measurements say so: run 30279602615 (2026-07-27) resolved gradio 6.20.0 -- 6.21.0 did
+        # not exist until 2026-07-29 -- and all three browser legs passed; and a direct probe of
+        # 6.20.0 vs 6.21.0 on a two-tab Blocks reports 0 `button-name` violations for BOTH. The
+        # cause is that the overflow control carries a `hide` class (`display:none`) until the
+        # strip really overflows, and axe skips `display:none` subtrees -- at 1280x720 our two tabs
+        # measure scrollWidth == clientWidth == 1216, so it never renders.
+        #
+        # To make it discriminating, a test would need `set_viewport_size({"width": 180, ...})`
+        # (measured: 6.20.0 -> 1 critical `button-name`, 6.21.0 -> 0) and must NOT sit behind
+        # `_wait_for_buttons_to_have_accessible_names`, which waits the button out by design.
+        run: >-
+          pytest tests/e2e -m browser -q -rs
+          --browser chromium
+          --tracing retain-on-failure
+          --video retain-on-failure
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces-gradio-floor
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
