@@ -4,7 +4,7 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-08-05
 
 ### Changed
 - **The `gradio` floor is now `>=6.21,<7`, up from `>=6.0`** (#26). Gradio's icon-only tab-overflow
@@ -20,6 +20,13 @@ All notable changes to this project are documented here. The format is based on
   at the root because the licence detector and the citation widget read the root only, and
   `THIRD_PARTY.md` stays because `pyproject.toml` declares it in `license-files` and it ships
   inside the wheel.
+- **The demo dependency manifest is named for what actually installs it.**
+  `deploy/hf_space/requirements.txt` → `deploy/requirements-demo.txt`. There is no Hugging Face
+  Space — a Gradio Space requires an HF PRO account — so the file's only live consumer is the Colab
+  demo notebook, which `pip install -r`s it directly. The old name read as dead deployment
+  scaffolding, which is plausibly why three commits raised the gradio floor without anyone
+  revisiting it. `deploy/hf_space/README.md` stays where it is: it carries the Space front-matter
+  and must be copied as `README.md` if a Space is ever created.
 
 ### Removed
 - **The `design/` handoff scaffolding.** `HANDOFF_README.md`, `INTEGRATE.md`, `PORTING.md` and
@@ -42,6 +49,18 @@ All notable changes to this project are documented here. The format is based on
   advertised otherwise. Verified against the declared dependency floor (Python 3.10 / numpy 2.2.6)
   as well as 3.12 / numpy 2.5.1, because checking only the newest numpy is what previously shipped
   a `py.typed` contract that was wrong for this package's own `numpy>=1.23`.
+- **The demo manifest no longer sits below the packaged gradio floor.** It declared
+  `gradio>=6.0,<7` — 21 minor versions under `pyproject.toml`'s `>=6.21` — and
+  `deploy/hf_space/README.md` pinned `sdk_version: 6.20.0`, the exact version carrying the critical
+  `button-name` violation. Colab installs resolved the newest 6.x and so avoided the defect by
+  luck, which is precisely the accident that raising the floor was meant to stop relying on.
+- **Two `TODO` comments that misdescribed working code.** `moldetr/matcher/matcher.py` carried
+  `# TODO: Implement the GIoU cost` directly above a `giou_cost()` that is implemented, called by
+  the matcher and weighted through `giou_cost_weighting` — a reader auditing the paper's loss
+  function would have concluded the term was never written. `moldetr/learner/multi_multiplet_learner.py`
+  labelled `single_parameter_loss_partial` "just temporary for debugging" although it feeds
+  `single_parameter_loss_metric` on the live metric path. Ten commented-out `print(` lines were
+  removed alongside them. No behaviour change.
 
 ### Tests
 - **The declared gradio floor is now asserted, not just installed** (#27 and follow-up). A
@@ -50,6 +69,12 @@ All notable changes to this project are documented here. The format is based on
   `test_tab_overflow_control_has_an_accessible_name` forces the tab strip to overflow and asserts
   the control has an accessible name — the defect the floor exists to prevent, which no previous
   scan could see because the control stays `display:none` until the tabs genuinely do not fit.
+- **The three gradio declarations are now held in step by a test** (`tests/test_deploy_manifest.py`).
+  It parses the floor out of `pyproject.toml`'s `app` extra, then asserts that
+  `deploy/requirements-demo.txt` declares the identical specifier — ceiling included, so a dropped
+  `<7` fails too — that `deploy/hf_space/README.md`'s `sdk_version` is at or above it, and that the
+  manifest names every distribution the extra does. The `gradio-floor` job cannot catch this drift:
+  it installs from the pyproject extras and never opens these files.
 
 ## [1.1.1] - 2026-08-02
 
