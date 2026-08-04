@@ -42,7 +42,6 @@ Matcher = Callable[
 ]
 
 
-# TODO: Implement the GIoU cost
 def giou_cost(
     out_param: torch.Tensor, tgt_param: torch.Tensor, calculate_giou: CalculateGIOU
 ) -> torch.Tensor:
@@ -54,11 +53,8 @@ def giou_cost(
 
     """
     out_param_matrix = out_param.unsqueeze(1).repeat(1, tgt_param.size(0), 1)
-    # print(f"Size out_param_matrix: {out_param_matrix.size()}")
     tgt_param_matrix = tgt_param.unsqueeze(0).repeat(out_param.size(0), 1, 1)
-    # print(f"Size tgt_param_matrix: {tgt_param_matrix.size()}")
     giou = calculate_giou(out_param_matrix, tgt_param_matrix)
-    # print(f"Size giou_cost: {giou_cost.size()}")
     return 1 - giou
 
 

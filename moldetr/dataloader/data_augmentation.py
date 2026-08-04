@@ -274,7 +274,6 @@ def augment_distortions(
     if toss_coin < 0.5:
         sweep_width = np.random.uniform(50000, 1000000)
         # sweep_width = sigma_custom
-        # print("sweep_width: ",sweep_width)
         spectrum=add_shim_distortions(spectrum,sweep_width=sweep_width)
     elif toss_coin < 0.95 and toss_coin >= .6:
         # Line broadening

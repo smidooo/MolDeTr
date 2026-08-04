@@ -242,7 +242,8 @@ def init_learner(cfg: MultipletConfig, test: bool = False) -> fastai.learner.Lea
         n_classes=len(cfg.mult_class_indices),
         parameter_weighting=parameter_loss_weights,
     )
-    # TODO: Just temporary for debugging
+    # Per-parameter breakdown; consumed by single_parameter_loss_metric below as a metric, not by
+    # the training loss (which uses parameter_loss_partial above).
     single_parameter_loss_partial = partial(
         single_parameter_loss,
         n_classes=len(cfg.mult_class_indices),
