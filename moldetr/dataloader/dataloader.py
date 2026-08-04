@@ -57,7 +57,6 @@ class DataReader(Dataset):
 
                 labels = sample["labels"]
 
-                # print(labels)
                 # plot_spectrum(sample)
                 # Wait for a condition or some event to signal shutdown
 
