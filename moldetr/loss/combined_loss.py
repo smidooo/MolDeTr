@@ -117,7 +117,6 @@ def combined_loss_func(
     group_indices = []
     group_costs = []
     for index, group in enumerate(outputs):
-        # print(f"group outputs shape: {group.shape}")
         if reduction in ("none"):
 
             indices,costs = matching_partial(group, targets, return_cost=True)

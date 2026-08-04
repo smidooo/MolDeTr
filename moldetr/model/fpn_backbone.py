@@ -156,7 +156,6 @@ class FPN_BB(DataclassModule):
         x (torch.Tensor): Input tensor of shape (batch_size, 1, signal_length).
         Returns: Output tensor of shape (batch_size, number of prediction objects, number of classes+number of parameters).
         """
-        # print(f"input shape: {x.shape}")
 
         assert (
             x.size()[-1] >= 2**self.pyramid_layers
@@ -165,9 +164,7 @@ class FPN_BB(DataclassModule):
         P = []
         for conv in self._conv1D:
             x = conv(x)
-            # print(f"conv block: {x.shape})")
             C.append(x)
-        # print(f"last conv block: {x.shape})")
         last_idx = len(C) - 1
         x = self._conv_x1[last_idx](x)
 

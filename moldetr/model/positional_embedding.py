@@ -34,7 +34,6 @@ class LearnedPositionalEncoding(nn.Module):
     def get_positional_encoding(self, x):
         # Assuming x is a tensor of shape [batch_size, seq_len, d_model]
         seq_len = x.size(1)  # Extract the sequence length as an integer
-        # print(seq_len)
         if seq_len > self.max_len:
             raise ValueError(f"Requested sequence length ({seq_len}) exceeds maximum length ({self.max_len})")
 
