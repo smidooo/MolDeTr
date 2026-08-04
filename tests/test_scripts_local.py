@@ -67,6 +67,7 @@ def test_evaluate_experimental_reproduces_paper_median() -> None:
     assert r.returncode == 0, r.stderr
     m = re.search(r"median \|dd\| = ([\d.]+) Hz", r.stdout)
     assert m, r.stdout
-    # paper ~0.89 Hz; this script's decode approximates it (see CLAUDE.md).
+    # paper ~0.89 Hz; this script's live decode approximates it rather than reproducing the
+    # aggregate figure exactly — see docs/SCOPE.md:88 for why the two paths differ.
     assert 0.5 <= float(m.group(1)) <= 1.3, r.stdout
     assert "proton-count accuracy" in r.stdout

@@ -43,7 +43,7 @@ test**. Line coverage cannot see this class of defect; layers L2 and L7 exist to
 
 ### 1. The documented "4 pre-existing `test_scripts` failures" were 5, with one cause — now fixed
 
-Previously recorded in `CLAUDE.md` as an accepted red baseline. Actual failures:
+Previously accepted as a known-red baseline and never re-checked. Actual failures:
 
 ```
 tests/test_scripts.py::test_quick_validation_passes
@@ -141,8 +141,10 @@ missed; that would be the evidence this trade-off was wrong.
 
 ## `docs/requirements/` stays gitignored
 
-Unlike `design/`, which was un-ignored so `tests/test_brand_contract.py` could enforce the brand
-source of truth in CI, `REQUIREMENTS.md` is grouped with `CLAUDE.md` as local project-management
-guidance and is not read by any test. Publishing it is a call about what belongs in a public
-paper companion, not a correctness fix — so it stays local, and this note records that the
-gitignore is deliberate rather than an oversight.
+`REQUIREMENTS.md` is local project-management guidance and is not read by any test. Publishing it
+is a call about what belongs in a public paper companion, not a correctness fix — so it stays
+local, and this note records that the gitignore is deliberate rather than an oversight.
+
+The brand source of truth is the opposite case. `docs/BRAND.md` is committed precisely because
+`tests/test_brand_contract.py` reads it in CI: a source of truth the suite cannot open is one
+nothing enforces.
