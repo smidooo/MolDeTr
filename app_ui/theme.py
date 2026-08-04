@@ -10,7 +10,9 @@ Usage in app.py:
 Do not call ``demo.launch(theme=..., css=...)`` directly — go through ``app.launch_app()``, which
 holds the launch kwargs in one place so tests serve the same styled app that users get.
 
-Targets the Gradio 6.x theme API (6.20, pinned in deploy/hf_space + pyproject).
+Targets the Gradio 6.x theme API (floor 6.21, declared in pyproject and mirrored by
+deploy/requirements-demo.txt + deploy/hf_space/README.md; tests/test_deploy_manifest.py holds
+the three in step).
 If a `.set(...)` key errors on another version, delete that line — every key is cosmetic.
 """
 

@@ -9,7 +9,7 @@ Exports:
                     ground_truth=None) -> plotly.graph_objects.Figure
     assignment_rows(predictions, ppm) -> list[dict]   (table rows, safe δ headers)
 
-Requires `plotly` (in the `app` extra of pyproject.toml and deploy/hf_space/requirements.txt).
+Requires `plotly` (in the `app` extra of pyproject.toml and deploy/requirements-demo.txt).
 """
 
 from __future__ import annotations
