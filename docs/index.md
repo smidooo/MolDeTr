@@ -9,7 +9,7 @@ quantum-mechanical spin-dynamics simulations and tested on real spectra from 80 
 
 ## Start here
 
-- **[Read the paper](https://doi.org/10.1021/acs.analchem.5c03465)**: *Analytical Chemistry*, 2026
+- **[Read the paper](https://doi.org/10.1021/acs.analchem.5c03465)**: *Analytical Chemistry*, 2026 — open access under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), with free [Supporting Information](https://pubs.acs.org/doi/10.1021/acs.analchem.5c03465)
 - **[Code on GitHub](https://github.com/smidooo/MolDeTr)**: model, training, and evaluation
 - **[Weights and data on Zenodo](https://doi.org/10.5281/zenodo.21217101)**: the trained checkpoint and the spectra
 - **[Try it in Colab](https://colab.research.google.com/github/smidooo/MolDeTr/blob/main/notebooks/MolDeTr_colab_demo.ipynb)**: the interactive Detect and Simulate app
