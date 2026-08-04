@@ -49,12 +49,5 @@ docs/requirements/
 docs/ZENODO_DEPOSIT.md
 deploy/EXTERNAL_STEPS.md
 
-# design/: the brand docs ARE committed — BRAND.md is the declared source of truth for the palette,
-# the tricolor and the canonical wording, and tests/test_brand_contract.py reads it to enforce
-# token sync. Ignoring it made that claim untestable on a fresh clone. Only the image exports stay
-# out; they live in the private Design/ handoff and are not needed to verify the contract.
-design/img/
-design/**/*.png
-
 # stray generated artifacts (regeneratable; not README assets)
 /prediction.png

@@ -12,8 +12,30 @@ All notable changes to this project are documented here. The format is based on
   which axe reports as a critical `button-name` violation. Installs that resolve gradio
   unconstrained have picked the fix up incidentally since 2026-07-29; this makes it a requirement.
   **If you pinned gradio below 6.21, `pip install -e ".[app]"` will now ask to upgrade it.**
+- **The repository root is five entries lighter.** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md` and
+  `SECURITY.md` moved into `.github/`, which GitHub resolves for the Security tab, the contributing
+  link on new issues and the Community Standards checklist exactly as it does the root;
+  `design/BRAND.md` moved to `docs/BRAND.md`; and the 40 KB `requirements-lock-linux64.txt` moved
+  to `deploy/`. Nothing that is resolved *by path* was touched: `LICENSE` and `CITATION.cff` stay
+  at the root because the licence detector and the citation widget read the root only, and
+  `THIRD_PARTY.md` stays because `pyproject.toml` declares it in `license-files` and it ships
+  inside the wheel.
+
+### Removed
+- **The `design/` handoff scaffolding.** `HANDOFF_README.md`, `INTEGRATE.md`, `PORTING.md` and
+  `SYNC.md` described a GUI migration that shipped in `e816d64`. Nothing in the code, CI or README
+  referenced them, and their instructions had gone stale: they still routed `theme.py` and
+  `plotting.py` to the repository root, where neither has lived since that migration, and copied
+  them from a `handoff/` directory that is not part of this repository. `design/BRAND.md` — the one
+  file with a consumer — survives as `docs/BRAND.md`.
 
 ### Fixed
+- **The brand contract can no longer skip itself.** `tests/test_brand_contract.py` guarded its two
+  `BRAND.md`↔code tests with `skipif(not BRAND_MD.exists())`, whose reason string claimed the file
+  was gitignored. It is committed, so the guard never fired — but had the file ever gone missing,
+  those two tests would have skipped and the suite would have reported green while enforcing
+  nothing. The guard is gone: a missing `docs/BRAND.md` now fails them (verified by removing it —
+  2 failed, not 2 skipped).
 - **`validate_spectrum` is annotated, so `py.typed` no longer over-promises** (#25). The function is
   public and the package ships a `py.typed` marker, but neither its argument nor its return carried
   an annotation — so every typed downstream consumer silently received `Any` while the marker
@@ -31,7 +53,7 @@ All notable changes to this project are documented here. The format is based on
 
 ## [1.1.1] - 2026-08-02
 
-Findings from the post-release code review of #21 — the review `CLAUDE.md` asks for on >100-LOC
+Findings from the post-release code review of #21 — the review this project requires on >100-LOC
 diffs touching the distort hub, which was skipped before v1.1.0 shipped — and from a second,
 adversarial review of the branch that fixed them. No change to the shipped checkpoint, to
 `moldetr.distort`'s behaviour, or to any number the paper reports.
