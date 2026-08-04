@@ -8,6 +8,7 @@
 <p align="center">
   <a href="https://zenodo.org/badge/latestdoi/1289888357"><img src="https://zenodo.org/badge/1289888357.svg" alt="DOI"></a>
   <a href="https://doi.org/10.1021/acs.analchem.5c03465"><img src="https://img.shields.io/badge/Paper-Anal.%20Chem.%202026-1e2d4d" alt="Paper"></a>
+  <a href="https://creativecommons.org/licenses/by/4.0/"><img src="https://img.shields.io/badge/Open_Access-CC_BY_4.0-f68212" alt="Open access under CC BY 4.0"></a>
   <a href="https://huggingface.co/smidooo/moldetr"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model-smidooo%2Fmoldetr-ffce1c" alt="Hugging Face model"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License"></a>
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-3776ab.svg" alt="Python"></a>
@@ -443,10 +444,18 @@ Cite the **article** as the primary reference:
 
 For the **software**, use the Zenodo concept DOI `10.5281/zenodo.21214876` (it resolves to the latest
 release). For the **data**, use the Zenodo concept DOI `10.5281/zenodo.21217101` (it resolves to the latest
-dataset version). Machine-readable metadata is in [`CITATION.cff`](CITATION.cff); GitHub's "Cite this repository"
+dataset version). The article's Data Availability statement cites `10.5281/zenodo.21217102` instead —
+that is the **version** DOI of v1.0.0 of this same deposit, the snapshot the paper was written against.
+Both are correct: cite the concept DOI to track every version, the version DOI to pin the one the paper
+used. Machine-readable metadata is in [`CITATION.cff`](CITATION.cff); GitHub's "Cite this repository"
 button uses it.
 
 ## Availability
+**Paper.** Open access under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — *Analytical
+Chemistry*, published 4 August 2026, DOI
+[10.1021/acs.analchem.5c03465](https://doi.org/10.1021/acs.analchem.5c03465). The
+[Supporting Information](https://pubs.acs.org/doi/10.1021/acs.analchem.5c03465) is free to download.
+
 **Code.** Apache-2.0, at <https://github.com/smidooo/MolDeTr>, archived at Zenodo
 (DOI [10.5281/zenodo.21214876](https://doi.org/10.5281/zenodo.21214876)). The trained weights are deposited
 with the data (concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zenodo.21217101), all versions).
@@ -454,7 +463,8 @@ with the data (concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zen
 **Data.** A selection of the simulated and experimental spectral regions analysed in this work, with their
 ground-truth spin-system annotations and metadata, is at Zenodo
 (concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zenodo.21217101), all versions). The metadata follow the format
-used in the Supporting Information; full curation details are in Supporting Information Section 4.4.
+used in the Supporting Information; full curation details are in
+[Supporting Information Section 4.4](https://pubs.acs.org/doi/10.1021/acs.analchem.5c03465).
 
 ## License
 Apache License 2.0; see [`LICENSE`](LICENSE). © 2026 Nicolas Schmid and the MolDeTr authors.
