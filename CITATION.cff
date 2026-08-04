@@ -38,6 +38,9 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.21217101
     description: Dataset (Zenodo, all versions)
+  - type: doi
+    value: 10.5281/zenodo.21217102
+    description: Dataset v1.0.0 (Zenodo) — the version cited in the article's Data Availability statement
 preferred-citation:
   type: article
   title: "MolDeTr: A Chemistry-Informed Deep Learning Model for Next-Generation Automated Analysis of 1H NMR Spectra"
