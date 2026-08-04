@@ -36,9 +36,9 @@ def test_real_output_shape_matches_stub_contract(real_model, valid_spectrum):
 
 # The vanillin oracle. CAPTURED from a live decode on 2026-07-25 against checkpoint md5
 # faf842d1a1d8beae67e0544e28f226b5 — not transcribed from the docs. It happens to agree with the
-# marker recorded in CLAUDE.md (δ 7.419/7.388/6.961; J 8.7/2.0/8.2) to every published digit, which
-# is worth stating: that marker was written down as GUI output, and CLAUDE.md separately warns that
-# the from-weights decode and the committed-JSON aggregate path differ. Here they do not.
+# same values read off the GUI (δ 7.419/7.388/6.961; J 8.7/2.0/8.2) to every published digit, which
+# is worth stating: the from-weights decode and the committed-JSON aggregate path are not required
+# to agree (docs/SCOPE.md:88 keeps them separate). Here they do.
 VANILLIN_SHIFTS_PPM = (7.4186, 7.3879, 6.9611)
 VANILLIN_MAX_J_HZ = (8.738, 1.966, 8.247)
 

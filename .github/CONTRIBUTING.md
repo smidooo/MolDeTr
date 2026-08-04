@@ -26,6 +26,19 @@ pip install -e ".[dev]"
   - **Notebooks:** `pip install -e ".[notebooks]" && pytest --nbmake notebooks/*.ipynb` (downloads the checkpoint).
 - Keep changes focused; describe the motivation and how you verified them.
 
+## Commit messages
+
+Subjects follow [Conventional Commits](https://www.conventionalcommits.org/) — `feat:`, `fix:`,
+`docs:`, `test:`, `ci:`, `chore:`, `refactor:`, with an optional scope. Nothing enforces this; the
+history is consistent because contributors keep it that way.
+
+Say **what changed in the software**, not how the change was produced. `fix(app): the model WAS
+trained with line broadening - correct the claim` is a good subject — a reader comes away knowing
+what is now true. Subjects describing the authoring process instead (a polishing pass, a rewording
+sweep) leave a reader with nothing they can act on. Choose carefully: releases here are archived to
+Zenodo and minted with a DOI, so a subject you would rather rephrase later is effectively permanent
+(`docs/RELEASING.md`).
+
 ## Reporting issues
 Please include your OS, Python and PyTorch versions, whether you built the CUDA op or used the
 pure-PyTorch fallback, and a minimal way to reproduce the problem.
