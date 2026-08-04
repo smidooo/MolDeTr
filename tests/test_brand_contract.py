@@ -1,13 +1,14 @@
-"""Brand invariants — the rules in `design/BRAND.md` that a code change can silently violate.
+"""Brand invariants — the rules in `docs/BRAND.md` that a code change can silently violate.
 
 Two families, deliberately separated:
 
-* **code ↔ code** (always run): the tricolor must be identical in both renderers, δ must never be
-  uppercased into Δ, every marker must carry its number, and any blob mentioning `max J` must also
-  name the full-coupling escape hatch. These need no external file and are CI-enforced.
-* **`BRAND.md` ↔ code** (skipped when the file is absent): `design/` is gitignored today, so the
-  source-of-truth sync test degrades to a skip on a fresh clone rather than a spurious failure.
-  Committing `design/BRAND.md` turns it on everywhere — see REQUIREMENTS/`SYNC.md`.
+* **code ↔ code**: the tricolor must be identical in both renderers, δ must never be uppercased
+  into Δ, every marker must carry its number, and any blob mentioning `max J` must also name the
+  full-coupling escape hatch. These need no external file.
+* **`BRAND.md` ↔ code**: the palette and the declared version in `docs/BRAND.md` must match what
+  the renderers actually use. Both families run unconditionally — `docs/BRAND.md` is committed, so
+  there is no absent-file case to guard, and a brand test that can silently skip itself reports
+  green while enforcing nothing.
 
 Why a contract file at all: these invariants span modules, so no single unit test owns them. The
 tricolor lives in two files that never import each other; the δ rule is a property of every header
@@ -28,7 +29,7 @@ from app_ui.plotting import assignment_rows, spectrum_figure
 from moldetr.visualization import MARKER_COLORS as FIGURE_TRICOLOR
 
 REPO = Path(__file__).resolve().parent.parent
-BRAND_MD = REPO / "design" / "BRAND.md"
+BRAND_MD = REPO / "docs" / "BRAND.md"
 
 BLUE, ORANGE, TEAL = "#2566b0", "#e08a1f", "#1f9e8c"
 
@@ -117,22 +118,16 @@ def test_every_max_j_mention_names_the_full_coupling_path(app_module, blob):
 
 # --- BRAND.md ↔ code -------------------------------------------------------------------------------
 
-_needs_brand_md = pytest.mark.skipif(
-    not BRAND_MD.exists(), reason="design/BRAND.md is gitignored and absent (see SYNC.md contract)"
-)
-
 
 @pytest.mark.unit
-@_needs_brand_md
 def test_brand_md_declares_a_design_version():
-    """`DESIGN_VERSION` is the handle SYNC.md uses to detect handoff drift; without it the SoT
-    cannot say whether the code is ahead of the brand or behind it.
+    """`DESIGN_VERSION` is the handle that detects drift between the brand source of truth and the
+    code; without it nothing can say whether the code is ahead of the brand or behind it.
     """
     assert re.search(r"DESIGN_VERSION:\s*v\d+", BRAND_MD.read_text(encoding="utf-8"))
 
 
 @pytest.mark.unit
-@_needs_brand_md
 def test_tricolor_hexes_are_the_ones_brand_md_publishes():
     """Every hex the renderers use must appear in the BRAND.md palette table, tagged as a marker.
 

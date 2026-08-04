@@ -4,7 +4,7 @@
 # reproduction of the training environment used for the released checkpoint
 # (CUDA 11.7, linux-64), use the explicit lockfile instead:
 #
-#     conda create --name moldetr --file requirements-lock-linux64.txt
+#     conda create --name moldetr --file deploy/requirements-lock-linux64.txt
 #
 # GPU (training + fast inference): keep the `pytorch-cuda` line below.
 # macOS (Apple Silicon) has no CUDA: remove `pytorch-cuda` (+ the `nvidia` channel); CPU/MPS only.

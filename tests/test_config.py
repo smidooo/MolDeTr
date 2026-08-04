@@ -1,7 +1,8 @@
 """Config smoke: every committed Hydra YAML parses, and config_big carries its expected top-level sections.
 
-Guards against a malformed config file or a production section silently dropped — the CLAUDE.md 'keep the
-dataclass and YAML in step' rule. Uses OmegaConf directly (no Hydra CWD/compose dance needed).
+Guards against a malformed config file or a production section silently dropped: the frozen dataclass in
+`moldetr/config.py` and the YAML must be changed together, and nothing else catches them drifting apart.
+Uses OmegaConf directly (no Hydra CWD/compose dance needed).
 """
 
 from pathlib import Path
