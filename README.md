@@ -14,7 +14,6 @@
   <a href="pyproject.toml"><img src="https://img.shields.io/badge/Python-3.10%2B-3776ab.svg" alt="Python"></a>
   <a href="https://github.com/smidooo/MolDeTr/actions/workflows/ci.yml"><img src="https://github.com/smidooo/MolDeTr/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/smidooo/MolDeTr/commits"><img src="https://img.shields.io/github/last-commit/smidooo/MolDeTr?color=1f9e8c" alt="Last commit"></a>
-  <a href="https://github.com/smidooo/MolDeTr/stargazers"><img src="https://img.shields.io/github/stars/smidooo/MolDeTr?color=e08a1f" alt="GitHub stars"></a>
 </p>
 
 <p align="center">
@@ -477,9 +476,3 @@ reports, an [issue](https://github.com/smidooo/MolDeTr/issues/new/choose) is oft
 
 ## Acknowledgements
 Supported by Innosuisse – Swiss Innovation Agency (Grant No. 2155007318).
-
-## Star history
-
-<p align="center">
-  <a href="https://star-history.com/#smidooo/MolDeTr&Date"><img src="https://api.star-history.com/svg?repos=smidooo/MolDeTr&type=Date" alt="MolDeTr GitHub star history over time" width="620"></a>
-</p>
