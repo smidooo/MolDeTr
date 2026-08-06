@@ -6,7 +6,7 @@
 </p>
 
 <p align="center">
-  <a href="https://zenodo.org/badge/latestdoi/1289888357"><img src="https://zenodo.org/badge/1289888357.svg" alt="DOI"></a>
+  <a href="https://doi.org/10.5281/zenodo.21214876"><img src="https://img.shields.io/badge/DOI-10.5281%2Fzenodo.21214876-007ec6" alt="DOI: 10.5281/zenodo.21214876"></a>
   <a href="https://doi.org/10.1021/acs.analchem.5c03465"><img src="https://img.shields.io/badge/Paper-Anal.%20Chem.%202026-1e2d4d" alt="Paper"></a>
   <a href="https://creativecommons.org/licenses/by/4.0/"><img src="https://img.shields.io/badge/Open_Access-CC_BY_4.0-f68212" alt="Open access under CC BY 4.0"></a>
   <a href="https://huggingface.co/smidooo/moldetr"><img src="https://img.shields.io/badge/%F0%9F%A4%97_Model-smidooo%2Fmoldetr-ffce1c" alt="Hugging Face model"></a>
