@@ -4,6 +4,23 @@ All notable changes to this project are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The DOI badge on the README front page renders again.** It was served from
+  `zenodo.org/badge/1289888357.svg`, and GitHub does not load README images in the browser — it
+  fetches them server-side through its shared `camo` proxy, so Zenodo saw the whole of GitHub as a
+  single client against an `x-ratelimit-limit: 120` per-IP-per-minute cap, on a response Zenodo
+  marks `cache-control: no-cache` and camo therefore cannot cache. Measured: 4 of 5 fetches through
+  camo returned `502 Invalid upstream response (429)`, while all nine `img.shields.io` badges on the
+  same page returned `200`. The badge is now a CDN-cached shields.io badge (`max-age=432000`) pinned
+  to the **concept** DOI `10.5281/zenodo.21214876`. That settles a second inconsistency in the same
+  line: the old `latestdoi` form named the newest *version* DOI, while `docs/RELEASING.md` requires
+  citation surfaces to pin the concept DOI and the README's own Availability section already did.
+  Pinning the static `zenodo.org/badge/DOI/….svg` form was rejected — measured, it carries the same
+  `no-cache` header and the same origin, so it stays flaky. Zenodo's release webhook is untouched
+  and releases still mint DOIs; `tests/test_readme_badges.py` now guards both rules.
+
 ## [1.2.0] - 2026-08-05
 
 ### Changed

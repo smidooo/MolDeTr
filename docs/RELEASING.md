@@ -1,11 +1,19 @@
 # Releasing MolDeTr: maintainer checklist
 
-Cutting a release here is **irreversible**. The repository carries Zenodo's GitHub integration
-(badge `zenodo.org/badge/latestdoi/1289888357`), so publishing a GitHub release automatically
-archives the tarball and mints a permanent version DOI under the software concept DOI
-`10.5281/zenodo.21214876`. Zenodo records are immutable: whatever is in the tree at tag time is
-public forever. That is why the GPL `shimming.py` had to be removed *before* v1.1.0 rather than
-after.
+Cutting a release here is **irreversible**. The repository carries Zenodo's GitHub integration — a
+release-scoped webhook on repository `1289888357`, configured in Zenodo and independent of anything
+in the README — so publishing a GitHub release automatically archives the tarball and mints a
+permanent version DOI under the software concept DOI `10.5281/zenodo.21214876`. Zenodo records are
+immutable: whatever is in the tree at tag time is public forever. That is why the GPL `shimming.py`
+had to be removed *before* v1.1.0 rather than after.
+
+The front-page DOI badge is **not** part of that mechanism, and changing it mints nothing. It is a
+static `img.shields.io` badge pinned to the concept DOI. Do not restore the `zenodo.org/badge/…`
+form: Zenodo serves badges `cache-control: no-cache` under an `x-ratelimit-limit: 120` per-IP cap,
+so GitHub's shared camo image proxy — which fetches README images server-side for the whole site —
+exhausts the quota and the badge renders as `502 Invalid upstream response (429)`. Measured on this
+page: 4 of 5 fetches failed, while all nine `img.shields.io` badges returned `200`.
+`tests/test_readme_badges.py` enforces both halves.
 
 The practical consequence: **a tag is not a checkpoint you can move.** Do not tag to "see if it
 works", and do not tag a commit you have not already decided to publish.
