@@ -7,9 +7,14 @@ the CUDA op is not compiled). The construction mirrors ``init_learner`` for the 
 
 from __future__ import annotations
 
+import os
+import warnings
+
 import numpy as np
 import torch
 
+from moldetr.checkpoint_meta import ALLOW_UNTRUSTED_ENV, TRUSTED_CHECKPOINT_MD5
+from moldetr.checkpoint_meta import file_md5 as _md5
 from moldetr.model.deformable_detr_nmr import Deformable_DETR_NMR
 from moldetr.model.deformable_transformer import DeformableTransformer
 from moldetr.model.fpn_backbone import FPN_BB
@@ -72,13 +77,57 @@ def build_model(
     return model.eval()
 
 
+def _require_trusted_checkpoint(ckpt_path, cause: BaseException) -> None:
+    """Decide whether dropping `weights_only` protection is permissible for *this* file.
+
+    ``torch.load(..., weights_only=True)`` raises ``pickle.UnpicklingError`` whenever it refuses a
+    global that is not on its allowlist (``torch/serialization.py``). The published fastai checkpoint
+    trips that because it carries optimizer state — and a hostile checkpoint trips it for the reason
+    the guard exists. **The exception cannot tell the two apart**, so catching something narrower
+    would not help; the decision has to be made on the file's identity.
+
+    Before this gate, the refusal itself was what unlocked the unsafe load:
+
+        weights_only=True → refuses payload → raises → except Exception → weights_only=False → runs it
+    """
+    if os.environ.get(ALLOW_UNTRUSTED_ENV, "").strip().lower() in {"1", "true", "yes"}:
+        warnings.warn(
+            f"{ALLOW_UNTRUSTED_ENV} is set, so {ckpt_path} is being loaded with weights_only=False, "
+            "which executes arbitrary code from the file. Only do this for checkpoints you produced.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+        return
+
+    digest = _md5(ckpt_path)
+    if digest == TRUSTED_CHECKPOINT_MD5:
+        return
+
+    raise RuntimeError(
+        f"Refusing to load {ckpt_path} without weights_only protection.\n"
+        f"  expected MD5 {TRUSTED_CHECKPOINT_MD5}  (the published checkpoint)\n"
+        f"  actual   MD5 {digest}\n"
+        "torch's safe loader rejected this file and it is not the published checkpoint, so loading "
+        "it would execute arbitrary code from it. Fetch the published weights with "
+        "`python scripts/download_weights.py`, or, if this is a checkpoint you trained and trust, "
+        f"set {ALLOW_UNTRUSTED_ENV}=1."
+    ) from cause
+
+
 def load_checkpoint(model, ckpt_path, map_location: str = "cpu"):
-    """Load a fastai-saved checkpoint (dict with a 'model' state_dict) with strict matching."""
-    # Prefer the safe weights_only load; fall back for the fastai checkpoint that stores
-    # optimizer state (source is the DOI-pinned Zenodo deposit, i.e. trusted).
+    """Load a fastai-saved checkpoint (dict with a 'model' state_dict) with strict matching.
+
+    Prefers the safe ``weights_only`` load. The fallback the fastai format needs is gated on the file
+    being the published checkpoint — see :func:`_require_trusted_checkpoint`.
+    """
     try:
         ckpt = torch.load(ckpt_path, map_location=map_location, weights_only=True)
-    except Exception:
+    except Exception as safe_load_refused:
+        # Deliberately still a broad catch. Narrowing to UnpicklingError would add a regression risk
+        # (a future torch could raise something else for the same condition and the published
+        # checkpoint would stop loading) while buying no security: the trust gate below, not the
+        # exception type, is what makes the fallback safe.
+        _require_trusted_checkpoint(ckpt_path, safe_load_refused)
         ckpt = torch.load(ckpt_path, map_location=map_location, weights_only=False)
     state = ckpt["model"] if isinstance(ckpt, dict) and "model" in ckpt else ckpt
     model.load_state_dict(state, strict=True)
