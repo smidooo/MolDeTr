@@ -26,6 +26,7 @@ malicious pickle to disk to test this would be irresponsible and unnecessary.
 
 from __future__ import annotations
 
+import os
 import pickle
 from pathlib import Path
 
@@ -33,6 +34,7 @@ import pytest
 import torch
 
 from moldetr import inference
+from moldetr.checkpoint_meta import CHECKPOINT_NAME
 
 
 class _NotOnTorchsAllowlist:
@@ -181,12 +183,22 @@ def test_trusted_digest_matches_the_published_checkpoint():
 
     Requires the 974 MB checkpoint, so it is `model`-marked and runs only where that exists. Without
     this, every other test here proves the gate works against a digest that might be wrong.
+
+    Honours ``MOLDETR_CHECKPOINT`` first, falling back to the package-relative default — the
+    convention every other `model`-marked module already follows (`test_model_contract.py:22`,
+    `test_reproducibility.py:19`). The first draft checked only the default path, so the nightly
+    fetched the checkpoint, verified its digest in the workflow, exported ``MOLDETR_CHECKPOINT``,
+    and *this test skipped anyway* while the job reported success. Reading the env var is not a
+    convenience here; it is the difference between the lane proving something and not.
     """
-    ckpt = (
-        Path(inference.__file__).resolve().parent / "model" / "model_spin_system_ABCDEFG_exp2.pth"
+    ckpt = Path(
+        os.environ.get(
+            "MOLDETR_CHECKPOINT",
+            str(Path(inference.__file__).resolve().parent / "model" / CHECKPOINT_NAME),
+        )
     )
     if not ckpt.exists():
-        pytest.skip(f"checkpoint not present at {ckpt}")
+        pytest.skip(f"checkpoint not present at {ckpt} (set MOLDETR_CHECKPOINT)")
     assert inference._md5(ckpt) == inference.TRUSTED_CHECKPOINT_MD5
 
 

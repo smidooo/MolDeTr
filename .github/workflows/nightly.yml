@@ -95,9 +95,21 @@ jobs:
           curl -fL --retry 3 --retry-delay 5 \
             "https://zenodo.org/api/records/21217102/files/experimental_rois.zip/content" \
             -o /tmp/experimental_rois.zip
-          unzip -q -o /tmp/experimental_rois.zip -d ~/.cache/moldetr/rois
-          find ~/.cache/moldetr/rois -name 'roi_S*.npz' | head -5
-          echo "roi count: $(find ~/.cache/moldetr/rois -name 'roi_S*.npz' | wc -l)"
+          # `-j` flattens: the archive nests everything under `experimental_rois/`, so a plain
+          # extract puts the arrays one level below MOLDETR_ROI_NPZ_DIR and every consumer skips.
+          # That is exactly what the first run did -- and the count echoed below still said 13,
+          # because `find -name` recurses. Flattening makes the env var correct regardless of how
+          # the deposit chooses to lay the archive out.
+          unzip -j -q -o /tmp/experimental_rois.zip '*.npz' -d ~/.cache/moldetr/rois
+          # `-maxdepth 1`, deliberately: this must count what the consumers can actually see, not
+          # what exists somewhere underneath. A recursive count here is a reassuring number that
+          # proves nothing, which is how the layout bug survived its first run.
+          count=$(find ~/.cache/moldetr/rois -maxdepth 1 -name 'roi_S*.npz' | wc -l)
+          echo "roi npz directly in MOLDETR_ROI_NPZ_DIR: $count"
+          if [ "$count" -lt 13 ]; then
+            echo "::error::expected 13 ROI arrays at the top level, found $count"
+            exit 1
+          fi
 
       - name: Real-checkpoint tests
         env:
@@ -107,31 +119,48 @@ jobs:
         # `-rs` because every test in this lane is skip-guarded on the artifacts above. Without the
         # skip reasons printed, a job that fetched nothing usable still exits 0 and reports "no
         # failures" -- which is the precise failure mode this whole effort exists to remove.
-        run: pytest -q -rs -m model
+        run: pytest -q -rs -m model --junitxml=/tmp/model-results.xml
 
-      - name: Fail if the lane skipped everything
-        # The guard for the guard. `pytest -m model` exits 0 when every test skips, so a broken
-        # download path would leave this job permanently green while verifying nothing. Asserting a
-        # floor on tests actually RUN is the only thing that distinguishes "passed" from "did nothing".
-        env:
-          MPLBACKEND: Agg
-          MOLDETR_CHECKPOINT: /home/runner/.cache/moldetr/model_spin_system_ABCDEFG_exp2.pth
-          MOLDETR_ROI_NPZ_DIR: /home/runner/.cache/moldetr/rois
+      - name: Fail if the lane did not actually run the tests
+        if: always()
+        # The guard for the guard, ROUND TWO. The first version counted tests COLLECTED, which is
+        # useless: a skipped test is still collected. The nightly's first run passed this check while
+        # reporting 13 -- and two of the tests that matter most had silently skipped, one because the
+        # ROI arrays were nested a directory deeper than MOLDETR_ROI_NPZ_DIR and one because a test
+        # ignored MOLDETR_CHECKPOINT. Green, and hollow, which is the failure this job exists to catch
+        # happening to the job itself.
+        #
+        # Now it asserts on tests that actually PASSED, read from the junit XML rather than parsed out
+        # of terminal output. `if: always()` so a red test run still gets this diagnosis attached
+        # instead of the step being skipped exactly when it would be most informative.
         run: |
           python - <<'PY'
-          import subprocess, sys, re
-          out = subprocess.run(
-              [sys.executable, "-m", "pytest", "-q", "-m", "model", "--collect-only"],
-              capture_output=True, text=True,
-          ).stdout
-          match = re.search(r"(\d+)/\d+ tests collected", out) or re.search(r"(\d+) tests? collected", out)
-          collected = int(match.group(1)) if match else 0
-          print(f"model-marked tests collected: {collected}")
-          # 13 measured 2026-08-07, not guessed -- the first draft of this guard said 4, taken from a
-          # count of `pytest.mark.model` occurrences, and would have passed with 9 of the 13 missing.
-          # Module-level `pytestmark` marks every test in a module, so occurrences are not tests.
-          # A floor rather than equality: widening RECOVERY_PHENOTYPES raises this legitimately.
-          if collected < 13:
-              sys.exit(f"expected at least 13 model-marked tests, collected {collected} — "
-                       "the lane is not exercising what it claims to")
+          import sys, xml.etree.ElementTree as ET
+
+          # stdlib ElementTree rather than defusedxml on purpose: this file is written by pytest in
+          # this same job seconds earlier, so there is no untrusted input and no XXE surface. Adding
+          # a dependency to satisfy a generic scanner would be cargo-cult.
+          tree = ET.parse("/tmp/model-results.xml")
+          cases = tree.iter("testcase")
+          passed, skipped = [], []
+          for case in cases:
+              name = f'{case.get("classname", "")}::{case.get("name", "")}'
+              if case.find("skipped") is not None:
+                  skipped.append(name)
+              elif case.find("failure") is None and case.find("error") is None:
+                  passed.append(name)
+
+          print(f"model-marked tests passed: {len(passed)}   skipped: {len(skipped)}")
+          for name in skipped:
+              print(f"  SKIPPED {name}")
+
+          # 13 measured 2026-08-07. A floor, not equality: widening RECOVERY_PHENOTYPES raises it
+          # legitimately. Skips are not tolerated at all here -- every skip in this lane means an
+          # artifact this job is responsible for fetching did not arrive where the test looks for it.
+          if len(passed) < 13:
+              sys.exit(
+                  f"only {len(passed)} model-marked tests actually ran; expected at least 13. "
+                  "The lane fetched its artifacts but the tests could not find them — check the "
+                  "skip reasons above before assuming the model regressed."
+              )
           PY
