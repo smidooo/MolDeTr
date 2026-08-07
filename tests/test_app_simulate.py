@@ -37,7 +37,9 @@ def test_build_gt_groups_singlet_has_no_coupling(app_module):
 def test_simulate_checkpoint_absent(app_module, monkeypatch):
     monkeypatch.setattr(app_module, "CHECKPOINT", str(Path("nope.pth")))
     grid, widths = app_module._phenotype_grid("ethyl")
-    _t, _f, msg = app_module.simulate_and_detect(grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0)
+    _t, _f, msg = app_module.simulate_and_detect(
+        grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
+    )
     assert "Checkpoint not found" in msg
 
 
@@ -45,7 +47,9 @@ def test_simulate_checkpoint_absent(app_module, monkeypatch):
 def test_simulate_ethyl_roundtrip(patch_model):
     app = patch_model
     grid, widths = app._phenotype_grid("ethyl")
-    table, fig, msg = app.simulate_and_detect(grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0)
+    table, fig, msg = app.simulate_and_detect(
+        grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
+    )
     assert "2 ground-truth multiplet(s)" in msg and "detected" in msg
     assert fig is not None
     # new comparison table: match status + explicit error columns; one non-spurious row per GT group,
@@ -71,7 +75,9 @@ def test_simulate_reports_a_bad_matrix_cell(patch_model):
     app = patch_model
     grid, widths = app._phenotype_grid("aromatic_ax")
     grid[0][1] = "foo"
-    _t, _f, msg = app.simulate_and_detect(grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0)
+    _t, _f, msg = app.simulate_and_detect(
+        grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
+    )
     assert msg.startswith("Invalid spin matrix:") and "row 1" in msg
 
 
@@ -80,7 +86,9 @@ def test_simulate_nonpositive_width(patch_model):
     app = patch_model
     grid, widths = app._phenotype_grid("ethyl")
     widths[0][3] = 0.0  # FWHM is the last column: system | δ | n H | FWHM
-    _t, _f, msg = app.simulate_and_detect(grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0)
+    _t, _f, msg = app.simulate_and_detect(
+        grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
+    )
     assert msg.startswith("Invalid parameters:") and "line width must be positive" in msg
 
 
@@ -153,7 +161,9 @@ def test_comparison_dataframe_never_reports_missed_and_extra_together(app_module
 def test_simulate_singlet_gt_j_dashed(patch_model):
     app = patch_model
     grid, widths = app._phenotype_grid("methoxy_singlet")
-    table, _f, msg = app.simulate_and_detect(grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0)
+    table, _f, msg = app.simulate_and_detect(
+        grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
+    )
     assert "1 ground-truth multiplet(s)" in msg
     # the singlet's one GT group has no coupling -> its GT J renders as a dash
     gt_rows = table[table["status"] != "+ extra"]

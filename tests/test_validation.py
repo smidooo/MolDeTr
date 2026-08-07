@@ -1,4 +1,5 @@
 """Tests for the input-contract validator (moldetr/validation.py)."""
+
 import numpy as np
 import pytest
 
