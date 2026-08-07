@@ -180,12 +180,15 @@ exclude = ["moldetr/dataloader/data_augmentation.py"]
 testpaths = ["tests"]
 # Markers keep the heavy/opt-in suites out of the default run. `model` needs the 974 MB checkpoint
 # (local only); `browser` needs `playwright install` (opt-in); `e2e` launches an in-process Gradio app.
+#
+# Every marker here is applied to at least one test, and `tests/test_marker_hygiene.py` keeps it that
+# way. `data`, `slow` and `network` used to be declared and applied to nothing, which made the CI
+# lanes' `-m "... and not network"` read as a deliberate exclusion while excluding the empty set.
+# Declare a marker when a test carries it, not in anticipation — an aspirational marker is
+# indistinguishable from a working one right up until it matters.
 markers = [
-    "unit: fast, weight-free unit test (a subset; CI runs `-m 'not e2e and not browser and not network'`)",
+    "unit: fast, weight-free unit test (a subset; CI runs `-m 'not e2e and not browser'`)",
     "e2e: in-process gradio_client end-to-end test (needs the .[app] extra)",
     "browser: Playwright browser test (opt-in; needs `playwright install`)",
     "model: requires the real 974 MB checkpoint (local only)",
-    "data: requires Zenodo spectra not in a clean clone (local only)",
-    "slow: slow test",
-    "network: needs network access (e.g. downloads weights/data); skipped in the default CI lane",
 ]

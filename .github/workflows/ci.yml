@@ -38,7 +38,7 @@ jobs:
       - name: Unit + scripts tests (no in-process server)
         env:
           MPLBACKEND: Agg
-        run: pytest -q -rs -m "not e2e and not browser and not network"
+        run: pytest -q -rs -m "not e2e and not browser"
       - name: Reproduce headline numbers (committed data, no weights)
         run: python scripts/aggregate_experimental.py
 
@@ -163,7 +163,7 @@ jobs:
         # `_id`, and exists to catch things like `api_name=False` serialising to the literal
         # "false". That is where a gradio-minor divergence actually surfaces. No browser and no
         # weights, so it is the cheapest step in the job.
-        run: pytest -q -rs -m "not e2e and not browser and not network"
+        run: pytest -q -rs -m "not e2e and not browser"
       - name: e2e at the floor
         env:
           MPLBACKEND: Agg
