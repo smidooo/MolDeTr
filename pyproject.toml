@@ -11,10 +11,16 @@ requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Nicolas Schmid" }]
 keywords = ["NMR", "multiplet detection", "deformable DETR", "deep learning", "spectroscopy"]
+# One `Programming Language :: Python :: 3.X` entry per interpreter the CI matrix actually runs, no
+# more and no fewer — `tests/test_public_api.py` asserts the two agree in both directions. 3.11 was
+# tested for a long time without being advertised, so a supported interpreter was invisible on the
+# package page and to PyPI's version filter. The reverse (advertising an untested version) is the
+# more dangerous half: that is how `gradio>=6.21` became a claim about a version CI never installed.
 classifiers = [
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering",
 ]

@@ -18,6 +18,7 @@ The torch check runs in a subprocess with an import blocker rather than in-proce
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 import textwrap
@@ -359,6 +360,74 @@ def test_every_extra_backing_a_network_command_provides_the_model_stack() -> Non
             f"the {name!r} extra backs a documented command that loads the checkpoint, so it "
             "must pull in the model extra or that command fails on a clean install"
         )
+
+
+def _classifier_pythons() -> set[str]:
+    """The ``Programming Language :: Python :: 3.X`` minors advertised on PyPI."""
+    with (REPO / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+    prefix = "Programming Language :: Python :: "
+    return {
+        c[len(prefix) :].strip()
+        for c in config["project"]["classifiers"]
+        if c.startswith(prefix) and c[len(prefix) :].strip() not in {"3"}
+    }
+
+
+def _ci_matrix_pythons() -> set[str]:
+    """The interpreter minors the test matrix actually runs.
+
+    Read from the workflow text rather than a YAML parser on purpose: PyYAML is not a dependency of
+    this project, and ``tests/test_deploy_manifest.py`` already establishes that precedent.
+    """
+    text = (REPO / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    match = re.search(r"python-version:\s*\[([^\]]+)\]", text)
+    assert match, "ci.yml declares no python-version matrix"
+    return set(re.findall(r"\d+\.\d+", match.group(1)))
+
+
+@pytest.mark.unit
+def test_classifiers_advertise_exactly_the_pythons_ci_proves() -> None:
+    """PyPI classifiers are a support *claim*; the CI matrix is the evidence. They must agree.
+
+    They did not: the matrix has run 3.10 and 3.11 for some time while the classifiers advertised
+    only 3.10 — so a supported, tested interpreter was invisible to anyone reading the package page,
+    and PyPI's own version filter would not surface it.
+
+    The failure is symmetric and the other direction is the dangerous one: advertising a version the
+    matrix does not run is an unevidenced claim, which is exactly how ``gradio>=6.21`` became a
+    promise about a version CI never installed (see the ``gradio-floor`` job's rationale).
+
+    Note what is deliberately *not* asserted: that ``requires-python`` gets an upper bound. Capping a
+    library's supported Python cascades through the ecosystem and makes downstream combinations
+    unsolvable; the floor is a real constraint, the ceiling is not ours to declare.
+    """
+    advertised = _classifier_pythons()
+    tested = _ci_matrix_pythons()
+    assert advertised == tested, (
+        f"classifiers advertise {sorted(advertised)} but the CI matrix runs {sorted(tested)}. "
+        f"Unadvertised-but-tested: {sorted(tested - advertised)}; "
+        f"advertised-but-untested: {sorted(advertised - tested)}."
+    )
+
+
+@pytest.mark.unit
+def test_requires_python_floor_is_the_lowest_advertised_version() -> None:
+    """``requires-python`` is what pip enforces at install time; the classifiers are what a human
+    reads. A floor below the lowest advertised minor lets pip install onto an interpreter the project
+    does not claim to support, and the user finds out at import time instead of install time.
+    """
+    with (REPO / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+    match = re.search(r">=\s*(\d+\.\d+)", config["project"]["requires-python"])
+    assert match, f"requires-python declares no >= floor: {config['project']['requires-python']!r}"
+
+    floor = tuple(int(p) for p in match.group(1).split("."))
+    lowest_advertised = min(tuple(int(p) for p in v.split(".")) for v in _classifier_pythons())
+    assert floor == lowest_advertised, (
+        f"requires-python floor is {match.group(1)} but the lowest advertised classifier is "
+        f"{'.'.join(map(str, lowest_advertised))}"
+    )
 
 
 #: Mimics a real missing dependency: ``ModuleNotFoundError`` with ``.name`` set, exactly as the
