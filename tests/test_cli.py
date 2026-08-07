@@ -17,7 +17,15 @@ needs_eval_extra = pytest.mark.skipif(
 )
 
 
-def _dispatcher_commands() -> list[str]:
+#: Subcommands whose module needs an extra the default CI install (`.[dev,app]`) does not provide.
+#: Explicit rather than derived: which extra a script needs is a packaging fact the dispatcher does
+#: not model — `cli._missing_extra` maps every non-`app` command to the `model` extra, so it cannot
+#: be asked. The first draft of the sweep below omitted this and went red on every CI leg while
+#: passing locally, because the development venv happens to carry the `eval` packages.
+_NEEDS_UNINSTALLED_EXTRA = {"evaluate-synthetic": needs_eval_extra}
+
+
+def _dispatcher_command_params() -> list:
     """Every subcommand the dispatcher advertises, read from the dispatcher itself.
 
     Read rather than hard-coded so a new subcommand is covered the moment it is added — a literal
@@ -25,11 +33,14 @@ def _dispatcher_commands() -> list[str]:
     """
     from moldetr.cli import COMMANDS
 
-    return sorted(set(COMMANDS) | {"app"})
+    return [
+        pytest.param(cmd, marks=[mark]) if (mark := _NEEDS_UNINSTALLED_EXTRA.get(cmd)) else cmd
+        for cmd in sorted(set(COMMANDS) | {"app"})
+    ]
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("command", _dispatcher_commands())
+@pytest.mark.parametrize("command", _dispatcher_command_params())
 def test_every_subcommand_answers_help_in_a_real_subprocess(command):
     """`--help` is the one contract every subcommand owes, and it rots silently.
 
