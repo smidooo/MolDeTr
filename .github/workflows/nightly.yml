@@ -1,0 +1,137 @@
+name: Nightly (real checkpoint)
+
+# The `model`-marked tests have never run anywhere but a maintainer's laptop. They are not thin:
+# `tests/test_model_contract.py` carries a vanillin oracle captured from a live decode against
+# checkpoint md5 faf842d1a1d8beae67e0544e28f226b5, asserting delta and J to tolerance, and
+# `tests/test_scripts_local.py` covers the checkpoint-gated success paths of the entry points. The
+# work here is therefore NOT to write a reproduction check -- one already exists -- but to execute it.
+#
+# Why nightly rather than per-PR: the checkpoint is 974 MB. Cached it is cheap, but a cold cache is
+# not something to put in front of every push.
+#
+# `workflow_dispatch` is deliberate and load-bearing. GitHub disables scheduled workflows after 60
+# days without a *commit* (issues, PRs, releases and tags do not count), and a published paper's
+# companion repo goes quiet by design -- so this job is exactly the kind that dies silently. Manual
+# dispatch is the escape hatch; a watcher that notices the silence is tracked separately.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+# The digest the loader trusts. Duplicated from moldetr/checkpoint_meta.py on purpose: this file has
+# to name it *before* the package is importable, and the cache key must be a literal. A contract test
+# pins the package copy against scripts/download_weights.py; if this one drifts, the verify step below
+# fails loudly rather than caching the wrong bytes forever.
+env:
+  CHECKPOINT_NAME: model_spin_system_ABCDEFG_exp2.pth
+  CHECKPOINT_MD5: faf842d1a1d8beae67e0544e28f226b5
+
+jobs:
+  model:
+    name: real-checkpoint tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (CPU PyTorch + app + eval)
+        # `eval` too, unlike the fast lane: scripts/evaluate_synthetic.py imports seaborn at module
+        # scope, and this is the job that actually runs the entry points rather than skipping them.
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,app,eval]"
+
+      - name: Restore the checkpoint from cache
+        id: ckpt-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/moldetr/${{ env.CHECKPOINT_NAME }}
+          # Keyed on the digest, not on a date or a run number: the checkpoint is immutable and
+          # DOI-pinned, so the only thing that should ever invalidate this cache is the trusted digest
+          # itself changing.
+          key: moldetr-checkpoint-${{ env.CHECKPOINT_MD5 }}
+
+      - name: Download the checkpoint (cache miss only)
+        if: steps.ckpt-cache.outputs.cache-hit != 'true'
+        # From the Hugging Face mirror, not Zenodo. Both host byte-identical copies (973,617,196
+        # bytes), but PR #33 measured Zenodo rate-limiting shared CI IP pools hard enough to return
+        # 429 for a badge; a 974 MB pull from a GitHub runner is the same shared-pool situation with
+        # far more to lose. HF is CDN-backed and built for exactly this.
+        run: |
+          mkdir -p ~/.cache/moldetr
+          curl -fL --retry 3 --retry-delay 5 \
+            "https://huggingface.co/smidooo/moldetr/resolve/main/${CHECKPOINT_NAME}" \
+            -o ~/.cache/moldetr/"${CHECKPOINT_NAME}"
+
+      - name: Verify the checkpoint is the published one
+        # A SEPARATE step so the failure is attributable. Folded into the download, a mirror that
+        # served different bytes would surface later as a wall of failing assertions and read as
+        # "the model regressed" rather than "we fetched the wrong file".
+        #
+        # This is also the mirror's safety net: moldetr.inference gates its weights_only=False
+        # fallback on this same digest, so a divergent mirror is refused at load time regardless.
+        # Checking here as well turns that refusal into a clear message instead of a stack trace.
+        run: |
+          actual=$(md5sum ~/.cache/moldetr/"${CHECKPOINT_NAME}" | cut -d' ' -f1)
+          if [ "$actual" != "${CHECKPOINT_MD5}" ]; then
+            echo "::error::checkpoint digest mismatch — expected ${CHECKPOINT_MD5}, got ${actual}."
+            echo "::error::The mirror served different bytes than the Zenodo deposit. This is a"
+            echo "::error::supply-chain signal, not a test failure. Do not re-run to make it pass."
+            exit 1
+          fi
+          echo "checkpoint verified: ${actual}"
+
+      - name: Fetch the experimental ROI arrays
+        # 3.4 MB, so straight from Zenodo without the mirror concern above, and cheap enough not to
+        # bother caching. `test_scripts_local.py` skips without these, and a skip here would hollow
+        # out the job while leaving it green.
+        run: |
+          mkdir -p ~/.cache/moldetr/rois
+          curl -fL --retry 3 --retry-delay 5 \
+            "https://zenodo.org/api/records/21217102/files/experimental_rois.zip/content" \
+            -o /tmp/experimental_rois.zip
+          unzip -q -o /tmp/experimental_rois.zip -d ~/.cache/moldetr/rois
+          find ~/.cache/moldetr/rois -name 'roi_S*.npz' | head -5
+          echo "roi count: $(find ~/.cache/moldetr/rois -name 'roi_S*.npz' | wc -l)"
+
+      - name: Real-checkpoint tests
+        env:
+          MPLBACKEND: Agg
+          MOLDETR_CHECKPOINT: /home/runner/.cache/moldetr/model_spin_system_ABCDEFG_exp2.pth
+          MOLDETR_ROI_NPZ_DIR: /home/runner/.cache/moldetr/rois
+        # `-rs` because every test in this lane is skip-guarded on the artifacts above. Without the
+        # skip reasons printed, a job that fetched nothing usable still exits 0 and reports "no
+        # failures" -- which is the precise failure mode this whole effort exists to remove.
+        run: pytest -q -rs -m model
+
+      - name: Fail if the lane skipped everything
+        # The guard for the guard. `pytest -m model` exits 0 when every test skips, so a broken
+        # download path would leave this job permanently green while verifying nothing. Asserting a
+        # floor on tests actually RUN is the only thing that distinguishes "passed" from "did nothing".
+        env:
+          MPLBACKEND: Agg
+          MOLDETR_CHECKPOINT: /home/runner/.cache/moldetr/model_spin_system_ABCDEFG_exp2.pth
+          MOLDETR_ROI_NPZ_DIR: /home/runner/.cache/moldetr/rois
+        run: |
+          python - <<'PY'
+          import subprocess, sys, re
+          out = subprocess.run(
+              [sys.executable, "-m", "pytest", "-q", "-m", "model", "--collect-only"],
+              capture_output=True, text=True,
+          ).stdout
+          match = re.search(r"(\d+)/\d+ tests collected", out) or re.search(r"(\d+) tests? collected", out)
+          collected = int(match.group(1)) if match else 0
+          print(f"model-marked tests collected: {collected}")
+          # 13 measured 2026-08-07, not guessed -- the first draft of this guard said 4, taken from a
+          # count of `pytest.mark.model` occurrences, and would have passed with 9 of the 13 missing.
+          # Module-level `pytestmark` marks every test in a module, so occurrences are not tests.
+          # A floor rather than equality: widening RECOVERY_PHENOTYPES raises this legitimately.
+          if collected < 13:
+              sys.exit(f"expected at least 13 model-marked tests, collected {collected} — "
+                       "the lane is not exercising what it claims to")
+          PY
