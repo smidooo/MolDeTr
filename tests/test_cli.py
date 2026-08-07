@@ -1,6 +1,7 @@
 """The ``moldetr`` console dispatcher: help lists commands, unknown errors, args forward to the sub-main."""
 
 import importlib.util
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,48 @@ needs_eval_extra = pytest.mark.skipif(
     not all(importlib.util.find_spec(m) for m in _EVAL_DEPS),
     reason="evaluate_synthetic needs the [eval] extra (pandas/seaborn/scikit-learn/cmcrameri)",
 )
+
+
+def _dispatcher_commands() -> list[str]:
+    """Every subcommand the dispatcher advertises, read from the dispatcher itself.
+
+    Read rather than hard-coded so a new subcommand is covered the moment it is added — a literal
+    list here would silently stop covering the thing it was written for.
+    """
+    from moldetr.cli import COMMANDS
+
+    return sorted(set(COMMANDS) | {"app"})
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("command", _dispatcher_commands())
+def test_every_subcommand_answers_help_in_a_real_subprocess(command):
+    """`--help` is the one contract every subcommand owes, and it rots silently.
+
+    Honest status: this is a **regression guard, not a bug fix** — all nine subcommands were probed
+    before it was written and all nine already exit 0. It is green on arrival and is kept anyway,
+    because the failure it guards against (someone edits an argparse block, `--help` starts raising,
+    nothing notices) has no other detector.
+
+    Subprocess rather than calling `main()` in-process: `test_cli_routes_each_command_to_its_module`
+    already covers routing, but it monkeypatches the target, so it passes even if the sub-script's
+    own parser is broken. Only a real invocation exercises that parser. `app` is included because
+    `--help` there must print usage rather than launch a blocking server — a regression that once
+    shipped.
+    """
+    result = subprocess.run(
+        [sys.executable, "-m", "moldetr.cli", command, "--help"],
+        capture_output=True,
+        text=True,
+        timeout=180,
+        cwd=REPO,
+        env={**os.environ, "MPLBACKEND": "Agg"},
+    )
+    assert result.returncode == 0, (
+        f"`moldetr {command} --help` exited {result.returncode}\n"
+        f"--- stdout ---\n{result.stdout[-800:]}\n--- stderr ---\n{result.stderr[-800:]}"
+    )
+    assert result.stdout.strip(), f"`moldetr {command} --help` printed nothing to stdout"
 
 
 @pytest.mark.unit
