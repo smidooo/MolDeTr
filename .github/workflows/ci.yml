@@ -29,6 +29,14 @@ jobs:
       - name: Lint
         # app.py + app_ui/ are the GUI hub and were previously unlinted in CI entirely.
         run: ruff check moldetr scripts tests app.py app_ui
+      - name: Format check
+        # Measured before adding: 24 files would have been reformatted, so this step was red on
+        # arrival until `[tool.ruff.format] exclude` in pyproject was widened. 18 of those 24 are the
+        # frozen training stack (model/, loss/, learner/, dataloader/, scripts/train.py) whose shape
+        # must keep matching a published checkpoint and whose content is provenance evidence; the
+        # other 6 were test files and were reformatted. Rationale for each exclusion lives next to
+        # the list in pyproject, not here.
+        run: ruff format --check moldetr scripts tests app.py app_ui
       - name: Type check
         # Scope and rationale live in pyproject's [tool.mypy]: this covers the pure-NumPy public
         # surface that py.typed's promise is actually actionable for, not the whole package.
@@ -38,9 +46,49 @@ jobs:
       - name: Unit + scripts tests (no in-process server)
         env:
           MPLBACKEND: Agg
+        # Coverage is measured on ONE leg only (see the `coverage` job below), not here: a hard
+        # floor evaluated on six OS/Python combinations invites flaking on cross-platform branch
+        # differences without adding signal about the code.
         run: pytest -q -rs -m "not e2e and not browser"
       - name: Reproduce headline numbers (committed data, no weights)
+        # NOTE: this reproduces the medians from `experimental_matched_pairs.json`, an already-matched
+        # intermediate — "no checkpoint, GPU, or raw spectra required". It proves the arithmetic, not
+        # that the model still produces those predictions. Closing that is the nightly job's job.
         run: python scripts/aggregate_experimental.py
+
+  coverage:
+    name: coverage (ratcheted)
+    # A separate job rather than a flag on the matrix: the floor only needs measuring once, and
+    # running it on every leg would multiply the cost of the slowest step for no extra information.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (CPU PyTorch + app)
+        run: |
+          python -m pip install --upgrade pip
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,app]"
+      - name: Coverage
+        env:
+          MPLBACKEND: Agg
+        # Floor is 78, one point under the 79 % measured 2026-08-07 — ratcheted against the real
+        # number, never an aspirational one. What the remaining gap is made of, and why it must not
+        # be closed by testing frozen training code or by omitting it, is documented in pyproject's
+        # [tool.coverage.report]. Source and omit come from there too, so a local `pytest --cov`
+        # measures the same thing this job does.
+        run: pytest -q -rs -m "not e2e and not browser" --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=78
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          retention-days: 7
+          if-no-files-found: ignore
 
   e2e:
     name: in-process e2e (gradio_client)

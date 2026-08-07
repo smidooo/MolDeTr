@@ -114,9 +114,7 @@ def generate_reference():
     """Generate reference outputs on CPU and save to disk."""
     from moldetr.model.ops.functions.ms_deform_attn_func import MSDA
 
-    backend = (
-        "cuda" if MSDA is not None and torch.cuda.is_available() else "cpu_pytorch"
-    )
+    backend = "cuda" if MSDA is not None and torch.cuda.is_available() else "cpu_pytorch"
     print(f"Generating reference with backend: {backend}")
 
     inputs = create_deterministic_inputs()
@@ -245,8 +243,7 @@ def test_cpu_cuda_equivalence():
         import pytest
 
         pytest.skip(
-            "Need both CPU and CUDA reference files. "
-            "Run --generate on each platform first."
+            "Need both CPU and CUDA reference files. Run --generate on each platform first."
         )
 
     assert compare_outputs(), "CPU and CUDA outputs differ beyond tolerance"

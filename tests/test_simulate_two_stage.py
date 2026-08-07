@@ -167,7 +167,9 @@ def test_the_no_distortion_path_hands_back_a_copy(app_module, patch_model, args)
     app = patch_model
     cache = app._simulate_stage(*args)
 
-    out = app._distorted_amplitudes(cache, False, 3.0, 0.0, 0.0, 0.0, False, 130.0)  # neutral: no distortion
+    out = app._distorted_amplitudes(
+        cache, False, 3.0, 0.0, 0.0, 0.0, False, 130.0
+    )  # neutral: no distortion
 
     assert not np.shares_memory(out, cache["spectrum"])
 

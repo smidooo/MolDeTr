@@ -175,12 +175,31 @@ select = ["E", "F", "W"]
 ignore = ["E501", "E741", "W605", "E402", "F403", "F405", "E731", "E722", "F811", "F841"]
 
 [tool.ruff.format]
-# The training-era augmentation pipeline is historical evidence, not live code to tidy. It is the
-# public twin of the private repo's `ds/dataloader/data_augumentation.py`, and the provenance work
-# that dates the shipped weights reads the two side by side. `ruff format` would rewrite ~270 lines
-# of it and destroy that correspondence for no behavioural gain, so it is excluded. Editors that
-# name the file explicitly still need `--force-exclude` to honour this.
-exclude = ["moldetr/dataloader/data_augmentation.py"]
+# `ruff format --check` runs in CI, so this exclude list is what makes that gate addable at all:
+# measured 2026-08-07, 24 files would otherwise be reformatted and the lint job would be red on
+# arrival. 18 of those 24 are the frozen training stack listed below — the same modules the coverage
+# run finds at 0–45 %, which is not a coincidence: neither half is actively developed.
+#
+# The augmentation pipeline is the strongest case and the reason this list exists. It is historical
+# evidence, not live code to tidy — the public twin of the private repo's
+# `ds/dataloader/data_augumentation.py`, and the provenance work that dates the shipped weights reads
+# the two side by side. `ruff format` would rewrite ~270 lines of it and destroy that correspondence
+# for no behavioural gain. The same argument holds, more weakly but still, for the model/loss/learner
+# code whose shape must keep matching a frozen checkpoint, and for `scripts/train.py`.
+#
+# Excluding *cosmetics* on frozen code costs nothing. Note this is the opposite call from coverage,
+# where these same modules are deliberately NOT omitted: omitting them there would hide untested
+# behaviour, which is how you stop noticing. Formatting hides nothing.
+#
+# Editors that name a file explicitly still need `--force-exclude` to honour this — which is why the
+# PostToolUse ruff hook rewrites these files anyway on edit. Put notes in Markdown, not in them.
+exclude = [
+    "moldetr/dataloader/**",
+    "moldetr/learner/**",
+    "moldetr/loss/**",
+    "moldetr/model/**",
+    "scripts/train.py",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
@@ -198,3 +217,32 @@ markers = [
     "browser: Playwright browser test (opt-in; needs `playwright install`)",
     "model: requires the real 974 MB checkpoint (local only)",
 ]
+
+[tool.coverage.run]
+source = ["moldetr", "app", "app_ui"]
+# `ops/setup.py` is a setuptools build script for the CUDA extension, not application code — 30
+# statements that can never execute under pytest. Nothing else is omitted, deliberately: see below.
+omit = ["*/model/ops/setup.py"]
+
+[tool.coverage.report]
+# `fail_under` is intentionally NOT set here, only on the CI command line (`--cov-fail-under`).
+# Setting it in config would make any local subset run (`pytest tests/test_foo.py --cov`) fail for
+# reporting low coverage of everything it did not run, which trains people to pass `--no-cov`.
+#
+# The CI floor is 78, one point under the 79 % measured on 2026-08-07 (2659 statements, 571 missed,
+# with the omit above). Ratcheted against the real number rather than an aspirational target: a floor
+# nobody currently meets gets deleted the first time it blocks a PR.
+#
+# Read the composition before acting on the headline. The shortfall is almost entirely the *training*
+# stack, which CI structurally cannot exercise — no GPU, no training corpus, checkpoint frozen:
+# `dataloader/dataloader.py` 34 %, `learner/multi_multiplet_learner.py` 0 %,
+# `dataloader/data_augmentation.py` 45 %, `loss/individual_losses.py` 43 %, `loss/combined_loss.py`
+# 0 % — roughly 430 of the 571 between them. The user-facing path is in good shape: `app.py` 93 %,
+# `postprocess` and `validation` 100 %, `simulate` 97 %, `visualization` 96 %.
+#
+# So do NOT chase this number by writing tests for frozen training code — that is textbook weak
+# tests-for-coverage's-sake, and the code cannot change without invalidating the published
+# checkpoint. And do NOT omit those modules to make the figure look better either: omitting is how
+# you stop noticing. They stay counted, the floor stays where the real number is, and the gap is
+# documented here instead.
+show_missing = true

@@ -383,9 +383,7 @@ def test_every_phenotype_ground_truth_matches_the_apps_own_derivation(app_module
     import simulate_and_predict as sp
 
     def key(groups):
-        return sorted(
-            (round(g["shift_ppm"], 6), g["proton_count"], g["max_j_hz"]) for g in groups
-        )
+        return sorted((round(g["shift_ppm"], 6), g["proton_count"], g["max_j_hz"]) for g in groups)
 
     for name, pheno in sp.PHENOTYPES.items():
         matrix = sp.build_coupling_matrix(len(pheno["shifts_ppm"]), pheno["couplings"])
