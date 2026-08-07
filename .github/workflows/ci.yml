@@ -13,7 +13,19 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
-        python-version: ["3.10", "3.11"]
+        # 3.12 added 2026-08-07 after checking wheel availability rather than assuming it: every
+        # dependency in every extras group has a cp312 wheel at a version this project's constraints
+        # permit, on all three OSes, and the development venv is already 3.12. `tests/test_public_api.py`
+        # asserts this list and the PyPI classifiers stay in agreement, so adding a leg here without
+        # advertising it (or vice versa) fails.
+        #
+        # 3.13 is deliberately NOT here. It resolves today, but with zero slack: `fastai>=2.7,<2.8`
+        # pins `torch<2.7`, and cp313 torch wheels for Windows/macOS start at 2.6.0 — so torch 2.6.0
+        # is the *only* version satisfying floor ∩ fastai ceiling ∩ 3-OS cp313. One upstream patch
+        # tightening fastai's torch ceiling flips that to unbuildable with no change here. Adding it
+        # would need this leg to also assert the resolved torch version, the way `gradio-floor`
+        # asserts `gradio.__version__`, or it silently degrades into a duplicate of 3.12.
+        python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -89,6 +101,146 @@ jobs:
           path: coverage.xml
           retention-days: 7
           if-no-files-found: ignore
+
+  package:
+    name: built wheel installs and works
+    # Every other job installs with `pip install -e .`, so nothing has ever exercised the artifact a
+    # user actually gets. An editable install cannot detect a missing `py.typed`, a package-data glob
+    # that drops the CUDA op sources, an unregistered console script, or a licence file that never
+    # reaches dist-info -- the source tree supplies all of them regardless.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Build sdist + wheel
+        run: |
+          python -m pip install --upgrade pip build twine
+          python -m build
+      - name: Metadata check
+        run: twine check --strict dist/*
+      - name: Install the wheel into a clean environment
+        # No extras: this is the base install a `pip install moldetr` user gets, and the assertions
+        # below must not depend on torch being present.
+        run: |
+          python -m venv /tmp/wheelenv
+          /tmp/wheelenv/bin/python -m pip install --upgrade pip
+          /tmp/wheelenv/bin/python -m pip install dist/*.whl
+      - name: Verify the INSTALLED package, not the source tree
+        # This step is the whole point of the job and it is easy to write so that it proves nothing.
+        # `cd /tmp` is load-bearing: run from the repo root and `import moldetr` resolves to ./moldetr
+        # and every assertion below passes against the source tree while the wheel could be empty.
+        #
+        # That failure mode is not hypothetical here -- the repo root carries a stale, gitignored
+        # `build/` directory, and `import build` resolves to it as a namespace package, which is
+        # exactly how a probe during this job's design reported a package as installed when it was
+        # not. So the first assertion is on `moldetr.__file__` itself: if it is not under
+        # site-packages, nothing after it means anything.
+        run: |
+          cd /tmp
+          /tmp/wheelenv/bin/python - <<'PY'
+          import pathlib, moldetr
+          location = pathlib.Path(moldetr.__file__).resolve()
+          assert "site-packages" in location.parts, (
+              f"moldetr resolved to {location}, not an installed copy -- this job is testing the "
+              "source tree and would pass against an empty wheel"
+          )
+          root = location.parent
+          assert (root / "py.typed").is_file(), (
+              "py.typed is missing from the INSTALLED package; PEP 561 support is silently off for "
+              "every downstream even though pyproject declares it as package-data"
+          )
+          print("installed at", root)
+          PY
+      - name: Verify the console script is registered and every subcommand answers
+        # `moldetr` is the documented entry point. Only a real subprocess against an installed
+        # distribution can catch a broken `console_scripts` mapping -- an in-process call to
+        # `cli.main()` works even when the script was never generated.
+        run: |
+          cd /tmp
+          /tmp/wheelenv/bin/moldetr --help
+      - name: Verify the licence files reached dist-info
+        # `THIRD_PARTY.md` sits at the repo root, so it is neither package-data nor matched by the
+        # default licence globs; pyproject names it explicitly in `license-files`. A third-party
+        # notice that reaches only people browsing GitHub has not reached the people who installed
+        # the package, which is who the notice is for.
+        run: |
+          cd /tmp
+          /tmp/wheelenv/bin/python - <<'PY'
+          import pathlib, importlib.metadata as md
+          files = md.files("moldetr") or []
+          names = {pathlib.PurePath(str(f)).name for f in files}
+          for required in ("LICENSE", "THIRD_PARTY.md"):
+              assert required in names, f"{required} did not reach dist-info; got {sorted(names)[:40]}"
+          print("licence files present:", sorted(n for n in names if n in {"LICENSE", "THIRD_PARTY.md"}))
+          PY
+      - name: Upload the distributions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  onboarding:
+    name: the README quickstart, run verbatim
+    # README.md's "Try it in 2 minutes" block is a promise to a first-time reader, and nothing checked
+    # it. The commands below are copied from that block rather than adapted -- if they drift, this job
+    # must break, which is the entire value. It also asserts the three headline numbers the block
+    # promises, so a change that silently moves them fails here as well as in the paper-medians guard.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install exactly as the README says
+        # The README does not tell a reader to preinstall CPU torch, so this job must not either --
+        # doing so would test a smoother path than the one that is documented.
+        run: pip install -e ".[dev]"
+      - name: Run the documented command and check its promised output
+        env:
+          MPLBACKEND: Agg
+        run: |
+          python scripts/aggregate_experimental.py | tee /tmp/quickstart.txt
+          python - <<'PY'
+          import pathlib, re, sys
+          out = pathlib.Path("/tmp/quickstart.txt").read_text(encoding="utf-8")
+          readme = pathlib.Path("README.md").read_text(encoding="utf-8")
+          promised = {"median |dd| = 0.90": r"median \|dd\| = 0\.90",
+                      "median |dJ| = 0.20": r"median \|dJ\| = 0\.20",
+                      "proton-count 93.5 %": r"proton-count accuracy \(overall\) = 93\.5 %"}
+          missing = [label for label, pattern in promised.items() if not re.search(pattern, out)]
+          if missing:
+              sys.exit(f"the quickstart no longer prints: {missing}\n--- actual ---\n{out}")
+          # The README block itself must keep quoting these numbers, or the job above is checking a
+          # promise the README has stopped making.
+          for token in ("0.90 Hz", "0.20 Hz", "93.5"):
+              assert token in readme, f"README quickstart no longer promises {token}"
+          print("quickstart reproduces the documented numbers")
+          PY
+
+  environment-file:
+    name: environment.yml still solves
+    # README.md:229-235 gives `conda env create -f environment.yml` as the PRIMARY install path, with
+    # pip only as "if you prefer pip" -- and no job has ever used conda, so the first thing a new user
+    # is told to run has never been validated. Solve-only rather than a full create: it catches the
+    # realistic breakage (a renamed package, an unsatisfiable pin) in a fraction of the time, and a
+    # full environment adds minutes to every PR for a path CI does not otherwise exercise.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+          activate-environment: ""
+      - name: Solve the declared environment without creating it
+        shell: bash -el {0}
+        run: conda env create -f environment.yml --dry-run
 
   e2e:
     name: in-process e2e (gradio_client)
