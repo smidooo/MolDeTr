@@ -66,10 +66,12 @@ def test_simulate_checkpoint_refusal_reaches_the_user(patch_model, monkeypatch):
             grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
         )
     except RuntimeError as exc:
-        pytest.fail(
+        # See the note in `test_app_predict.py`: an explicit raise, not `pytest.fail`, so the
+        # analyzer can see this branch terminates and the asserts below are unreachable from it.
+        raise AssertionError(
             "the checkpoint refusal escaped `simulate_and_detect` as an exception instead of "
-            f"returning through the status channel:\n{exc}"
-        )
+            "returning through the status channel"
+        ) from exc
 
     assert table is None and fig is None
     assert "MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT" in msg, (

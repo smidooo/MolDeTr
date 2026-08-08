@@ -74,10 +74,15 @@ def test_checkpoint_refusal_reaches_the_user(patch_model, tmp_npz, valid_spectru
     try:
         table, fig, msg = app.predict(path, 0.3, app.AUTO, None, None, 5.12)
     except RuntimeError as exc:
-        pytest.fail(
+        # `raise ... from`, not `pytest.fail`: CodeQL's flow analysis does not know `pytest.fail`
+        # is `NoReturn`, so it saw a path reaching the asserts below with `table`/`fig`/`msg`
+        # unbound and reported three error-level `py/uninitialized-local-variable` alerts. An
+        # explicit raise is unambiguously terminating, and chaining the cause keeps the original
+        # traceback that `pytest.fail` would have discarded.
+        raise AssertionError(
             "the checkpoint refusal escaped `predict` as an exception, so Gradio shows a bare "
-            f"'Error' toast and the remedy never reaches the user:\n{exc}"
-        )
+            "'Error' toast and the remedy never reaches the user"
+        ) from exc
 
     assert table is None and fig is None
     assert "MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT" in msg, (
