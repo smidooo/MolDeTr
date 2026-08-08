@@ -27,9 +27,9 @@ jobs:
         # asserts `gradio.__version__`, or it silently degrades into a duplicate of 3.12.
         python-version: ["3.10", "3.11", "3.12"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip
@@ -74,8 +74,8 @@ jobs:
     # running it on every leg would multiply the cost of the slowest step for no extra information.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -95,7 +95,7 @@ jobs:
         run: pytest -q -rs -m "not e2e and not browser and not network" --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=78
       - name: Upload coverage XML
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-xml
           path: coverage.xml
@@ -110,8 +110,8 @@ jobs:
     # reaches dist-info -- the source tree supplies all of them regardless.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -178,7 +178,7 @@ jobs:
           PY
       - name: Upload the distributions
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: distributions
           path: dist/
@@ -193,8 +193,8 @@ jobs:
     # promises, so a change that silently moves them fails here as well as in the paper-medians guard.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -233,8 +233,8 @@ jobs:
     # full environment adds minutes to every PR for a path CI does not otherwise exercise.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: conda-incubator/setup-miniconda@v3
+      - uses: actions/checkout@v7
+      - uses: conda-incubator/setup-miniconda@v4
         with:
           auto-update-conda: true
           activate-environment: ""
@@ -246,8 +246,8 @@ jobs:
     name: in-process e2e (gradio_client)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -274,8 +274,8 @@ jobs:
       matrix:
         browser: [chromium, firefox, webkit]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -300,7 +300,7 @@ jobs:
           --video retain-on-failure
       - name: Upload Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces-${{ matrix.browser }}
           path: test-results/
@@ -315,8 +315,8 @@ jobs:
     # This job is the one place the declared floor is actually run.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -401,9 +401,36 @@ jobs:
           --video retain-on-failure
       - name: Upload Playwright artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-traces-gradio-floor
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # --- failure delivery -----------------------------------------------------------------------
+  #
+  # Only for pushes to `main`. A red PR is already visible to the person who opened it, and an
+  # issue per failed PR is noise that trains people to close issues unread — which is the exact
+  # failure mode the weekly lane's comment warns about. A red *trunk* has no such audience:
+  # `main` sat red for a full day on 2026-08-08 after #41 merged, three PRs were opened on top of
+  # it, and it was found by looking rather than by being told.
+  report-failure:
+    name: announce a red trunk
+    needs:
+      [test, coverage, package, onboarding, environment-file, e2e, browser-e2e, gradio-floor]
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/report-failure
+        with:
+          title: "CI is failing on main"
+          guards: >-
+            The per-push matrix, coverage ratchet, wheel install, README quickstart, environment
+            solve, and the e2e / browser / gradio-floor lanes. Only seven of these are required
+            status checks, so a merge can turn `main` red without any PR ever going red.
+          token: ${{ github.token }}

@@ -29,9 +29,9 @@ jobs:
       security-events: write # to upload findings to the Security tab
       actions: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Initialise CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: python
           # `security-and-quality` over the default `security-extended`: this is research code with a
@@ -40,7 +40,7 @@ jobs:
           # Python needs none.
           queries: security-and-quality
       - name: Analyse
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:python"
 
@@ -53,8 +53,8 @@ jobs:
     # never go red because an advisory landed while it was open.
     if: github.event_name != 'pull_request'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
           cache: pip
@@ -90,3 +90,23 @@ jobs:
           echo "see the rationale in \`.github/workflows/security.yml\`. Once the noise floor is" >> "$GITHUB_STEP_SUMMARY"
           echo "known, either enforce it or add a reviewed ignore-list — do not leave it advisory" >> "$GITHUB_STEP_SUMMARY"
           echo "indefinitely." >> "$GITHUB_STEP_SUMMARY"
+
+  # CodeQL going red is a finding, not an inconvenience, and nobody watches the Actions tab of a
+  # paper companion between releases. `pip-audit` is report-only by design and cannot fail the
+  # build, so in practice this fires for CodeQL and for infrastructure breakage.
+  report-failure:
+    name: announce a failed security lane
+    needs: [codeql, dependency-audit]
+    if: failure() && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/report-failure
+        with:
+          title: "Security lane is failing"
+          guards: >-
+            CodeQL static analysis and the advisory `pip-audit` dependency scan.
+          token: ${{ github.token }}
