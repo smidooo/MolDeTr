@@ -123,6 +123,54 @@ def test_download_buttons_deliver_the_detected_rows(page: Page, served_app_url: 
     )
 
 
+def _expect_plotly_or_report(page: Page):
+    """Wait for the Plotly canvas, and on timeout say what the DOM actually contained.
+
+    `browser e2e (webkit)` has failed here twice — the #41 merge run (31247518046) and the #49 merge
+    run (31266452657) — both times as a bare "Locator expected to be visible", which cannot
+    distinguish *Plotly drew late* from *Plotly never ran*. Both retained traces answer it the same
+    way, and identically to each other: `js-plotly-plot`, `plotly` and `main-svg` appear in **none**
+    of the 15 DOM snapshots across the full 30 s, while `#md-plot` itself is present, and a
+    `ResizeObserver loop completed with undelivered notifications` pageError fires ~1.9 s in. So
+    Plotly never initialises, and a resize notification is provably dropped.
+
+    That signature is reproducible, but its cause is not established and it does not reproduce
+    locally — chromium, firefox and webkit all pass here. Rather than guess a fix and then be unable
+    to tell whether a green lane meant anything, this puts the measurement in the failure message:
+    the next occurrence reports the container's geometry, its child count, and whether `window.Plotly`
+    even loaded — without depending on someone downloading a trace inside its 7-day retention.
+
+    Raises `AssertionError(...) from exc` rather than calling `pytest.fail`, matching the fix this
+    repo already applied for CodeQL's `py/uninitialized-local-variable`: `pytest.fail` is not
+    recognised as `NoReturn`.
+    """
+    plot = page.locator("#md-plot .js-plotly-plot")
+    try:
+        expect(plot).to_be_visible(timeout=30_000)
+    except AssertionError as exc:
+        state = page.evaluate(
+            """() => {
+                const c = document.querySelector('#md-plot');
+                if (!c) return {container: 'ABSENT'};
+                const r = c.getBoundingClientRect();
+                const cs = getComputedStyle(c);
+                return {
+                    box: `${Math.round(r.width)}x${Math.round(r.height)}`,
+                    display: cs.display,
+                    visibility: cs.visibility,
+                    children: c.childElementCount,
+                    hasPlotlyDiv: !!c.querySelector('.js-plotly-plot'),
+                    plotlyLoaded: typeof window.Plotly !== 'undefined',
+                    html: c.innerHTML.slice(0, 300),
+                };
+            }"""
+        )
+        raise AssertionError(
+            f"the Plotly canvas never appeared within 30 s. #md-plot at timeout: {state}"
+        ) from exc
+    return plot
+
+
 def test_spectrum_plot_zooms_and_resets(page: Page, served_app_url: str) -> None:
     """Drag-to-zoom is advertised in the caption, so it is part of the contract.
 
@@ -131,8 +179,7 @@ def test_spectrum_plot_zooms_and_resets(page: Page, served_app_url: str) -> None
     """
     _detect_with_example(page, served_app_url, "guajazulene")
     expect(page.get_by_text("Detected", exact=False)).to_be_visible(timeout=30_000)
-    plot = page.locator("#md-plot .js-plotly-plot")
-    expect(plot).to_be_visible(timeout=30_000)
+    plot = _expect_plotly_or_report(page)
 
     box = plot.bounding_box()
     assert box, "the Plotly canvas has no layout box"
