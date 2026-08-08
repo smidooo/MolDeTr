@@ -61,7 +61,7 @@ jobs:
         # Coverage is measured on ONE leg only (see the `coverage` job below), not here: a hard
         # floor evaluated on six OS/Python combinations invites flaking on cross-platform branch
         # differences without adding signal about the code.
-        run: pytest -q -rs -m "not e2e and not browser"
+        run: pytest -q -rs -m "not e2e and not browser and not network"
       - name: Reproduce headline numbers (committed data, no weights)
         # NOTE: this reproduces the medians from `experimental_matched_pairs.json`, an already-matched
         # intermediate — "no checkpoint, GPU, or raw spectra required". It proves the arithmetic, not
@@ -92,7 +92,7 @@ jobs:
         # be closed by testing frozen training code or by omitting it, is documented in pyproject's
         # [tool.coverage.report]. Source and omit come from there too, so a local `pytest --cov`
         # measures the same thing this job does.
-        run: pytest -q -rs -m "not e2e and not browser" --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=78
+        run: pytest -q -rs -m "not e2e and not browser and not network" --cov --cov-report=term-missing --cov-report=xml --cov-fail-under=78
       - name: Upload coverage XML
         if: always()
         uses: actions/upload-artifact@v4
@@ -363,7 +363,7 @@ jobs:
         # `_id`, and exists to catch things like `api_name=False` serialising to the literal
         # "false". That is where a gradio-minor divergence actually surfaces. No browser and no
         # weights, so it is the cheapest step in the job.
-        run: pytest -q -rs -m "not e2e and not browser"
+        run: pytest -q -rs -m "not e2e and not browser and not network"
       - name: e2e at the floor
         env:
           MPLBACKEND: Agg
