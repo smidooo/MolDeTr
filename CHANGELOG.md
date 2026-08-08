@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-08-09
+
 ### Added
 - **A second, independent spin system in the Simulate tab.** The simulator could always do this —
   `simulate_systems` splits the coupling matrix into disconnected blocks, simulates each on a
@@ -53,6 +55,28 @@ All notable changes to this project are documented here. The format is based on
   `MAX_MATRIX_SPINS`, which costs nothing at render time because Gradio draws as many columns as the
   *data* has and consults `headers` only for their labels. Found by looking at a screenshot: the
   unit, browser and axe-a11y tiers were all green, because none of them asserted on column labels.
+- **A refused checkpoint now explains itself instead of showing a bare "Error" toast.** The trust
+  gate under *Security* below made `load_checkpoint` raise `RuntimeError`, but `app.py::_get_model()`
+  was called inline inside `run(...)` at both call sites with nothing catching it — while every other
+  failure in `predict` and `_detect_stage` returns a status string. Gradio therefore showed a bare
+  "Error", and the refusal text is the only place `MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT` is named: the
+  one piece of information a user needs in order to run weights they trained themselves was exactly
+  the piece that never reached the screen, so the security fix had broken the documented own-weights
+  workflow. `_get_model()` is hoisted out of the nested call at both sites and returns through the
+  existing `(None, None, message)` channel. The message is fenced rather than interpolated into a
+  sentence, because the gate's text is multi-line and carries both MD5s, and markdown collapses those
+  lines into an unreadable run precisely where the user has to compare two hex digests.
+- **The simulator's ppm window is derived from the field instead of declared beside it.** The
+  checkpoint expects 6144 points across a 1200 Hz window — 5.12 points/Hz — and the simulator is
+  parameterised in ppm, so that resolution held only while
+  `(LEFT_PPM - RIGHT_PPM) * BASE_FREQ_MHZ == 1200`, with all three declared independently. At the
+  shipped 80 MHz over a 15 → 0 ppm window it holds exactly, which is why nothing had gone wrong. Set
+  `BASE_FREQ_MHZ` to 600 and leave the ppm bounds alone, though, and the window becomes 9000 Hz at
+  0.68 points/Hz — an eighth of the trained resolution, with nothing raised anywhere. The detector
+  still returns numbers and they are confidently wrong: not an error, an answer that looks like every
+  other answer. `LEFT_PPM`/`RIGHT_PPM` now come from `ppm_window(base_freq_mhz)`, so the invariant is
+  unrepresentable rather than merely documented. At 80 MHz the derivation yields exactly (15.0, 0.0)
+  — byte-for-byte the previous constants, so no behaviour changes on the frozen-checkpoint path.
 - **Two README figures rendered below the 2× device-pixel floor.** Nine of the eleven local figures
   are pinned at ≥2.00× their displayed width via `<img … width="N">`; `docs/img/gui.png` (1425×1182,
   ~1.4×) and `docs/img/demo.gif` (960×867, ~1.0×) were the only two written as Markdown
@@ -65,14 +89,6 @@ All notable changes to this project are documented here. The format is based on
   stays a GIF because GitHub strips `<video>` from rendered Markdown for both repo-relative and
   `raw` URLs, taking any nested `<img>` fallback with it. `tests/test_readme_figures.py` holds the
   floor.
-- **The dependency audit had never audited anything.** `security.yml` ran `pip-audit --strict`, and
-  `--strict` promotes "could not be audited" to a fatal error — which this project triggers on every
-  run by construction, because it installs itself with `pip install -e` and its own distribution can
-  never resolve on PyPI. The one run the lane had ever had died 1.7 s in and printed no advisory
-  table, while `continue-on-error: true` reported the job green. `--skip-editable` does *not* rescue
-  it (that yields a `SkippedDependency`, which `--strict` also fatals on); dropping `--strict` does.
-  The first real audit reports 45 advisories across `torch`, `pillow` and `setuptools`, all with
-  fixes available. Still deliberately report-only — the noise floor now has one reading, not none.
 - **The DOI badge on the README front page renders again.** It was served from
   `zenodo.org/badge/1289888357.svg`, and GitHub does not load README images in the browser — it
   fetches them server-side through its shared `camo` proxy, so Zenodo saw the whole of GitHub as a
@@ -86,6 +102,122 @@ All notable changes to this project are documented here. The format is based on
   Pinning the static `zenodo.org/badge/DOI/….svg` form was rejected — measured, it carries the same
   `no-cache` header and the same origin, so it stays flaky. Zenodo's release webhook is untouched
   and releases still mint DOIs; `tests/test_readme_badges.py` now guards both rules.
+
+### Security
+- **The `weights_only=False` fallback is gated on the checkpoint's identity.** `.github/SECURITY.md`
+  stated that `inference.py` loads with `weights_only=True` first and only falls back to
+  `weights_only=False` for the fastai-format checkpoint. The first half was true; the second was not.
+  `load_checkpoint` wrapped the safe load in a bare `except Exception` and retried unsafely, and torch
+  raises `pickle.UnpicklingError` whenever `weights_only=True` refuses a non-allowlisted global —
+  exactly what a hostile checkpoint triggers. **The safe loader's refusal was therefore what unlocked
+  the unsafe load.** Catching a narrower exception does not fix this: the published fastai checkpoint
+  carries optimizer state and fails the safe load with the *same* `UnpicklingError` a malicious file
+  does, so exception type cannot separate them and the decision has to be made on the file's identity.
+  The fallback is now gated on the checkpoint's MD5. Measured on a file that fails the safe load,
+  `weights_only` calls go from `[True, False]` to `[True]` plus a refusal.
+- **The checkpoint's identity is checked before the blanket opt-in, not after.**
+  `_require_trusted_checkpoint` consulted `MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT` before computing the
+  digest, so setting it once — the documented way to run weights you trained yourself — stopped the
+  *published* checkpoint being identified for the rest of the process. Every later load in that
+  process took the escape hatch instead of the trust anchor and warned that it was "executing
+  arbitrary code from the file" about a file whose digest the gate could have recognised; a warning
+  that fires on the known-good checkpoint is a warning users learn to skip. Hashing first restores the
+  intended precedence: identity wins, and the opt-in is what it was documented to be — a fallback for
+  files the anchor does not recognise. The untrusted path still warns, and still loads. The cost is
+  one streaming MD5 on the opt-in path that used to skip it: seconds on a 974 MB file, once per load,
+  and only on the branch where the safe loader already refused.
+
+### Tests
+The recurring defect this cycle was a guard that reports green while performing none of its work.
+Three were found, every one of them by reading a log rather than by anything failing:
+
+- **The dependency audit had never audited anything.** `security.yml` ran `pip-audit --strict`, and
+  `--strict` promotes "could not be audited" to a fatal error — which this project triggers on every
+  run by construction, because it installs itself with `pip install -e` and its own distribution can
+  never resolve on PyPI. The one run the lane had ever had died 1.7 s in and printed no advisory
+  table, while `continue-on-error: true` reported the job green. `--skip-editable` does *not* rescue
+  it (that yields a `SkippedDependency`, which `--strict` also fatals on); dropping `--strict` does.
+  The first real audit reports 45 advisories across `torch`, `pillow` and `setuptools`, all with
+  fixes available. Still deliberately report-only — the noise floor now has one reading, not none.
+- **The rot watcher would never have run a single check.** `integrations.yml` installed pytest alone,
+  reasoning that `tests/test_integrations.py` imports only the standard library — true of that file,
+  wrong about the run. pytest loads `tests/conftest.py` before collecting anything under `tests/`, and
+  that conftest imported numpy and torch at module scope, so collection died before a single check
+  ran, and the job's own failure handler then filed a `ModuleNotFoundError` issue that reads as a
+  broken dependency rather than as a job that never worked. A watcher built to prevent hollow-green
+  that is itself hollow-green is worse than absent, because its noise trains the maintainer to ignore
+  it. Caught before it ever fired: the lane had been added the day before and its cron had not run.
+- **The nightly went green while the two tests it exists to run skipped.** Its first dispatch reported
+  `11 passed, 8 skipped`, and the workflow's own anti-hollow-green guard passed anyway — the failure
+  this whole effort is about, occurring inside the machinery built to prevent it. Three defects, none
+  visible from the tick. The clearest: `experimental_rois.zip` nests everything under
+  `experimental_rois/`, so a plain extract left the arrays one directory below `MOLDETR_ROI_NPZ_DIR`,
+  while the reassuring `roi count: 13` came from a recursive `find` that counted files no consumer
+  could see. Now `unzip -j` to flatten and `-maxdepth 1` to count, failing below 13.
+- **The declared markers and classifiers now describe reality.** Every lane selected
+  `-m "not e2e and not browser and not network"`, which reads as three deliberate exclusions.
+  `network` was applied to no test, so the clause excluded the empty set; `slow` and `data` were
+  likewise declared and never used. pytest does not warn about a declared-but-unused marker, and
+  `-m "not <unknown>"` is not an error — an unknown name matches nothing and the lane goes green, so
+  the defect has no symptom. Measured proof it was inert: the default lane deselected 35 tests both
+  before and after removing the clause, identically. The `network` marker later returned, this time
+  with tests behind it (below).
+- **Coverage and formatting are gated, both scoped by measurement rather than aspiration.**
+  pytest-cov was a dev dependency with the command sitting in a comment, and only `ruff check` ran,
+  never `ruff format --check`. Measured before adding rather than after: 24 files would have been
+  reformatted, so the naive step would have been red on arrival — and 18 of them are the frozen
+  training stack, the same set the coverage run finds at 0–45 %. Two independent measurements landing
+  on one boundary. The exclude list widens to cover that stack and the remaining 6, all test files,
+  are reformatted: 24 → 6 → 0.
+- **The artifact a user installs is now tested, from outside the repository.** Every job installed
+  with `pip install -e .`, so nothing had ever touched the wheel a user actually gets — and an
+  editable install cannot detect a missing `py.typed`, a dropped package-data glob, an unregistered
+  console script, or a licence file that never reaches `dist-info`, because the source tree supplies
+  all of them regardless. The job builds, runs `twine check --strict`, installs the wheel into a clean
+  venv and asserts from outside the tree. That `cd` is load-bearing, and the first assertion is that
+  `moldetr.__file__` resolves under `site-packages`, because the alternative passes against an empty
+  wheel.
+- **The real-checkpoint tests run nightly.** The thirteen `model`-marked tests had never run anywhere
+  but a maintainer's laptop, and they are not thin: `tests/test_model_contract.py` carries a vanillin
+  oracle captured from a live decode against checkpoint md5 `faf842d1a1d8beae67e0544e28f226b5`,
+  asserting δ and J to tolerance. So this is not a new reproduction check — one already existed and is
+  good. It is the lane that executes it, which is why the change is one workflow file and no new
+  tests.
+- **The external references nothing was watching are now watched.** This closes the defect that
+  started the overhaul: the README's DOI badge began rendering as `502 Invalid upstream response
+  (429)` and a *user* reported it, because every check in `ci.yml` runs against the repository's own
+  contents. Re-adding the `network` marker required three things to move together, and all three are
+  here — the declaration, the tests in `tests/test_integrations.py`, and `and not network` restored to
+  all three `ci.yml` selectors, without which the fast lane would start making internet calls on every
+  push. Confirmed by the deselect count: 35 → 43.
+- **A failing lane now tells someone.** `main` went red on 2026-08-08, stayed red all day, and three
+  PRs were opened on top of it; it was found by looking. Nothing here was going to say so —
+  `nightly.yml` and `security.yml` had no failure-reporting step at all, and `ci.yml`'s two
+  `if: failure()` steps only upload artifacts. `.github/actions/report-failure` files a deduplicated
+  issue or comments on the open one, and is wired into all three silent lanes: one implementation
+  rather than three copies, because three copies drift and only one of them ever gets tested.
+- **The webkit lane: one real race removed, and the remaining failure now reports what it measured.**
+  `browser e2e (webkit)` is the only CI job that has ever needed a re-run, and
+  `test_moving_a_distortion_slider_does_not_re_simulate` accounted for two of the three. The gesture
+  had a genuine race: `page.mouse` is viewport-absolute and performs no actionability check, so the
+  press landed at coordinates captured by an earlier `bounding_box()`, and Gradio re-measures its
+  layout on every ResizeObserver fire — a press landing off the input emits no `.release` at all.
+  `hover()` re-resolves the locator and waits for it to stop moving before the pointer lands. The
+  other failure, `test_spectrum_plot_zooms_and_resets`, is deliberately **not** fixed: its only
+  evidence was "Locator expected to be visible", which cannot distinguish Plotly drawing late from
+  Plotly never running. The retained traces now answer that, identically across two runs —
+  `js-plotly-plot`, `plotly` and `main-svg` appear in none of the 15 DOM snapshots across the full
+  30 s while `#md-plot` is present throughout, and a `ResizeObserver loop completed with undelivered
+  notifications` pageError fires ~1.9 s in. Reproducible rather than coincidence, and tracked as an
+  open issue rather than patched speculatively.
+- **Dependabot is enabled, configured against alert fatigue rather than missed updates.** This tree is
+  torch-sized and the code is frozen at a paper release, so ungrouped weekly PRs would produce a
+  stream a maintainer learns to close unread — strictly worse than not enabling it. Two pip groups
+  split by what a failure would mean: dev-tooling breaks loudly and locally in CI so it can move
+  together, while runtime can change model behaviour so it gets its own PR and its own nightly result.
+  Verified the patterns partition the tree with nothing left over: 9 dev-tooling, 15 runtime, 0
+  unclassified. `torch` and `fastai` major/minor bumps are ignored. The first grouped run bumped six
+  actions.
 
 ## [1.2.0] - 2026-08-05
 
