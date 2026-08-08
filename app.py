@@ -309,7 +309,8 @@ SIMULATE_INTRO = (
     "Build a spin system on the model's grid (80 MHz, 15→0 ppm, 6144 pts), distort it within the "
     "range the model was trained on, then run the detector on it and compare against ground truth "
     "you defined. Start from a known system or edit the matrix directly: shifts on the diagonal, "
-    "couplings above it, and as many independent systems in one window as you leave uncoupled. "
+    "couplings above it. A second, independent system can be switched on below the first and is "
+    "summed with it at matching per-proton integrals. "
     "Once a spectrum is simulated, the distortion sliders re-distort it live — the spin dynamics "
     "are not solved again."
 )
@@ -319,15 +320,22 @@ PHENOTYPE_CHOICES = sorted(sp.PHENOTYPES)
 MATRIX_HINT = (
     "Each row is one spin. The **diagonal** holds its shift δ in ppm; cells **above** the diagonal "
     "hold the coupling J in Hz between that pair. Leave a pair at 0 and the two spins belong to "
-    "separate spin systems, which are simulated independently and summed — so one matrix can "
-    "describe several molecules in the same window. Cells below the diagonal are ignored."
+    "separate spin systems, which are simulated independently and summed. Cells below the diagonal "
+    "are ignored. For a second molecule, either leave its couplings to this one at 0 here, or use "
+    "the **Second spin system** panel below — they describe the same computation."
 )
 
 
-#: Largest spin count the matrix editor offers. `simulate` pays 2**n per coupled block, and
-#: `MAX_BLOCK_SPINS` caps a single block at 10, so offering more rows than that would only ever
-#: produce systems the simulator refuses.
+#: Largest spin count the matrix editor offers, **per editor**. `simulate` pays 2**n per coupled
+#: block, and `MAX_BLOCK_SPINS` caps a single block at 10, so offering more rows than that would only
+#: ever produce systems the simulator refuses. With a second editor the combined spectrum may hold
+#: more spins than this — legitimately, since the Hamiltonian is built per block and never on the
+#: joined matrix.
 MAX_MATRIX_SPINS = 8
+
+#: What the optional second panel starts from. Any of `PHENOTYPE_CHOICES` works; this one is small,
+#: strongly coupled, and pairs with the presets people reach for first.
+SECOND_SYSTEM_PRESET = "AB"
 
 #: Pople letters name the spins the way the spin-system literature and the paper's table do.
 _POPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -505,6 +513,37 @@ def _widths_per_spin(
         for spin in block:
             per_spin[spin] = width
     return per_spin
+
+
+def _join_systems(
+    first: tuple[list[float], NDArray[np.float64], list[float]],
+    second: tuple[list[float], NDArray[np.float64], list[float]],
+) -> tuple[list[float], NDArray[np.float64], list[float]]:
+    """Lay two independent spin systems out on one block-diagonal coupling matrix.
+
+    The cross terms stay zero, which is exactly what `coupling_blocks` reads as "separate systems",
+    so the joined matrix goes through the unchanged `simulate_systems` path: each block simulated on
+    a per-proton scale and summed under a single global peak rescale. That equivalence is what makes
+    two editors and one matrix the same computation (`test_simulate_additivity`), and it only holds
+    while the rescale happens **once, at the end** — adding two separately peak-normalised spectra
+    would silently flatten the relative integrals.
+
+    Widths are expanded to per-spin **before** joining, so the result never depends on the order
+    `coupling_blocks` happens to return the combined blocks in. Matching a concatenated width table
+    positionally against those blocks is the one way this could hand a system the wrong line shape.
+
+    An empty second system needs no special case and does not have one: `joined[n:, n:]` is then a
+    0×0 slice and the concatenations are no-ops, so the result *is* the first system. An earlier
+    version guarded that explicitly; deleting the guard changed no test, which is how it was found
+    to be dead. `test_two_spin_systems` pins the behaviour rather than the branch.
+    """
+    (shifts, couplings, widths), (shifts2, couplings2, widths2) = first, second
+
+    n, n2 = len(shifts), len(shifts2)
+    joined = np.zeros((n + n2, n + n2))
+    joined[:n, :n] = couplings
+    joined[n:, n:] = couplings2
+    return shifts + shifts2, joined, widths + widths2
 
 
 def _build_gt_groups(
@@ -688,7 +727,11 @@ SimCache = dict[str, Any]
 
 
 def _simulate_stage(
-    matrix_rows: list[list[object]], width_rows: list[list[object]]
+    matrix_rows: list[list[object]],
+    width_rows: list[list[object]],
+    second_enabled: bool = False,
+    matrix_rows2: list[list[object]] | None = None,
+    width_rows2: list[list[object]] | None = None,
 ) -> SimCache | str:
     """Run the spin dynamics once and return everything the cheap stage needs.
 
@@ -696,6 +739,14 @@ def _simulate_stage(
     upper triangle — so there is one description of what is being simulated rather than a phenotype
     and an edited copy of it that can disagree. The preset dropdown fills the grid and then has no
     further say.
+
+    A second, independent system can be supplied from its own grid. It is **off unless asked for**:
+    the panel's controls always hold real values, so gating on `second_enabled` rather than on the
+    grid being empty is what keeps every single-system caller — including the positional ones — bit
+    identical to before this existed.
+
+    The parameters here carry defaults because this helper is wired to no Gradio event; only
+    `simulate_to_state` is, and its arity is checked against the wired input list.
 
     Returns a cache dict, or a **string** carrying the user-facing error. The string channel keeps
     the two stages composable into the original single-return-shape callback.
@@ -720,6 +771,16 @@ def _simulate_stage(
         widths = _widths_per_spin(shifts, couplings, width_rows)
     except ValueError as exc:
         return f"Invalid spin matrix: {exc}"
+    if second_enabled:
+        try:
+            shifts2, couplings2 = _matrix_to_system(matrix_rows2 or [])
+            widths2 = _widths_per_spin(shifts2, couplings2, width_rows2 or [])
+        except ValueError as exc:
+            # Named, because two grids are on screen and "row 1" alone would be ambiguous.
+            return f"Invalid second spin matrix: {exc}"
+        shifts, couplings, widths = _join_systems(
+            (shifts, couplings, widths), (shifts2, couplings2, widths2)
+        )
     if not shifts:
         return "Add at least one spin to the matrix."
     try:
@@ -852,13 +913,23 @@ def simulate_and_detect(
     threshold: float,
     satellites: bool,
     sat_j: float,
+    second_enabled: bool = False,
+    matrix_rows2: list[list[object]] | None = None,
+    width_rows2: list[list[object]] | None = None,
 ) -> tuple[pd.DataFrame | None, object | None, str]:
     """Simulate the matrix, optionally distort, detect, and compare to ground truth.
 
-    Kept as the single-call entry point (the Gradio event and the gradio_client API both address it)
-    and a thin composition of the two stages, so the one-shot and cached paths cannot drift.
+    Kept as a thin composition of the two stages, so the one-shot and cached paths cannot drift.
+
+    It is the **direct-call** entry point — for tests and library users — and is wired to no event.
+    The button runs :func:`simulate_to_state`, which merely carries `api_name="simulate_and_detect"`;
+    that shared name is why an earlier version of this docstring claimed the Gradio event addressed
+    this function. It does not, and the distinction is load-bearing: because `test_ui_graph`'s arity
+    check only inspects *wired* callbacks, the second-system arguments can carry defaults here while
+    `simulate_to_state`'s must not — which is what leaves every existing positional caller binding
+    exactly as before.
     """
-    cache = _simulate_stage(matrix_rows, width_rows)
+    cache = _simulate_stage(matrix_rows, width_rows, second_enabled, matrix_rows2, width_rows2)
     return _detect_stage(
         cache, add_noise, snr, phase0, broaden, baseline, threshold, satellites, sat_j
     )
@@ -941,6 +1012,9 @@ def simulate_to_state(
     threshold: float,
     satellites: bool,
     sat_j: float,
+    second_enabled: bool,
+    matrix_rows2: list[list[object]],
+    width_rows2: list[list[object]],
 ) -> tuple[SimCache | str, pd.DataFrame | None, object | None, str]:
     """Simulate once, hand the cache back for `gr.State`, and render the first result.
 
@@ -948,8 +1022,14 @@ def simulate_to_state(
     paying the eigendecomposition again. It is deliberately the *same* cache
     :func:`simulate_and_detect` builds internally, so the live path and the one-shot API path cannot
     describe different spectra.
+
+    Every parameter is **required**, including the three second-system ones appended last:
+    `test_ui_graph` asserts that this function's no-default parameter count equals the wired input
+    list, and a defaulted parameter would wire a control Gradio then never passes. The client can
+    still omit the tail — gradio_client fills missing trailing arguments from the *components'*
+    values, which is why the second panel shipping switched off keeps the 8-argument call honest.
     """
-    cache = _simulate_stage(matrix_rows, width_rows)
+    cache = _simulate_stage(matrix_rows, width_rows, second_enabled, matrix_rows2, width_rows2)
     table, fig, msg = _detect_stage(
         cache, add_noise, snr, phase0, broaden, baseline, threshold, satellites, sat_j
     )
@@ -1089,6 +1169,7 @@ def build_ui() -> gr.Blocks:
                 with gr.Row():
                     with gr.Column(scale=2):
                         _grid, _widths = _phenotype_grid("ethyl")
+                        _grid2, _widths2 = _phenotype_grid(SECOND_SYSTEM_PRESET)
                         sim_cache = gr.State(None)
                         sim_phenotype = gr.Dropdown(
                             PHENOTYPE_CHOICES,
@@ -1106,8 +1187,8 @@ def build_ui() -> gr.Blocks:
                         )
                         sim_matrix = gr.Dataframe(
                             value=_grid,
-                            headers=["spin", *(_spin_label(i) for i in range(len(_grid)))],
-                            datatype=_matrix_datatype(len(_grid)),
+                            headers=["spin", *(_spin_label(i) for i in range(MAX_MATRIX_SPINS))],
+                            datatype=_matrix_datatype(MAX_MATRIX_SPINS),
                             type="array",
                             label="Spin matrix — δ in ppm on the diagonal · J in Hz above it",
                             elem_id="sim-matrix",
@@ -1122,6 +1203,53 @@ def build_ui() -> gr.Blocks:
                             label="Line width FWHM per spin system (coupled spins share one)",
                             elem_id="sim-widths",
                         )
+                        # Collapsed and switched off, so the tab opens exactly as it did before.
+                        # The controls hold real values throughout — the checkbox, not an emptied
+                        # grid, is what says "one system", which keeps the grid always well formed.
+                        with gr.Accordion("Second spin system (optional)", open=False):
+                            sim_second_enabled = gr.Checkbox(
+                                value=False,
+                                label="Simulate a second, independent spin system",
+                                info=(
+                                    "Summed with the first at matching per-proton integrals — the "
+                                    "same result as leaving their couplings at 0 in one matrix."
+                                ),
+                                elem_id="sim-second-enabled",
+                            )
+                            sim_phenotype2 = gr.Dropdown(
+                                PHENOTYPE_CHOICES,
+                                value=SECOND_SYSTEM_PRESET,
+                                label="Start the second system from a known spin system",
+                                elem_id="sim-preset-2",
+                            )
+                            sim_n_spins2 = gr.Slider(
+                                1,
+                                MAX_MATRIX_SPINS,
+                                value=len(_grid2),
+                                step=1,
+                                label="Number of spins (second system)",
+                                elem_id="sim-nspins-2",
+                            )
+                            sim_matrix2 = gr.Dataframe(
+                                value=_grid2,
+                                headers=[
+                                    "spin",
+                                    *(_spin_label(i) for i in range(MAX_MATRIX_SPINS)),
+                                ],
+                                datatype=_matrix_datatype(MAX_MATRIX_SPINS),
+                                type="array",
+                                label="Second spin matrix — δ in ppm on the diagonal · J in Hz above it",
+                                elem_id="sim-matrix-2",
+                                static_columns=[0],
+                            )
+                            sim_widths2 = gr.Dataframe(
+                                value=_widths2,
+                                headers=["system", "δ (ppm)", "n H", "FWHM (Hz)"],
+                                datatype=["str", "str", "number", "number"],
+                                type="array",
+                                label="Line width FWHM (second system)",
+                                elem_id="sim-widths-2",
+                            )
                         gr.Markdown("**Distortions**: each bounded to the model's trained range.")
                         with gr.Row():
                             # Default ON: training applied satellites to every spectrum, so leaving
@@ -1168,7 +1296,7 @@ def build_ui() -> gr.Blocks:
                         sim_btn = gr.Button("Simulate & Predict", variant="primary")
                     with gr.Column(scale=3):
                         sim_status = gr.Markdown(
-                            "Edit the matrix, or start from a known system, then press "
+                            "Edit a matrix, or start from a known system, then press "
                             "**Simulate & Predict**. The distortion sliders update live afterwards."
                         )
                         sim_plot = gr.Plot(label="Ground truth vs detected")
@@ -1213,9 +1341,10 @@ def build_ui() -> gr.Blocks:
             outputs=[sim_matrix, sim_widths],
             api_name="resize_spin_matrix",
         )
-        # Order must match the tail of `simulate_and_detect` / `redistort`: the distortion sliders,
-        # then threshold, then the two satellite controls (appended last so the pre-existing
-        # positional call sites keep binding).
+        # Order must match the middle of `simulate_to_state` (the wired callback) and the tail of
+        # `redistort`: the distortion sliders, then threshold, then the two satellite controls
+        # (appended last so the pre-existing positional call sites keep binding). No longer the
+        # *tail* of the simulate callback — the second-system controls now follow these.
         _distortions = [
             sim_add_noise,
             sim_snr,
@@ -1226,9 +1355,19 @@ def build_ui() -> gr.Blocks:
             sim_satellites,
             sim_sat_j,
         ]
+        # The second system is appended after the distortions for the same reason the satellite
+        # controls were: `gradio_client` binds positionally, so anything inserted earlier would shift
+        # existing callers' arguments silently instead of erroring.
         sim_btn.click(
             simulate_to_state,
-            inputs=[sim_matrix, sim_widths, *_distortions],
+            inputs=[
+                sim_matrix,
+                sim_widths,
+                *_distortions,
+                sim_second_enabled,
+                sim_matrix2,
+                sim_widths2,
+            ],
             outputs=[sim_cache, sim_table, sim_plot, sim_status],
             api_name="simulate_and_detect",
         )
@@ -1243,6 +1382,40 @@ def build_ui() -> gr.Blocks:
             api_name="matrix_edited",
         )
         sim_widths.change(invalidate_cache, outputs=sim_cache, api_name="invalidate_on_width_edit")
+        # The second panel mirrors the first exactly — same handlers, its own components. Editing it
+        # invalidates the cache but never simulates, because eager simulation would make every
+        # keystroke in the grid cost a 2**n eigendecomposition. (`test_browser_simulate.py` asserts
+        # zero `simulate_systems` calls while the *distortion sliders* move; nothing measures these
+        # controls yet, so this is a design invariant rather than a covered one.)
+        sim_phenotype2.change(
+            preset_grid,
+            inputs=sim_phenotype2,
+            outputs=[sim_matrix2, sim_widths2, sim_n_spins2],
+            api_name="phenotype_defaults_2",
+        )
+        sim_n_spins2.change(
+            resize_spin_matrix,
+            inputs=[sim_matrix2, sim_widths2, sim_n_spins2],
+            outputs=[sim_matrix2, sim_widths2],
+            api_name="resize_spin_matrix_2",
+        )
+        sim_matrix2.change(
+            matrix_edited,
+            inputs=[sim_matrix2, sim_widths2],
+            outputs=[sim_cache, sim_widths2],
+            api_name="matrix_edited_2",
+        )
+        sim_widths2.change(
+            invalidate_cache, outputs=sim_cache, api_name="invalidate_on_width_edit_2"
+        )
+        # The checkbox changes *what is simulated*, so it must clear the cache like the grids do.
+        # Without this it reached the button's input list and nothing else: a fresh press was always
+        # right, but ticking the box after simulating left the sliders re-distorting a one-system
+        # spectrum while the panel above said two. Invalidating is also the safe direction for the
+        # inverse case — untick after simulating and the two-system result cannot persist.
+        sim_second_enabled.change(
+            invalidate_cache, outputs=sim_cache, api_name="invalidate_on_second_toggle"
+        )
         # `.release` rather than `.change`: a slider fires continuously while dragged, and each
         # event costs a forward pass. `always_last` keeps the final position authoritative when
         # events are dropped mid-drag, so the view never settles on a stale value.

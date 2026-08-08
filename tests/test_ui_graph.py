@@ -20,13 +20,21 @@ import pytest
 #: not by stasis: the shift textbox, the two
 #: number boxes and their row went away, and a spin-count slider, two dataframes and a hint line
 #: arrived. `gr.State` holds the simulation cache but is not itself a Block.
-N_COMPONENTS = 60
-#: load_example · _spec_report ×2 · predict_ui · preset_grid · resize_spin_matrix ·
-#: simulate_to_state · redistort x8 (the two 13C-satellite controls joined the live triggers) ·
-#: invalidate_cache x2. Gradio derives an endpoint id for every
-#: re-distort handlers are named one per control — `api_name=False` becomes the literal "false",
+#: 60 -> 67 when the optional second spin system landed. Six were written by hand — the Accordion,
+#: its enable checkbox, a preset Dropdown, a spin-count Slider and two Dataframes — and the seventh
+#: is a `Form` **Gradio generated**, because it wraps runs of consecutive form-like components. That
+#: is why this number is read off the failure rather than derived: hand-counting the source misses it.
+N_COMPONENTS = 67
+#: load_example · _spec_report ×2 · predict_ui · simulate_to_state · redistort ×8 (the two
+#: 13C-satellite controls joined the live triggers) · and, **per spin-system panel**, preset_grid ·
+#: resize_spin_matrix · matrix_edited · invalidate_cache — four each. 17 -> 21 for the second
+#: panel's four, then **-> 22** for `invalidate_on_second_toggle`: the enable checkbox changes what
+#: is simulated, so it clears the cache like the grids do. It was the one such control wired to
+#: nothing, and only `test_every_control_that_defines_the_spectrum_clears_the_cache` could see that
+#: — this count was already satisfied at 21. Gradio derives an endpoint id for every wiring, so the
+#: re-distort handlers are named one per control: `api_name=False` becomes the literal "false",
 #: "false_1", ..., which is the auto-derived surface these tests exist to prevent.
-N_EVENTS = 17
+N_EVENTS = 22
 
 #: Label of the Simulate tab's line-broadening slider, addressed by the OOD-copy guard below.
 BROADEN_LABEL = "Broadening FWHM (Hz; 0 = off)"
@@ -41,9 +49,14 @@ EXPECTED_ELEM_IDS = {
     "md-ppm",
     "md-table",
     "sim-matrix",
+    "sim-matrix-2",
     "sim-nspins",
+    "sim-nspins-2",
     "sim-preset",
+    "sim-preset-2",
+    "sim-second-enabled",
     "sim-widths",
+    "sim-widths-2",
 }
 
 
@@ -94,6 +107,35 @@ def test_every_event_arity_matches_its_callback_signature(demo):
 
 
 @pytest.mark.unit
+def test_the_simulate_click_wires_its_inputs_in_the_callbacks_parameter_order(demo):
+    """Arity is not order. Gradio binds the input list positionally, so three controls of the right
+    count in the wrong order type-check, build, render, and hand `simulate_to_state` a grid where it
+    expects a bool.
+
+    `test_every_event_arity_matches_its_callback_signature` compares counts only — 13 wired vs 13
+    required — and stays green through any permutation. The failure would surface as
+    "Invalid spin matrix" on a matrix the user can plainly see is valid, or worse, as a plausible
+    spectrum built from the wrong panel.
+
+    Only the spin-system controls carry `elem_id`s, so this pins the head and the tail — the two
+    regions where a parameter was actually appended — rather than the anonymous distortion sliders
+    in between.
+    """
+    import app as app_module
+
+    click = next(d for d in demo.fns.values() if d.api_name == "simulate_and_detect")
+    wired = [getattr(c, "elem_id", None) for c in click.inputs]
+    params = _required_params(app_module.simulate_to_state)
+
+    assert len(wired) == len(params), f"{len(wired)} wired vs {len(params)} params"
+    assert wired[:2] == ["sim-matrix", "sim-widths"]
+    assert params[:2] == ["matrix_rows", "width_rows"]
+    # The tail is what this diff appended, and appending is only safe if it stays the tail.
+    assert wired[-3:] == ["sim-second-enabled", "sim-matrix-2", "sim-widths-2"]
+    assert params[-3:] == ["second_enabled", "matrix_rows2", "width_rows2"]
+
+
+@pytest.mark.unit
 def test_no_event_wires_a_component_from_outside_this_graph(demo):
     """Orphan check: a component built outside the `with gr.Blocks()` context (or left over from a
     previous `build_ui()`) wires up silently and then never updates in the browser.
@@ -116,6 +158,61 @@ def test_expected_elem_ids_are_all_present(demo):
     """
     present = {b.elem_id for b in demo.blocks.values() if getattr(b, "elem_id", None)}
     assert EXPECTED_ELEM_IDS <= present, f"missing elem_ids: {sorted(EXPECTED_ELEM_IDS - present)}"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "elem_id",
+    ["sim-matrix", "sim-widths", "sim-matrix-2", "sim-widths-2", "sim-second-enabled"],
+)
+def test_every_control_that_defines_the_spectrum_clears_the_cache(demo, elem_id):
+    """A control that changes *what is simulated* must invalidate the cached spectrum.
+
+    The distortion sliders deliberately do not: they re-distort the cache, which is the whole point
+    of keeping it. But anything describing the spin system itself has to clear it, or the next slider
+    drag re-renders a spectrum the controls no longer describe — plot, table and spurious count all
+    labelled with the old system.
+
+    Written because `sim-second-enabled` was the one such control wired to nothing. It reached the
+    button's input list, so a fresh press was always right, and every other test passed: simulate
+    with the box off, tick it, nudge a slider, and the tab still showed one system. Counting inputs
+    cannot catch that — only asking which controls *trigger* an invalidation can.
+    """
+    import gradio as gr
+
+    control = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == elem_id)
+    state_ids = {b._id for b in demo.blocks.values() if isinstance(b, gr.State)}
+
+    clearing = [
+        d.api_name
+        for d in demo.fns.values()
+        if any(t[0] == control._id for t in getattr(d, "targets", []))
+        and {c._id for c in d.outputs} & state_ids
+    ]
+
+    assert clearing, f"{elem_id} changes the spectrum but triggers no cache invalidation"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("elem_id", ["sim-matrix", "sim-matrix-2"])
+def test_the_spin_grid_labels_every_column_it_can_ever_grow_to(demo, elem_id):
+    """`headers` and `datatype` are frozen at build time; the grid is not.
+
+    No handler returns `gr.update`, so a matrix sized from its seed preset keeps those headers
+    forever. Resize past the seed and the surplus columns fall back to positional indices: the
+    second panel seeds from a 2-spin preset, so choosing `AA'BB'` rendered `spin | A | B | 4 | 5`
+    instead of `A B C D` — visible in the shipped screenshot before this was fixed.
+
+    Sizing both to `MAX_MATRIX_SPINS` costs nothing, because Gradio renders as many columns as the
+    *data* has and only reads `headers` for their labels — a 2-spin grid still shows two columns.
+    """
+    import app as app_module
+
+    grid = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == elem_id)
+    expected = app_module.MAX_MATRIX_SPINS + 1  # the static label column, then one per spin
+
+    assert len(grid.headers) == expected, f"{elem_id} cannot label a full-width grid"
+    assert len(grid.datatype) == expected, f"{elem_id} would type a full-width grid as text"
 
 
 @pytest.mark.unit
@@ -169,7 +266,8 @@ def test_editable_dataframes_hand_back_plain_lists(demo):
 
 
 @pytest.mark.unit
-def test_the_matrix_edit_handler_clears_the_cache_and_rebuilds_the_widths(demo):
+@pytest.mark.parametrize("suffix", ["", "_2"])
+def test_the_matrix_edit_handler_clears_the_cache_and_rebuilds_the_widths(demo, suffix):
     """Assert the wiring, not just that a function exists.
 
     The first version of this guard called `invalidate_cache()` and checked it returned `None`,
@@ -177,13 +275,18 @@ def test_the_matrix_edit_handler_clears_the_cache_and_rebuilds_the_widths(demo):
     mis-wiring its output to the status box so the cache was never cleared, both left it green. What
     actually has to hold is that editing the matrix is wired to the state block *and* to the width
     table, so this reads the built graph.
+
+    Parametrised over both spin-system panels. Resolving the handler by `api_name` means an
+    unparametrised version keeps testing panel 1 forever: the second panel could be wired to nothing
+    and this would stay green, which is the failure mode the whole test was written against.
     """
     import gradio as gr
 
-    edit = next(d for d in demo.fns.values() if d.api_name == "matrix_edited")
+    ids = f"sim-widths{suffix.replace('_', '-')}", f"sim-matrix{suffix.replace('_', '-')}"
+    edit = next(d for d in demo.fns.values() if d.api_name == f"matrix_edited{suffix}")
     state_ids = {b._id for b in demo.blocks.values() if isinstance(b, gr.State)}
-    widths = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == "sim-widths")
-    matrix = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == "sim-matrix")
+    widths = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == ids[0])
+    matrix = next(b for b in demo.blocks.values() if getattr(b, "elem_id", None) == ids[1])
 
     output_ids = {c._id for c in edit.outputs}
     assert output_ids & state_ids, "a matrix edit must clear the cached spectrum"
@@ -191,7 +294,9 @@ def test_the_matrix_edit_handler_clears_the_cache_and_rebuilds_the_widths(demo):
     assert {matrix._id, widths._id} <= {c._id for c in edit.inputs}
 
     # The width table clears the cache too, and must not be wired to rewrite itself.
-    width_edit = next(d for d in demo.fns.values() if d.api_name == "invalidate_on_width_edit")
+    width_edit = next(
+        d for d in demo.fns.values() if d.api_name == f"invalidate_on_width_edit{suffix}"
+    )
     assert {c._id for c in width_edit.outputs} <= state_ids
 
 
