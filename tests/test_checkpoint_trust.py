@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import os
 import pickle
+import warnings
 from pathlib import Path
 
 import pytest
@@ -136,6 +137,50 @@ def test_an_explicit_opt_in_allows_a_users_own_checkpoint(tmp_path, monkeypatch)
         inference.load_checkpoint(inference.build_model(), str(own))
 
     assert False in calls, "the documented opt-in must permit the fallback"
+
+
+@pytest.mark.unit
+def test_identity_is_checked_before_the_blanket_opt_in(tmp_path, monkeypatch):
+    """The published checkpoint must be recognised by digest even when the opt-in is set.
+
+    The gate consulted the environment variable *before* hashing, so a user who set it once — the
+    documented way to run weights they trained themselves — thereby stopped the published checkpoint
+    being identity-checked too. Every subsequent load in that process took the escape hatch instead
+    of the trust anchor, and announced that it was "executing arbitrary code from the file" about a
+    file whose digest the gate could have recognised.
+
+    The warning is the observable: it is emitted only on the bypass path, so its absence is what
+    proves the digest was consulted first. The fallback must still be permitted — this is about
+    *which* branch allows it, not whether the trusted checkpoint loads.
+    """
+    trusted = _write_checkpoint_that_fails_the_safe_load(tmp_path / "trusted.pth")
+    monkeypatch.setattr(inference, "TRUSTED_CHECKPOINT_MD5", inference._md5(trusted))
+    monkeypatch.setenv("MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT", "1")
+
+    calls: list[bool] = []
+    real_load = torch.load
+
+    def recording_load(*args, **kwargs):
+        calls.append(kwargs.get("weights_only"))
+        return real_load(*args, **kwargs)
+
+    monkeypatch.setattr(inference.torch, "load", recording_load)
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        # As in the sibling test: the shape mismatch after the gate is not what is under test.
+        with pytest.raises(Exception):
+            inference.load_checkpoint(inference.build_model(), str(trusted))
+
+    bypass = [w for w in caught if "MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT" in str(w.message)]
+    assert not bypass, (
+        "the trusted checkpoint took the opt-in bypass instead of being identified by digest, so "
+        "setting the escape hatch for your own weights also un-gates the published file:\n  "
+        + "\n  ".join(str(w.message) for w in bypass)
+    )
+    assert calls == [True, False], (
+        f"the trusted checkpoint must still be allowed to fall back; got {calls}"
+    )
 
 
 @pytest.mark.unit
