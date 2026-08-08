@@ -77,9 +77,7 @@ def _ppm_to_index(ppm_val, n, ppm_left, ppm_right):
     return int(round(min(max(frac, 0.0), 1.0) * (n - 1)))
 
 
-def comparison_figure(
-    amplitudes, matched, spurious=None, *, ppm_left, ppm_right, base_freq_mhz
-):
+def comparison_figure(amplitudes, matched, spurious=None, *, ppm_left, ppm_right, base_freq_mhz):
     """Ground-truth-vs-prediction spectrum with an intuitive match / miss / spurious overlay.
 
     ``matched`` is the ``match_to_gt`` output: a list of ``(gt, pred_or_None)`` where ``gt`` has

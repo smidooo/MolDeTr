@@ -104,8 +104,6 @@ def test_connector_amber_on_proton_count_mismatch() -> None:
             {"chemical_shift_ppm": 5.0, "proton_count": 3, "confidence": 0.9},
         )
     ]
-    fig = comparison_figure(
-        _amp(), matched, [], ppm_left=8.0, ppm_right=0.0, base_freq_mhz=80.0
-    )
+    fig = comparison_figure(_amp(), matched, [], ppm_left=8.0, ppm_right=0.0, base_freq_mhz=80.0)
     colors = _connector_colors(fig)
     assert MATCH_OFF in colors and MATCH_OK not in colors

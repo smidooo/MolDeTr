@@ -153,9 +153,10 @@ def test_comparison_dataframe_marks_unmatched_gt_as_missed(app_module):
 
     assert list(df["status"]) == ["✓ excellent", "✗ missed"]
     missed = df.iloc[1]
-    assert list(
-        missed[["pred δ (ppm)", "pred H", "pred J (Hz)", "Δδ (Hz)", "ΔH", "ΔJ (Hz)", "conf"]]
-    ) == ["–"] * 7
+    assert (
+        list(missed[["pred δ (ppm)", "pred H", "pred J (Hz)", "Δδ (Hz)", "ΔH", "ΔJ (Hz)", "conf"]])
+        == ["–"] * 7
+    )
     assert missed["GT δ (ppm)"] == "1.20" and missed["GT H"] == 3  # GT side stays populated
 
 
