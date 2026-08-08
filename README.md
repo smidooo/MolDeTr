@@ -310,7 +310,7 @@ is what supplies PyTorch — see the note under [Install](#install).
 ### Graphical interface
 A [Gradio](https://gradio.app) app: load a spectrum, get the assignment table and the annotated plot.
 
-![Animated demo of the MolDeTr Gradio app: loading the guajazulene 500 MHz example, clicking Detect multiplets, then reading the three detected multiplets in the assignment table (proton count, δ, max J, line width) alongside the colour-linked annotated spectrum](docs/img/demo.gif)
+<img src="docs/img/demo.gif" alt="Animated demo of the MolDeTr Gradio app: loading the guajazulene 500 MHz example, clicking Detect multiplets, then reading the three detected multiplets in the assignment table (proton count, δ, max J, line width) alongside the colour-linked annotated spectrum" width="860">
 
 ```bash
 pip install -e ".[app]"
@@ -321,7 +321,7 @@ Ready-to-try inputs are in [`examples/`](examples/).
 
 <details><summary>Static screenshot (full detail)</summary>
 
-![The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, Paper/GitHub/Scope links) over a two-pane layout with an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom](docs/img/gui.png)
+<img src="docs/img/gui.png" alt="The MolDeTr GUI: a branded header (wordmark, ¹H NMR multiplet detection, Paper/GitHub/Scope links) over a two-pane layout with an input rail on the left (dropzone, input-check list, ppm-axis calibration, detection-threshold slider, Detect button, example chips) and, on the right, an assignment table with proton count, chemical shift δ, max J, and line width, CSV/JSON export, and a colour-linked annotated spectrum with drag-to-zoom" width="860">
 
 </details>
 
