@@ -47,13 +47,52 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO / ".github" / "workflows" / "integrations.yml"
 
-#: Probe that reports every top-level module present after importing pytest.
-_CLOSURE_PROBE = (
-    "import json, sys, pytest; print(json.dumps(sorted({m.split('.')[0] for m in sys.modules})))"
-)
+#: Probe reporting what a `pip install pytest` environment provides on the interpreter running it.
+#:
+#: It walks pytest's *declared* requirements with environment markers evaluated, and does not rely
+#: on what `import pytest` happens to pull in. That distinction is the whole point: pytest imports
+#: `tomli` lazily, only when it parses `pyproject.toml`, so an import-time snapshot misses it on
+#: Python 3.10 and the shim then refuses a module pytest genuinely needs.
+_CLOSURE_PROBE = r"""
+import json, sys, pytest
+from importlib.metadata import distribution
 
-#: Modules the closure must contain, or the probe measured something other than a pytest install.
-_CLOSURE_FLOOR = frozenset({"pytest", "_pytest", "pluggy"})
+names = {m.split(".")[0] for m in sys.modules}
+try:
+    from packaging.requirements import Requirement
+except Exception:
+    Requirement = None
+
+if Requirement is not None:
+    seen, queue = set(), ["pytest"]
+    while queue:
+        raw = queue.pop()
+        key = raw.lower().replace("_", "-")
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            dist = distribution(raw)
+        except Exception:
+            continue
+        names.add(raw.replace("-", "_"))
+        names.update((dist.read_text("top_level.txt") or "").split())
+        for req in dist.requires or []:
+            try:
+                parsed = Requirement(req)
+            except Exception:
+                continue
+            # Markers carry the version conditions -- `tomli>=1; python_version < "3.11"`.
+            # Evaluating them here is what makes this correct per interpreter.
+            if parsed.marker is None or parsed.marker.evaluate():
+                queue.append(parsed.name)
+
+print(json.dumps(sorted(n for n in names if n)))
+"""
+
+#: Python's own `site` machinery. `site` imports these by name after the shim is installed, and
+#: blocking them makes the interpreter report an import error that has nothing to do with the lane.
+SITE_MACHINERY = frozenset({"sitecustomize", "usercustomize"})
 
 #: This repository's own importable roots. Present in the job because the checkout is.
 FIRST_PARTY = frozenset({"app", "app_ui", "conftest", "moldetr", "scripts", "tests"})
@@ -83,17 +122,29 @@ def _pytest_closure() -> set[str]:
     """
     proc = _run(["-c", _CLOSURE_PROBE], None)
     assert proc.returncode == 0, (
-        f"could not measure the pytest import closure:\n{proc.stdout}{proc.stderr}"
+        f"could not measure the pytest closure:\n{proc.stdout}{proc.stderr}"
     )
     closure = set(json.loads(proc.stdout))
-    missing = _CLOSURE_FLOOR - closure
-    assert not missing, f"the closure probe did not measure a pytest install; missing {missing}"
+
+    floor = {"pytest", "_pytest", "pluggy", "iniconfig", "packaging"}
+    if sys.version_info < (3, 11):
+        # pytest declares these only for `python_version < "3.11"`, and `tomli` in particular is
+        # imported lazily when pyproject.toml is parsed — so an import-time snapshot misses it and
+        # the shim then blocks it. That cost three red py3.10 legs; assert it here, where the
+        # message says what is wrong, instead of downstream as an opaque collection error.
+        floor |= {"tomli", "exceptiongroup"}
+
+    missing = floor - closure
+    assert not missing, (
+        f"the closure probe did not measure a usable pytest install on Python "
+        f"{sys.version_info.major}.{sys.version_info.minor}; missing {sorted(missing)}"
+    )
     return closure
 
 
 def _shim_source() -> str:
     """A `sitecustomize.py` that permits the standard library and nothing else the job lacks."""
-    extra = sorted(_pytest_closure() | FIRST_PARTY)
+    extra = sorted(_pytest_closure() | FIRST_PARTY | SITE_MACHINERY)
     return (
         "import sys\n"
         f"EXTRA = {extra!r}\n"
