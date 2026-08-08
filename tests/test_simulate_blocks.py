@@ -3,8 +3,10 @@
 Two reasons this exists, and both matter:
 
 * **Correctness.** Users want to define several spin systems and see them summed. Leaving the cross
-  couplings at zero already says "independent", so the blocks fall out of the single matrix with no
-  extra UI concept.
+  couplings at zero already says "independent", so the blocks fall out of the matrix itself. The
+  Simulate tab now *also* offers a second matrix editor, but that is presentation only: it lays the
+  two systems out block-diagonally and calls the same ``simulate_systems`` once, which is why these
+  tests still cover it without knowing it exists.
 * **Cost.** The Hamiltonian is ``2**n``. A 3+2+2 layout is ``2**7 = 128`` states as one system but
   ``8 + 4 + 4 = 16`` as three blocks, which is the difference between usable and not on a free
   Colab CPU.

@@ -4,7 +4,11 @@ One grid carries both halves of a spin-system definition: the **diagonal** holds
 chemical shift in ppm, the **upper triangle** holds the pairwise couplings in Hz. That is not a UI
 affectation — `simulate` reads only `couplings[i, j]` for `i < j`, so the upper triangle is already
 the contract, and several independent spin systems fall out of one matrix by leaving the cross terms
-at zero rather than needing a separate "system" concept in the interface.
+at zero.
+
+A second matrix editor now offers the same thing as an explicit choice, for discoverability; it
+concatenates block-diagonally into exactly the single matrix these tests describe, so nothing here
+changes. `test_two_spin_systems` covers that composition.
 
 These tests cover the translation layer between the editor grid and the simulator, which is where a
 misread row or a swapped index turns into a silently wrong spectrum rather than an error.
