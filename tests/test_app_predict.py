@@ -40,6 +40,51 @@ def test_checkpoint_absent_message(app_module, tmp_npz, valid_spectrum, monkeypa
     assert "Checkpoint not found" in msg and "10.5281/zenodo.21217102" in msg
 
 
+#: The shape of what `moldetr.inference._require_trusted_checkpoint` raises. Reproduced rather than
+#: imported: what matters is that the *remedy it names* survives the trip to the screen.
+CHECKPOINT_REFUSAL = (
+    "Refusing to load weights.pth without weights_only protection.\n"
+    "  expected MD5 faf842d1a1d8beae67e0544e28f226b5  (the published checkpoint)\n"
+    "  actual   MD5 0000000000000000000000000000dead\n"
+    "torch's safe loader rejected this file and it is not the published checkpoint, so loading it "
+    "would execute arbitrary code from it. Fetch the published weights with "
+    "`python scripts/download_weights.py`, or, if this is a checkpoint you trained and trust, "
+    "set MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT=1."
+)
+
+
+@pytest.mark.unit
+def test_checkpoint_refusal_reaches_the_user(patch_model, tmp_npz, valid_spectrum, monkeypatch):
+    """A refused checkpoint must arrive as a status message, not a bare Gradio "Error" toast.
+
+    The trust gate raises `RuntimeError`, and `_get_model` is called inline inside `run(...)` with
+    nothing catching it — while every other failure in `predict` returns a status string. The
+    refusal text is the only place the opt-in environment variable is named, so when the exception
+    escapes, the single piece of information the user needs in order to load their own weights is
+    exactly the piece that never reaches the screen.
+    """
+    app = patch_model
+
+    def _refuse():
+        raise RuntimeError(CHECKPOINT_REFUSAL)
+
+    monkeypatch.setattr(app, "_get_model", _refuse)
+    path = _valid_npz_with_ppm(tmp_npz, valid_spectrum)
+
+    try:
+        table, fig, msg = app.predict(path, 0.3, app.AUTO, None, None, 5.12)
+    except RuntimeError as exc:
+        pytest.fail(
+            "the checkpoint refusal escaped `predict` as an exception, so Gradio shows a bare "
+            f"'Error' toast and the remedy never reaches the user:\n{exc}"
+        )
+
+    assert table is None and fig is None
+    assert "MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT" in msg, (
+        f"the status message must name the opt-in, which is the only remedy; got: {msg!r}"
+    )
+
+
 # --- validation errors (stub patched, but rejection happens before the model) --------------------
 
 

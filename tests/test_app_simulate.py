@@ -44,6 +44,40 @@ def test_simulate_checkpoint_absent(app_module, monkeypatch):
 
 
 @pytest.mark.unit
+def test_simulate_checkpoint_refusal_reaches_the_user(patch_model, monkeypatch):
+    """The Simulate tab shares `_get_model`, so it shares the defect and needs its own guard.
+
+    `_detect_stage` already returns `(None, None, message)` for every other failure it handles; a
+    refused checkpoint must use the same channel rather than escaping as an exception.
+    """
+    app = patch_model
+
+    def _refuse():
+        raise RuntimeError(
+            "Refusing to load weights.pth without weights_only protection. "
+            "set MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT=1."
+        )
+
+    monkeypatch.setattr(app, "_get_model", _refuse)
+    grid, widths = app._phenotype_grid("ethyl")
+
+    try:
+        table, fig, msg = app.simulate_and_detect(
+            grid, widths, False, 3.0, 0.0, 0.0, 0.0, 0.3, False, 130.0
+        )
+    except RuntimeError as exc:
+        pytest.fail(
+            "the checkpoint refusal escaped `simulate_and_detect` as an exception instead of "
+            f"returning through the status channel:\n{exc}"
+        )
+
+    assert table is None and fig is None
+    assert "MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT" in msg, (
+        f"the status message must name the opt-in, which is the only remedy; got: {msg!r}"
+    )
+
+
+@pytest.mark.unit
 def test_simulate_ethyl_roundtrip(patch_model):
     app = patch_model
     grid, widths = app._phenotype_grid("ethyl")

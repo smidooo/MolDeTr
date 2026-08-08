@@ -78,6 +78,21 @@ def _get_model():
     return _MODEL
 
 
+def _checkpoint_error_message(exc: Exception) -> str:
+    """Render a checkpoint-load refusal for the status box.
+
+    `load_checkpoint` raises `RuntimeError` when the trust gate refuses a file, and that message is
+    the only place `MOLDETR_ALLOW_UNTRUSTED_CHECKPOINT` — the documented way to run weights you
+    trained yourself — is named. Unwrapped, it surfaced as a bare Gradio "Error" toast, so the one
+    piece of information needed to resolve the situation was the piece that never arrived.
+
+    Fenced rather than interpolated into the sentence: the gate's message is multi-line and carries
+    both MD5s, and markdown collapses those lines into an unreadable run precisely where the user
+    has to compare two hex digests.
+    """
+    return f"⚠ Could not load the checkpoint:\n\n```\n{exc}\n```"
+
+
 EXAMPLES_DIR = ROOT / "examples"
 
 
@@ -218,8 +233,13 @@ def predict(file, threshold, ppm_mode, manual_left, manual_right, points_per_hz)
     else:  # NONE, or MANUAL without both bounds -> report shift in Hz
         ppm_left = ppm_right = None
 
+    try:
+        model = _get_model()
+    except RuntimeError as exc:  # the checkpoint trust gate; its text names the only remedy
+        return None, None, _checkpoint_error_message(exc)
+
     preds = decode_predictions(
-        run(_get_model(), amplitudes),
+        run(model, amplitudes),
         load_extrema(EXTREMA),
         pph,
         ppm_left=ppm_left,
@@ -752,6 +772,11 @@ def _detect_stage(
         return None, None, f"Invalid parameters: {exc}"
     label = cache["label"]
     gt_groups = cache["gt_groups"]
+    try:
+        model = _get_model()
+    except RuntimeError as exc:  # the checkpoint trust gate; its text names the only remedy
+        return None, None, _checkpoint_error_message(exc)
+
     preds = decode_predictions(
         # Skip the in-model noise floor when the user has already added calibrated noise here.
         # The floor (0.005 * max) exists to drag a perfectly clean FFT-resampled spectrum back
@@ -760,7 +785,7 @@ def _detect_stage(
         # equal only at the slider's 2.0 minimum, so at the 3.0 default the requested noise sits
         # 10x under the floor and at 5.0 it is 1000x under. That is why the slider felt inert.
         # Detect (and predict.py) deliberately keep the floor: they feed the frozen decode.
-        run(_get_model(), amplitudes, noise_frac=0.0 if add_noise else 0.005),
+        run(model, amplitudes, noise_frac=0.0 if add_noise else 0.005),
         load_extrema(EXTREMA),
         sp.POINTS_PER_HZ,
         ppm_left=sp.LEFT_PPM,
