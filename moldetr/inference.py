@@ -90,6 +90,20 @@ def _require_trusted_checkpoint(ckpt_path, cause: BaseException) -> None:
 
         weights_only=True → refuses payload → raises → except Exception → weights_only=False → runs it
     """
+    digest = _md5(ckpt_path)
+    if digest == TRUSTED_CHECKPOINT_MD5:
+        return
+
+    # Identity is checked first, and the order is the point. Consulting the environment variable
+    # first meant that setting it once — the documented way to run weights you trained yourself —
+    # also stopped the *published* checkpoint being identified, for the rest of the process. Every
+    # later load took the escape hatch instead of the trust anchor and announced that it was
+    # executing arbitrary code from a file the gate could have recognised, which teaches the user
+    # to read that warning as noise.
+    #
+    # The cost is that an untrusted checkpoint is now hashed before the opt-in is honoured, so the
+    # opt-in path pays one streaming MD5 it used to skip. That is seconds on a 974 MB file, once per
+    # load, and only on the branch where the safe loader has already refused.
     if os.environ.get(ALLOW_UNTRUSTED_ENV, "").strip().lower() in {"1", "true", "yes"}:
         warnings.warn(
             f"{ALLOW_UNTRUSTED_ENV} is set, so {ckpt_path} is being loaded with weights_only=False, "
@@ -97,10 +111,6 @@ def _require_trusted_checkpoint(ckpt_path, cause: BaseException) -> None:
             RuntimeWarning,
             stacklevel=3,
         )
-        return
-
-    digest = _md5(ckpt_path)
-    if digest == TRUSTED_CHECKPOINT_MD5:
         return
 
     raise RuntimeError(
