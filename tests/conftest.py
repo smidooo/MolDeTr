@@ -11,10 +11,20 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-import numpy as np
 import pytest
-import torch
+
+if TYPE_CHECKING:  # annotations only — `from __future__ import annotations` keeps them unevaluated
+    import numpy as np
+    import torch
+
+# numpy and torch are imported inside the functions that use them, NOT at module scope. pytest loads
+# this conftest before collecting anything under `tests/`, including `tests/test_integrations.py`,
+# which `.github/workflows/integrations.yml` runs in an environment with neither installed. A
+# module-scope import here kills that job at collection, so it performs none of its checks and
+# reports a `ModuleNotFoundError` instead — which is what it did, every Monday, from the day it was
+# added. Keep these local; `tests/test_integrations_isolation.py` fails if they move back up.
 
 REPO = Path(__file__).resolve().parent.parent
 EXAMPLES = REPO / "examples"
@@ -43,6 +53,9 @@ def make_output(detections: list[dict]) -> torch.Tensor:
     (``[0, 6143]``); keep centers ≥ ~0.004 apart so ``_merge`` (20-pt NMS) does not collapse them.
     Queries beyond ``len(detections)`` get all-low logits and are dropped by ``decode_predictions``.
     """
+    import numpy as np
+    import torch
+
     out = np.zeros((N_QUERIES, VEC), dtype=np.float32)
     out[:, :5] = _INACTIVE_LOGIT
     for i, d in enumerate(detections):
@@ -120,6 +133,8 @@ def patch_model(app_module, fake_model, tmp_path, monkeypatch):
 @pytest.fixture
 def valid_spectrum() -> np.ndarray:
     """A finite, real, 6144-point spectrum (abs of seeded noise) — passes ``validate_spectrum``."""
+    import numpy as np
+
     rng = np.random.RandomState(0)
     return np.abs(rng.rand(6144)).astype(np.float64)
 
@@ -127,12 +142,15 @@ def valid_spectrum() -> np.ndarray:
 @pytest.fixture
 def ppm_axis() -> np.ndarray:
     """A plausible descending ppm axis over the 6144-point grid (10 → 0 ppm)."""
+    import numpy as np
+
     return np.linspace(10.0, 0.0, 6144)
 
 
 @pytest.fixture
 def tmp_npz(tmp_path):
     """Factory: write named arrays into a ``.npz`` and return its path string."""
+    import numpy as np
 
     def _write(name: str = "spec.npz", **arrays) -> str:
         p = tmp_path / name
@@ -145,6 +163,7 @@ def tmp_npz(tmp_path):
 @pytest.fixture
 def tmp_npy(tmp_path):
     """Factory: write one array to a ``.npy`` and return its path string."""
+    import numpy as np
 
     def _write(array, name: str = "spec.npy") -> str:
         p = tmp_path / name
