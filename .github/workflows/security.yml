@@ -76,8 +76,32 @@ jobs:
         # The intended path is to run it visibly for a few cycles, learn the actual noise floor, and
         # then either enforce or add a reviewed `--ignore-vuln` list. Tightening this is a follow-up
         # with evidence behind it; leaving it permanently advisory would be the cargo-cult outcome.
+        #
+        # `--strict` WAS HERE AND AUDITED NOTHING. Measured 2026-08-08, from the one run this lane
+        # has ever had (it is gated off `pull_request`, so only a push to main or the Wednesday cron
+        # reaches it): the audit died 1.7 s in with
+        #     ERROR:pip_audit._cli:moldetr: Dependency not found on PyPI and could not be audited
+        # No vulnerability table was printed, and `continue-on-error` turned that into a green job --
+        # a guard reporting success while performing none of its work, the exact defect #43 fixed in
+        # the rot watcher.
+        #
+        # `--skip-editable` alone does NOT rescue `--strict`, which is the trap here. Read off
+        # pip-audit's source rather than assumed: the flag does not drop the distribution, it yields
+        # a `SkippedDependency(skip_reason="distribution marked as editable")`
+        # (`_dependency_source/pip.py`), and `--strict` calls `_fatal()` on *any* skip whatever its
+        # reason (`_cli.py`). So `--strict --skip-editable` still exits before the table, only with a
+        # different message.
+        #
+        # This project installs itself with `pip install -e`, so it always has at least one skipped
+        # dependency. `--strict` therefore cannot mean "a stricter audit" here; it can only mean "no
+        # audit". Dropping it is the fix; `--skip-editable` just keeps the output free of a warning
+        # about a non-problem. Both pinned by tests/test_security_workflow.py.
+        #
+        # NOISE FLOOR STILL UNMEASURED: n=0 usable runs, not n=1. Do not promote this to enforcing
+        # until a few real audits have been observed; the next natural data point is the Wednesday
+        # cron (`0 6 * * 3`).
         continue-on-error: true
-        run: pip-audit --strict --desc --format columns
+        run: pip-audit --skip-editable --desc --format columns
 
       - name: Summarise
         if: always()
