@@ -1,0 +1,116 @@
+name: Integrations (external rot watch)
+
+# The reason this repository has a testing overhaul at all: in August 2026 the README's DOI badge
+# started rendering as `502 Invalid upstream response (429)` and *a user reported it*. Every check in
+# `ci.yml` runs against the repository's own contents; nothing looked outward, so nothing could have
+# caught it. This is the outward-looking half.
+#
+# NEVER runs on a pull request, and that is a design decision rather than an oversight. Publishers
+# and CDNs have bad afternoons; a transient WAF 403 blocking an unrelated PR teaches people to
+# override the check, and an overridden check is worse than no check. Weekly, plus manual dispatch,
+# plus an issue on failure — so a real break is durable and visible without ever being in the way.
+#
+# `workflow_dispatch` is load-bearing for a second reason: GitHub disables scheduled workflows after
+# 60 days without a *commit* (issues, PRs, releases and tags do not count), and a published paper's
+# companion repo goes quiet by design. This job is the likeliest in the repo to be silently switched
+# off, and it cannot detect that about itself — anything watching from inside GitHub dies with it.
+
+on:
+  schedule:
+    # Monday 06:00 UTC. Weekly, not daily: these targets are archival (DOIs, Zenodo, HF) and change
+    # on the scale of months. Daily polling would add noise and rate-limit exposure for no signal.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write # to file the issue below; nothing else needs writing
+
+jobs:
+  external:
+    name: DOIs, badges and weight mirrors
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install (no torch needed)
+        # `tests/test_integrations.py` imports only the standard library, so the heavy stack is
+        # pointless here. `.[dev]` pulls torch via `moldetr[model]`, which is why this installs
+        # pytest directly instead: a rot watcher that takes four minutes to install PyTorch before
+        # making nine HTTP requests is a rot watcher nobody will run by hand.
+        run: |
+          python -m pip install --upgrade pip
+          pip install pytest
+
+      - name: Check DOIs, badges and weight mirrors
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # The badge check needs a token only for the GitHub API rate limit; the repo is public.
+        #
+        # `-p no:cacheprovider` because nothing else here writes to the workspace and a stray
+        # `.pytest_cache` in an otherwise read-only job is noise.
+        run: pytest tests/test_integrations.py -m network -q -rs -p no:cacheprovider
+
+      - name: Check documentation links
+        # lychee for the bulk sweep — README and docs/ prose links, which are numerous, boring, and
+        # exactly what a purpose-built checker is for. It is deliberately NOT asked to check DOIs:
+        # no link checker understands DOI semantics, `doi.org` redirects to the publisher, and
+        # `pubs.acs.org` answers automated clients with 403. Measured on this repo's own article DOI:
+        # a plain GET through doi.org returns 403 while the Handle API reports responseCode 1. The
+        # pytest step above owns DOIs for that reason; lychee owns everything else.
+        uses: lycheeverse/lychee-action@v2
+        with:
+          args: >-
+            --no-progress
+            --max-retries 3
+            --accept 200,206,403,429
+            --exclude 'https://doi\.org/'
+            --exclude 'https://pubs\.acs\.org/'
+            --exclude-path notebooks
+            README.md 'docs/**/*.md'
+          fail: true
+        continue-on-error: true
+        id: lychee
+
+      - name: File an issue if anything rotted
+        if: failure() || steps.lychee.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        # Going red is not enough on a weekly job in a quiet repo: nobody is watching the Actions tab
+        # of a paper companion between releases. The issue is the delivery mechanism, and it is
+        # deduplicated by title so a persistent outage does not open a new one every Monday.
+        run: |
+          title="External reference check failed"
+          existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number // empty')
+          body=$(printf '%s\n' \
+            "The weekly external-reference check failed: $RUN_URL" \
+            "" \
+            "This job watches things this repository cannot fix from inside itself — DOIs, README" \
+            "badges as GitHub's camo proxy actually serves them, the Zenodo and Hugging Face weight" \
+            "mirrors, and documentation links." \
+            "" \
+            "Before assuming a real outage, note that the badge check is the one that caught the" \
+            "original 2026-08 incident, where Zenodo rate-limited GitHub's shared camo IP pool. A" \
+            "badge can be perfectly healthy from a laptop and broken for every visitor." \
+            "" \
+            "Closing this without a fix is reasonable if the cause was transient — the job reopens" \
+            "one next Monday if it is not.")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+            echo "commented on existing issue #$existing"
+          else
+            gh issue create --title "$title" --body "$body" --label "" || \
+              gh issue create --title "$title" --body "$body"
+          fi
+
+      - name: Fail the job if the link sweep failed
+        # `continue-on-error` above lets the issue get filed; the job must still end red, or the
+        # Actions tab shows a green tick over a filed issue and the two disagree.
+        if: steps.lychee.outcome == 'failure'
+        run: exit 1
