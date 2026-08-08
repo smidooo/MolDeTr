@@ -43,6 +43,14 @@ jobs:
         # pointless here. `.[dev]` pulls torch via `moldetr[model]`, which is why this installs
         # pytest directly instead: a rot watcher that takes four minutes to install PyTorch before
         # making nine HTTP requests is a rot watcher nobody will run by hand.
+        #
+        # That reasoning is right about the test module and wrong about the run. pytest loads
+        # `tests/conftest.py` before collecting anything under `tests/`, and while that conftest
+        # imported numpy and torch at module scope this job would have died at collection, run
+        # none of its checks, and filed an issue blaming a missing module — caught before the
+        # first cron fired, so it never actually happened. Keeping the install this thin is
+        # therefore a live constraint on the conftest, not just a speed optimisation, and
+        # `tests/test_integrations_isolation.py` is what holds the other end of it.
         run: |
           python -m pip install --upgrade pip
           pip install pytest
