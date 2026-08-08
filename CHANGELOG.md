@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **A second, independent spin system in the Simulate tab.** The simulator could always do this —
+  `simulate_systems` splits the coupling matrix into disconnected blocks, simulates each on a
+  per-proton scale and sums them under one global peak rescale — but the only way to reach it was to
+  know that convention and hand-assemble a block-diagonal grid cell by cell, because picking a preset
+  *replaces* the whole matrix. An optional **Second spin system** panel now gives that second system
+  its own preset dropdown, spin-count slider, matrix and line-width table, so the maintainer's own
+  example (`AB` + `AA'BB'`) is two dropdowns rather than a 6×6 grid filled by hand. It is collapsed
+  and switched **off** by default, so a simulation that ignores it is bit-identical to before —
+  including over the wire, where `gradio_client` fills the three new trailing arguments from the
+  components' own values. One behaviour does change even with the box off: touching *any*
+  second-system control clears the cached spectrum, so the distortion sliders ask for a fresh
+  **Simulate & Predict** rather than re-distorting a spectrum the panels no longer describe. That is
+  the same invalidation the first panel's grids have always done, and it is the safe direction —
+  the alternative is a plot and table labelled with a spin system that is no longer on screen.
+  The physics is untouched: the two grids are laid out block-diagonally and handed to the same single
+  `simulate_systems` call, which is why `test_simulate_additivity` and `test_simulate_blocks` already
+  cover the result and needed no changes. One consequence worth naming — `MAX_MATRIX_SPINS = 8`
+  bounds *an editor*, not the spectrum, so `ethyl` + `AA'BB'C` (10 spins) is now reachable and
+  legal, the real limit being `MAX_BLOCK_SPINS = 10` per coupled block.
+
 ### Changed
 - **The Simulate tab grades a match instead of calling it right or wrong, and now shows the
   predicted coupling.** `status` was `dd_hz <= 2.0 and dh == 0`, which collapsed "0.3 Hz out" and
@@ -23,6 +44,15 @@ All notable changes to this project are documented here. The format is based on
   detection is not, so only the table decouples.
 
 ### Fixed
+- **The spin-matrix editor mislabelled every column past its seed preset's width.** `headers` and
+  `datatype` are fixed when the component is built and no handler returns `gr.update`, so a grid
+  seeded from a 5-spin preset kept five labels forever: resizing to 8 spins rendered the surplus
+  columns as positional indices (`… | E | 6 | 7 | 8`) rather than `F G H`. Latent since the matrix
+  editor landed, and immediately visible in the new second panel, which seeds from a 2-spin preset —
+  choosing `AA'BB'` there showed `spin | A | B | 4 | 5`. Both grids now size their headers to
+  `MAX_MATRIX_SPINS`, which costs nothing at render time because Gradio draws as many columns as the
+  *data* has and consults `headers` only for their labels. Found by looking at a screenshot: the
+  unit, browser and axe-a11y tiers were all green, because none of them asserted on column labels.
 - **Two README figures rendered below the 2× device-pixel floor.** Nine of the eleven local figures
   are pinned at ≥2.00× their displayed width via `<img … width="N">`; `docs/img/gui.png` (1425×1182,
   ~1.4×) and `docs/img/demo.gif` (960×867, ~1.0×) were the only two written as Markdown
