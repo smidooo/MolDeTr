@@ -164,3 +164,25 @@ jobs:
                   "skip reasons above before assuming the model regressed."
               )
           PY
+
+  # See `ci.yml`'s note: a cron lane in a quiet repo that only goes red tells nobody. This one is
+  # the science guard -- it runs the real-checkpoint tests, including the vanillin oracle, that no
+  # other lane can run. If it breaks, the repository has stopped verifying the paper's numbers.
+  report-failure:
+    name: announce a failed nightly
+    needs: [model]
+    if: failure()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/report-failure
+        with:
+          title: "Nightly real-checkpoint lane is failing"
+          guards: >-
+            The only lane that runs the `-m model` tests against the real 974 MB checkpoint,
+            including the vanillin oracle. While it is red, nothing is checking that the shipped
+            weights still reproduce the paper's numbers.
+          token: ${{ github.token }}

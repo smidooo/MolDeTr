@@ -407,3 +407,30 @@ jobs:
           path: test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  # --- failure delivery -----------------------------------------------------------------------
+  #
+  # Only for pushes to `main`. A red PR is already visible to the person who opened it, and an
+  # issue per failed PR is noise that trains people to close issues unread — which is the exact
+  # failure mode the weekly lane's comment warns about. A red *trunk* has no such audience:
+  # `main` sat red for a full day on 2026-08-08 after #41 merged, three PRs were opened on top of
+  # it, and it was found by looking rather than by being told.
+  report-failure:
+    name: announce a red trunk
+    needs:
+      [test, coverage, package, onboarding, environment-file, e2e, browser-e2e, gradio-floor]
+    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/report-failure
+        with:
+          title: "CI is failing on main"
+          guards: >-
+            The per-push matrix, coverage ratchet, wheel install, README quickstart, environment
+            solve, and the e2e / browser / gradio-floor lanes. Only seven of these are required
+            status checks, so a merge can turn `main` red without any PR ever going red.
+          token: ${{ github.token }}
