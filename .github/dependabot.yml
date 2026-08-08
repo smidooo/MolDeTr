@@ -1,0 +1,54 @@
+# Dependency updates, deliberately quiet.
+#
+# The failure mode this configuration is written against is alert fatigue, not missed updates. This
+# project's dependency tree is torch-sized: ungrouped, weekly, per-dependency PRs would produce a
+# steady stream of noise against a repository whose code is frozen at a paper release, and a
+# maintainer who learns to close Dependabot PRs unread is strictly worse off than one who never
+# enabled it. Everything below trades update latency for signal.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    # Actions are pinned by tag in the workflows and are the supply-chain surface most worth keeping
+    # current -- a compromised action runs with the workflow's token. Grouped into one PR so that
+    # staying current costs one review, not six.
+    groups:
+      actions:
+        patterns: ["*"]
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(actions)"
+
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    # Two groups rather than one, split by what a failure would mean:
+    #   `dev-tooling` — ruff/mypy/pytest and friends. Breakage here is loud, immediate and local to
+    #   CI, so these can move together and often.
+    #   `runtime` — everything the published package actually depends on. A bump here can change
+    #   model behaviour, so it wants its own PR and its own nightly result before merging.
+    groups:
+      dev-tooling:
+        patterns: ["pytest*", "ruff", "mypy", "hypothesis", "tomli", "nbmake", "axe-*"]
+      runtime:
+        patterns: ["*"]
+        exclude-patterns: ["pytest*", "ruff", "mypy", "hypothesis", "tomli", "nbmake", "axe-*"]
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    # torch and fastai are pinned against each other for a reason recorded in pyproject
+    # (`fastai>=2.7,<2.8` — 2.8.x drops `L.starmap` and `learner.load()` crashes), and the shipped
+    # checkpoint was trained against a specific stack. An automated major bump of either is not a
+    # dependency update, it is a decision about whether the published model still loads. Those two
+    # stay manual.
+    ignore:
+      - dependency-name: torch
+        update-types: ["version-update:semver-major"]
+      - dependency-name: fastai
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
