@@ -1,0 +1,67 @@
+name: Report a failed lane as an issue
+description: >-
+  File a deduplicated issue when a lane fails, or comment on the open one if it already exists.
+  Going red is not enough in a quiet repository: nobody watches the Actions tab of a paper companion
+  between releases, and `main` sat red for a full day before anyone noticed. The issue is the
+  delivery mechanism.
+
+inputs:
+  title:
+    description: >-
+      Issue title, and also the deduplication key — matched exactly, so keep it stable across runs
+      and free of run numbers, dates or SHAs. Anything varying belongs in the body.
+    required: true
+  guards:
+    description: One or two sentences on what this lane watches, so the issue explains itself.
+    required: true
+  token:
+    # Quoted: an unquoted plain scalar containing `: ` is parsed as a nested mapping, which made
+    # this whole action fail to load — a broken notifier being exactly what it exists to prevent.
+    description: "Token with `issues: write` permission, which callers must also declare."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: File or update the failure issue
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPORT_TITLE: ${{ inputs.title }}
+        REPORT_GUARDS: ${{ inputs.guards }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        WORKFLOW: ${{ github.workflow }}
+        REF: ${{ github.ref_name }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+
+        # Exact-title match, not the fuzzy result GitHub search returns. `in:title` narrows the
+        # query, but search is fuzzy enough to return a *different* issue whose title merely shares
+        # words — and commenting on an unrelated issue is worse than opening a second one. `$ENV`
+        # keeps the title out of the jq program text, so quotes in it cannot break the filter.
+        existing=$(gh issue list --state open --search "$REPORT_TITLE in:title" \
+          --json number,title \
+          --jq 'map(select(.title == $ENV.REPORT_TITLE)) | .[0].number // empty')
+
+        body=$(printf '%s\n' \
+          "**$WORKFLOW** failed on \`$REF\` at \`${SHA:0:8}\`." \
+          "" \
+          "$REPORT_GUARDS" \
+          "" \
+          "Run: $RUN_URL" \
+          "" \
+          "Read the *skip* count before concluding the lane is healthy again — this repository has" \
+          "already shipped a nightly that went green while its two key tests silently skipped." \
+          "" \
+          "Closing this without a fix is reasonable if the cause was transient; the lane reopens or" \
+          "comments here the next time it fails, so the frequency stays visible rather than being" \
+          "forgotten between releases.")
+
+        if [ -n "$existing" ]; then
+          gh issue comment "$existing" --body "$body"
+          echo "commented on existing issue #$existing"
+        else
+          gh issue create --title "$REPORT_TITLE" --body "$body"
+          echo "opened a new issue"
+        fi
