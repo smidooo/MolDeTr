@@ -75,9 +75,20 @@ def test_moving_a_distortion_slider_does_not_re_simulate(
     # on the range input, so setting `value` programmatically changes the number on screen and
     # triggers nothing — which is how the first version of this test passed while asserting that a
     # re-distort had *not* re-simulated, when in fact no re-distort had happened at all.
+    # `hover()` places the pointer, rather than a bare `mouse.move()` to a box measured beforehand.
+    # `page.mouse` is viewport-absolute and runs no actionability check, so the press lands wherever
+    # the element *was* when `bounding_box()` returned. Gradio re-measures its layout on every
+    # ResizeObserver fire, and a press landing off the input emits no `.release` at all — which is
+    # exactly the failure recorded here (`counts["redistort"] == 0` after the full 30 s poll) on
+    # `browser e2e (webkit)` on 2026-08-07 and again on 2026-08-08. `hover()` re-resolves the
+    # locator and waits for it to stop moving first.
+    #
+    # This removes a real race in the gesture; it is NOT proof the race caused those CI failures,
+    # which never reproduced locally — webkit, chromium and firefox all pass here. Read a green lane
+    # afterwards as consistent with the fix, not as confirmation of it.
+    phase.hover()
     box = phase.bounding_box()
     assert box is not None, "the phase slider has no layout box to drag"
-    simulate_page.mouse.move(box["x"] + box["width"] * 0.5, box["y"] + box["height"] / 2)
     simulate_page.mouse.down()
     simulate_page.mouse.move(box["x"] + box["width"] * 0.8, box["y"] + box["height"] / 2, steps=8)
     simulate_page.mouse.up()
