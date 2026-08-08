@@ -19,7 +19,9 @@ Two things here are deliberately stricter than the bug that prompted them:
 that happened to break it and green-light the next one — `httpx`, say, which `tests/e2e/conftest.py`
 already imports and which arrives transitively with gradio. The job installs *only pytest*, so the
 faithful question is "would a `pip install pytest` venv have this?", and anything else must be
-refused. `PYTEST_ONLY_CLOSURE` was read off such a venv rather than guessed.
+refused. That closure is **measured in the running interpreter**, not hardcoded — pytest needs
+`tomli` and `exceptiongroup` only below Python 3.11, so a list read off one version is wrong on
+another. See `_pytest_closure`.
 
 **The invocation is read from the workflow, not restated here.** A guard that hard-codes
 `tests/test_integrations.py` stops covering the job the moment a second file is added to that step —
@@ -33,6 +35,7 @@ whenever a DOI is added, and a hardcoded number would be right today and quietly
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import subprocess
@@ -44,12 +47,13 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 WORKFLOW = REPO / ".github" / "workflows" / "integrations.yml"
 
-#: Every top-level module a `pip install pytest` venv actually provides, read off one built for the
-#: purpose (pytest 9.1.1) rather than assumed. Widen this ONLY after checking that `pip install
-#: pytest` really ships the addition — every name here is a hole in the guard.
-PYTEST_ONLY_CLOSURE = frozenset(
-    {"_pytest", "colorama", "iniconfig", "packaging", "pip", "pluggy", "py", "pygments", "pytest"}
+#: Probe that reports every top-level module present after importing pytest.
+_CLOSURE_PROBE = (
+    "import json, sys, pytest; print(json.dumps(sorted({m.split('.')[0] for m in sys.modules})))"
 )
+
+#: Modules the closure must contain, or the probe measured something other than a pytest install.
+_CLOSURE_FLOOR = frozenset({"pytest", "_pytest", "pluggy"})
 
 #: This repository's own importable roots. Present in the job because the checkout is.
 FIRST_PARTY = frozenset({"app", "app_ui", "conftest", "moldetr", "scripts", "tests"})
@@ -61,9 +65,35 @@ SHIM_MARKER = "installs only pytest"
 SUBPROCESS_TIMEOUT = 300
 
 
+def _pytest_closure() -> set[str]:
+    """Top-level modules a `pip install pytest` environment provides — measured in *this*
+    interpreter, never hardcoded.
+
+    A literal list was wrong, and wrong in a way that only showed up in CI. pytest's dependencies
+    are version-conditional: `pytest` requires `tomli>=1` and `exceptiongroup>=1` **only** on
+    `python_version < "3.11"`. A closure read off a 3.12 venv therefore blocks both on 3.10, the
+    blocked collection fails for a reason that has nothing to do with the conftest, and the guard
+    goes RED while reporting the wrong cause. That is exactly what happened: all three py3.10 legs
+    failed while 3.11 and 3.12 passed. Measuring beats guessing, but only if you measure on the
+    thing that actually runs it.
+
+    Slight over-permission is possible (a richer dev environment could import something a bare
+    pytest venv would not), which is why `FIRST_PARTY` stays explicit and the floor below asserts
+    the probe measured a pytest install at all rather than silently returning junk.
+    """
+    proc = _run(["-c", _CLOSURE_PROBE], None)
+    assert proc.returncode == 0, (
+        f"could not measure the pytest import closure:\n{proc.stdout}{proc.stderr}"
+    )
+    closure = set(json.loads(proc.stdout))
+    missing = _CLOSURE_FLOOR - closure
+    assert not missing, f"the closure probe did not measure a pytest install; missing {missing}"
+    return closure
+
+
 def _shim_source() -> str:
     """A `sitecustomize.py` that permits the standard library and nothing else the job lacks."""
-    extra = sorted(PYTEST_ONLY_CLOSURE | FIRST_PARTY)
+    extra = sorted(_pytest_closure() | FIRST_PARTY)
     return (
         "import sys\n"
         f"EXTRA = {extra!r}\n"
