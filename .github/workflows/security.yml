@@ -1,0 +1,92 @@
+name: Security
+
+# `.github/SECURITY.md` documents a trust boundary and a reporting address, and until now nothing
+# automated backed any of it. Two of its claims are now checked elsewhere -- `tests/test_checkpoint_trust.py`
+# enforces the `weights_only` gate, and GitHub's secret scanning (already enabled on this repository,
+# with push protection) backs "no credentials are committed". This workflow adds the two remaining
+# pieces: static analysis of the code, and a look at the dependency tree.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Wednesday, deliberately offset from the Monday integrations and dependabot runs so a quiet week
+    # does not produce one morning with three separate red mails.
+    - cron: "0 6 * * 3"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write # to upload findings to the Security tab
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          # `security-and-quality` over the default `security-extended`: this is research code with a
+          # frozen training half, and the quality queries surface the kind of thing worth knowing
+          # about the *live* half (the GUI, the CLI, the inference path) without a build step, since
+          # Python needs none.
+          queries: security-and-quality
+      - name: Analyse
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:python"
+
+  dependency-audit:
+    name: pip-audit (report-only)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # NOT on pull_request: this reaches PyPI's advisory database, and the `network` marker convention
+    # established in integrations.yml keeps network-dependent checks out of PR lanes. A PR should
+    # never go red because an advisory landed while it was open.
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install the audited environment
+        # The full app+eval surface, because auditing a subset would report a clean tree while the
+        # documented install pulls more than was scanned.
+        run: |
+          python -m pip install --upgrade pip pip-audit
+          pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -e ".[dev,app,eval]"
+      - name: Audit
+        # REPORT-ONLY on purpose, and this is a considered choice rather than timidity.
+        #
+        # A torch-sized transitive tree will surface advisories in packages this project neither
+        # imports nor can upgrade independently. Enforcing on day one produces a red lane nobody can
+        # fix, which is the same failure as an aspirational coverage floor: the check gets disabled,
+        # and then it is not report-only, it is absent.
+        #
+        # The intended path is to run it visibly for a few cycles, learn the actual noise floor, and
+        # then either enforce or add a reviewed `--ignore-vuln` list. Tightening this is a follow-up
+        # with evidence behind it; leaving it permanently advisory would be the cargo-cult outcome.
+        continue-on-error: true
+        run: pip-audit --strict --desc --format columns
+
+      - name: Summarise
+        if: always()
+        # So the result is legible from the run summary without opening logs -- a report-only check
+        # nobody reads is decoration.
+        run: |
+          echo "### pip-audit (report-only)" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Advisory output is in the *Audit* step above. This step does not gate the build:" >> "$GITHUB_STEP_SUMMARY"
+          echo "see the rationale in \`.github/workflows/security.yml\`. Once the noise floor is" >> "$GITHUB_STEP_SUMMARY"
+          echo "known, either enforce it or add a reviewed ignore-list — do not leave it advisory" >> "$GITHUB_STEP_SUMMARY"
+          echo "indefinitely." >> "$GITHUB_STEP_SUMMARY"

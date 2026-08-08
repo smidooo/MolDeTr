@@ -22,6 +22,7 @@ neither `tests/conftest.py` nor `tests/e2e/conftest.py` defines `pytest_collecti
 
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from pathlib import Path
@@ -35,7 +36,13 @@ else:  # `tomllib` is 3.11+; this package supports 3.10, matching tests/test_dep
 
 REPO = Path(__file__).resolve().parent.parent
 TESTS = REPO / "tests"
-CI_WORKFLOW = REPO / ".github" / "workflows" / "ci.yml"
+
+#: EVERY workflow, not just `ci.yml`. The first version of this module scanned one file, which was
+#: correct when one file existed — by the time `nightly.yml` (`-m model`), `integrations.yml`
+#: (`-m network`) and `security.yml` had been added, three of the four selector sites were outside
+#: the guard's view. A guard scoped to one file silently stops covering the thing it was written for
+#: the moment a second file appears, which is this module's own subject matter.
+WORKFLOWS = sorted((REPO / ".github" / "workflows").glob("*.yml"))
 
 #: Markers pytest and its plugins provide. Not declared in `pyproject.toml`, so they are not this
 #: file's business, and they appear in the source scan like any other mark.
@@ -68,22 +75,44 @@ def _declared_markers() -> dict[str, str]:
 
 
 def _markers_used_in_tests() -> set[str]:
-    """Every `pytest.mark.<name>` appearing in the suite source, builtins removed.
+    """Every marker genuinely applied in the suite, read from the AST rather than the text.
 
-    Catches the decorator form, the module-level `pytestmark = pytest.mark.x` form, and the callable
-    form (`pytest.mark.model(...)`, as used in tests/test_simulate_predict.py) alike, because all
-    three spell `pytest.mark.<name>` in the source.
+    Catches the decorator form, the module-level `pytestmark = ...` form, and the callable form
+    (as used in tests/test_simulate_predict.py) alike, because all three are the same attribute
+    access once parsed.
+
+    **A regex over the source was wrong, and this module's own docstring is what proved it.** The
+    previous version matched `pytest.mark.(\\w+)` in raw text, so the illustrative example written
+    one paragraph above registered a marker named `x` as "used". Harmless in that instance — nothing
+    declares `x` — but the general case is not: a marker mentioned only in a comment or a docstring
+    would count as applied, so someone could delete every real use of a marker and this guard would
+    still pass. That is exactly the class of failure this module exists to catch, reproduced inside
+    the guard itself.
+
+    Parsing sidesteps it by construction: string and comment contents are not attribute accesses.
     """
     used: set[str] = set()
     for path in TESTS.rglob("*.py"):
-        text = path.read_text(encoding="utf-8", errors="replace")
-        used.update(re.findall(r"pytest\.mark\.(\w+)", text))
+        try:
+            tree = ast.parse(path.read_text(encoding="utf-8", errors="replace"))
+        except SyntaxError:  # a deliberately broken fixture should not take the guard down
+            continue
+        for node in ast.walk(tree):
+            # `pytest.mark.NAME` parses as Attribute(attr=NAME, value=Attribute(attr="mark", ...)).
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Attribute)
+                and node.value.attr == "mark"
+                and isinstance(node.value.value, ast.Name)
+                and node.value.value.id == "pytest"
+            ):
+                used.add(node.attr)
     return used - BUILTIN_MARKERS
 
 
 def _markers_named_in_ci_selectors() -> set[str]:
-    """Marker names appearing in any `-m <expr>` in the CI workflow."""
-    text = CI_WORKFLOW.read_text(encoding="utf-8")
+    """Marker names appearing in any `-m <expr>` across every workflow."""
+    text = "\n".join(w.read_text(encoding="utf-8") for w in WORKFLOWS)
     names: set[str] = set()
     for line in text.splitlines():
         # Only `-m` that belongs to a pytest invocation is a marker expression. `python -m pip` and
