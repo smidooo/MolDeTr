@@ -44,11 +44,16 @@ MAIN_MESSAGE_TAIL = (
     "in red."
 )
 ETHYL_LABEL = "**Simulated 5 spin(s) in 1 system(s)**"
+# Re-derived, not re-recorded, when `status` became graded and the predicted coupling gained columns:
+#   row 1  |3.000 - 3.50| ppm x 80 MHz = 40.00 Hz  -> past the 10 Hz band  -> "✗ off";  ΔH = 3-2 = +1
+#   row 2  |7.500 - 1.20| ppm x 80 MHz = 504.00 Hz -> likewise             -> "✗ off";  ΔH = 2-3 = -1
+#   both   ΔJ = |8.0 - 7.0| = 1.00 (the stub predicts J = 8.0 for every detection)
+# Under the old binary rule both rows read "~ off", the same label a 0.3 Hz miss would have earned.
 MAIN_TABLE_CSV = [
-    "#,status,GT δ (ppm),GT H,GT J (Hz),pred δ (ppm),pred H,Δδ (Hz),ΔH,conf",
-    "1,~ off,3.50,2,7.0,3.000,3,40.00,+1,1.00",
-    "2,~ off,1.20,3,7.0,7.500,2,504.00,-1,1.00",
-    "3,+ extra,–,–,–,12.000,1,–,–,1.00",
+    "#,status,GT δ (ppm),GT H,GT J (Hz),pred δ (ppm),pred H,pred J (Hz),Δδ (Hz),ΔH,ΔJ (Hz),conf",
+    "1,✗ off,3.50,2,7.0,3.000,3,8.0,40.00,+1,1.00,1.00",
+    "2,✗ off,1.20,3,7.0,7.500,2,8.0,504.00,-1,1.00,1.00",
+    "3,+ extra,–,–,–,12.000,1,8.0,–,–,–,1.00",
 ]
 
 

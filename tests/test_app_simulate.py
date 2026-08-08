@@ -151,9 +151,12 @@ def test_comparison_dataframe_marks_unmatched_gt_as_missed(app_module):
     """More GT groups than predictions → the leftover GT row is `✗ missed` with a dashed pred side."""
     df = app_module._comparison_dataframe([_GT_AROMATIC, _GT_METHYL], [_pred(7.5)])
 
-    assert list(df["status"]) == ["✓ match", "✗ missed"]
+    assert list(df["status"]) == ["✓ excellent", "✗ missed"]
     missed = df.iloc[1]
-    assert list(missed[["pred δ (ppm)", "pred H", "Δδ (Hz)", "ΔH", "conf"]]) == ["–"] * 5
+    assert (
+        list(missed[["pred δ (ppm)", "pred H", "pred J (Hz)", "Δδ (Hz)", "ΔH", "ΔJ (Hz)", "conf"]])
+        == ["–"] * 7
+    )
     assert missed["GT δ (ppm)"] == "1.20" and missed["GT H"] == 3  # GT side stays populated
 
 
@@ -164,7 +167,7 @@ def test_comparison_dataframe_appends_spurious_predictions_as_extra(app_module):
         [_GT_AROMATIC], [_pred(7.5), _pred(2.0, protons=2, confidence=0.42)]
     )
 
-    assert list(df["status"]) == ["✓ match", "+ extra"]
+    assert list(df["status"]) == ["✓ excellent", "+ extra"]
     extra = df.iloc[1]
     assert list(extra[["GT δ (ppm)", "GT H", "GT J (Hz)"]]) == ["–", "–", "–"]
     assert (extra["pred δ (ppm)"], extra["pred H"], extra["conf"]) == ("2.000", 2, "0.42")
@@ -172,10 +175,19 @@ def test_comparison_dataframe_appends_spurious_predictions_as_extra(app_module):
 
 
 @pytest.mark.unit
-def test_comparison_dataframe_right_shift_wrong_proton_count_is_off_not_match(app_module):
-    """`✓ match` needs BOTH |Δδ| ≤ tol and ΔH == 0 — an exact shift with the wrong H is `~ off`."""
+def test_comparison_dataframe_grades_the_shift_independently_of_proton_count(app_module):
+    """An exact δ grades ``✓ excellent`` even when H is wrong — deliberately reversed.
+
+    This test previously pinned the opposite: `status` was ``dd_hz <= 2.0 and dh == 0``, so a
+    spot-on shift read ``~ off`` whenever the proton count was out by one, hiding a perfect δ
+    behind an unrelated defect and leaving no way to tell the two failures apart. ``status`` now
+    grades the shift alone and ``ΔH`` carries the count, so both are legible at once.
+
+    The *figure* keeps the conjunctive rule on purpose — see `test_comparison_figure.py`, where a
+    green connector still requires both, because green there reads as "this detection is good".
+    """
     row = app_module._comparison_dataframe([_GT_AROMATIC], [_pred(7.5, protons=2)]).iloc[0]
-    assert (row["status"], row["Δδ (Hz)"], row["ΔH"]) == ("~ off", "0.00", "+1")
+    assert (row["status"], row["Δδ (Hz)"], row["ΔH"]) == ("✓ excellent", "0.00", "+1")
 
 
 @pytest.mark.unit
@@ -189,7 +201,7 @@ def test_comparison_dataframe_never_reports_missed_and_extra_together(app_module
     should be changed deliberately rather than discovered by surprise.
     """
     df = app_module._comparison_dataframe([_GT_AROMATIC], [_pred(1.0)])  # 520 Hz away, same H
-    assert list(df["status"]) == ["~ off"]
+    assert list(df["status"]) == ["✗ off"]
     assert df.iloc[0]["Δδ (Hz)"] == "520.00"
 
 
