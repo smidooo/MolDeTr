@@ -45,10 +45,26 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # The released model's grid: 80 MHz, 15 -> 0 ppm = 1200 Hz over 6144 points -> 5.12 points/Hz.
 BASE_FREQ_MHZ = 80.0
-LEFT_PPM = 15.0
-RIGHT_PPM = 0.0
 N_POINTS = 6144
 POINTS_PER_HZ = 5.12
+
+#: Width of the trained window, in Hz. A property of the frozen checkpoint, not a preference.
+WINDOW_HZ = N_POINTS / POINTS_PER_HZ
+
+
+def ppm_window(base_freq_mhz: float, right_ppm: float = 0.0) -> tuple[float, float]:
+    """The ``(left, right)`` ppm bounds spanning exactly :data:`WINDOW_HZ` at this field.
+
+    Derived rather than declared, because a ppm window is only the trained 1200 Hz at *one* field.
+    Pinning the bounds and the frequency independently lets a single edited number put the simulator
+    off the model's grid with nothing raised: leave the shipped 15 -> 0 ppm in place and set 600 MHz
+    and the window becomes 9000 Hz at 0.68 points/Hz, an eighth of the trained 5.12. The detector
+    still returns numbers, and they are confidently wrong.
+    """
+    return right_ppm + WINDOW_HZ / base_freq_mhz, right_ppm
+
+
+LEFT_PPM, RIGHT_PPM = ppm_window(BASE_FREQ_MHZ)
 THRESHOLD = 0.3  # decode_predictions detection threshold (predict.py default)
 
 DEFAULT_CHECKPOINT = os.environ.get(
