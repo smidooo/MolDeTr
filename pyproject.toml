@@ -213,10 +213,16 @@ testpaths = ["tests"]
 # Declare a marker when a test carries it, not in anticipation — an aspirational marker is
 # indistinguishable from a working one right up until it matters.
 markers = [
-    "unit: fast, weight-free unit test (a subset; CI runs `-m 'not e2e and not browser'`)",
+    "unit: fast, weight-free unit test (a subset; CI runs `-m 'not e2e and not browser and not network'`)",
     "e2e: in-process gradio_client end-to-end test (needs the .[app] extra)",
     "browser: Playwright browser test (opt-in; needs `playwright install`)",
     "model: requires the real 974 MB checkpoint (local only)",
+    # Returned 2026-08-08 WITH tests, having been deleted in #35 for having none.
+    # `tests/test_integrations.py` checks DOIs, badges through camo, and the weight mirrors — the
+    # outward-looking half that nothing covered when the DOI badge broke and a user had to report it.
+    # Run weekly by `.github/workflows/integrations.yml`, never on a PR: a publisher WAF having a bad
+    # afternoon must not block unrelated work, because a check that blocks unrelated work gets ignored.
+    "network: reaches the public internet; excluded from every PR lane, run weekly",
 ]
 
 [tool.coverage.run]
