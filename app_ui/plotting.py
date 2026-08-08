@@ -15,6 +15,8 @@ Requires `plotly` (in the `app` extra of pyproject.toml and deploy/requirements-
 from __future__ import annotations
 
 import numpy as np
+
+from app_ui import grading
 import plotly.graph_objects as go  # type: ignore[import-untyped]  # plotly ships no type stubs
 
 MARKER_COLORS = ["#2566b0", "#e08a1f", "#1f9e8c"]  # multiplet 1/2/3 cycle (paper tricolor)
@@ -76,7 +78,7 @@ def _ppm_to_index(ppm_val, n, ppm_left, ppm_right):
 
 
 def comparison_figure(
-    amplitudes, matched, spurious=None, *, ppm_left, ppm_right, base_freq_mhz, tol_hz=2.0
+    amplitudes, matched, spurious=None, *, ppm_left, ppm_right, base_freq_mhz
 ):
     """Ground-truth-vs-prediction spectrum with an intuitive match / miss / spurious overlay.
 
@@ -84,7 +86,8 @@ def comparison_figure(
     ``shift_ppm``/``proton_count`` and ``pred`` has ``chemical_shift_ppm``/``proton_count``/
     ``confidence``. ``spurious`` is the predictions matched to no GT (false positives). Encoding:
     ground truth = teal ▽ on a lane above the spectrum; prediction = clay ● (opacity ∝ confidence);
-    a connector links each matched pair, **green** when |Δδ| ≤ ``tol_hz`` else **amber**; a missed GT
+    a connector links each matched pair, **green** when the shift grades usable
+    (``app_ui.grading``) *and* the proton count matches, else **amber**; a missed GT
     is a red-outlined ▽; a spurious prediction is a red ● with a dashed ring. x-axis is ppm.
     """
     spurious = spurious or []
@@ -134,10 +137,14 @@ def comparison_figure(
         px = float(pred["chemical_shift_ppm"])
         conf = float(pred.get("confidence", 1.0))
         dd_hz = abs(px - gx) * base_freq_mhz
-        # Green only for a fully-correct match (position within tol AND right proton count), so the
-        # connector colour agrees with the "✓ match" status in the comparison table.
+        # Green needs BOTH a usable shift grade and the right proton count, and deliberately so.
+        # The table's `status` was decoupled — it grades δ alone, with ΔH in its own column —
+        # but a connector is a coarse visual where green reads as "this detection is good",
+        # and a spot-on δ carrying the wrong proton count is not. `test_comparison_figure.py`
+        # pins that. What changed here is only where the threshold comes from: `grading`,
+        # rather than a fourth copy of the literal 2.0.
         h_ok = int(pred.get("proton_count", -1)) == int(gt.get("proton_count", -2))
-        conn = MATCH_OK if (dd_hz <= tol_hz and h_ok) else MATCH_OFF
+        conn = MATCH_OK if (grading.is_usable(grading.grade_shift(dd_hz)) and h_ok) else MATCH_OFF
         fig.add_trace(
             go.Scatter(
                 x=[gx, px],

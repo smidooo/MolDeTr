@@ -46,7 +46,7 @@ def test_matched_missed_spurious_encoding() -> None:
     ]
     spurious = [{"chemical_shift_ppm": 7.0, "proton_count": 1, "confidence": 0.6}]
     fig = comparison_figure(
-        _amp(), matched, spurious, ppm_left=8.0, ppm_right=0.0, base_freq_mhz=80.0, tol_hz=2.0
+        _amp(), matched, spurious, ppm_left=8.0, ppm_right=0.0, base_freq_mhz=80.0
     )
     assert isinstance(fig, go.Figure)
 
@@ -95,7 +95,9 @@ def test_prediction_opacity_scales_with_confidence() -> None:
 
 def test_connector_amber_on_proton_count_mismatch() -> None:
     """A spot-on δ but wrong proton count is an ``off`` match (amber), never green — the connector
-    colour must agree with the table's ``✓ match`` (which requires both δ and H)."""
+    colour requires both δ and H. The table's ``status`` was decoupled and grades δ
+    alone (``ΔH`` carries the count), but a connector is a coarse visual where green reads as
+    "this detection is good" — so it keeps the conjunctive rule deliberately."""
     matched = [
         (
             {"shift_ppm": 5.0, "proton_count": 2},
@@ -103,7 +105,7 @@ def test_connector_amber_on_proton_count_mismatch() -> None:
         )
     ]
     fig = comparison_figure(
-        _amp(), matched, [], ppm_left=8.0, ppm_right=0.0, base_freq_mhz=80.0, tol_hz=2.0
+        _amp(), matched, [], ppm_left=8.0, ppm_right=0.0, base_freq_mhz=80.0
     )
     colors = _connector_colors(fig)
     assert MATCH_OFF in colors and MATCH_OK not in colors

@@ -44,6 +44,7 @@ from moldetr.inference import build_model, load_checkpoint, run
 from moldetr.postprocess import decode_predictions, load_extrema
 from moldetr.simulate import COUPLING_EPS_HZ, coupling_blocks, simulate_systems
 from moldetr.validation import INPUT_LENGTH, POINTS_PER_HZ, validate_spectrum
+from app_ui import grading
 from app_ui.plotting import (  # BRAND: interactive Plotly plots
     assignment_rows,
     comparison_figure,
@@ -556,15 +557,30 @@ def _build_gt_groups(
     return gt
 
 
-def _comparison_dataframe(
-    gt_groups: list[dict], preds: list[dict], tol_hz: float = 2.0
-) -> pd.DataFrame:
-    """GT-vs-detected table with a match status and explicit error columns.
+def _predicted_max_j(pred: dict) -> float | None:
+    """The model's single predicted coupling, or ``None`` when it emitted none.
+
+    ``coupling_constants_hz`` holds **0 or 1** entries by construction -- ``PARAM_NAMES[3:7]`` are
+    ``[sum, min, max, std]`` of the multiset, not four separate J values -- so there is one number to
+    show, not a set. Mirrors ``sp._comparison_row``, which has had this column all along while the
+    GUI table showed ``GT J`` with no predicted counterpart to compare it against.
+    """
+    js = pred.get("coupling_constants_hz") or []
+    return float(js[0]) if len(js) else None
+
+
+def _comparison_dataframe(gt_groups: list[dict], preds: list[dict]) -> pd.DataFrame:
+    """GT-vs-detected table with a graded status and explicit error columns.
 
     Each GT group is paired with its nearest-δ prediction (``match_to_gt``); predictions matched to
-    no GT are appended as spurious rows. ``status``: ``✓ match`` (within ``tol_hz`` and right H) ·
-    ``~ off`` · ``✗ missed`` (GT with no prediction) · ``+ extra`` (spurious prediction). These
-    mirror the connector / marker colours in :func:`plotting.comparison_figure`.
+    no GT are appended as spurious rows.
+
+    ``status`` grades the **chemical shift alone** -- ``✓ excellent`` · ``✓ good`` · ``✓ ok`` ·
+    ``~ fair`` · ``✗ off``, see :mod:`app_ui.grading`. It used to be conjunctive
+    (``dd_hz <= 2.0 and dh == 0``), which forced ``~ off`` on a proton-count mismatch *at zero shift
+    error*. Proton count now travels in ``ΔH`` and the coupling in ``ΔJ (Hz)``, each reported on its
+    own terms; ``✗ missed`` and ``+ extra`` are unchanged, being the absence of a pairing rather than
+    a grade. These mirror the connector / marker colours in :func:`plotting.comparison_figure`.
     """
     matched = sp.match_to_gt(gt_groups, preds)
     matched_ids = {id(p) for _g, p in matched if p is not None}
@@ -581,40 +597,51 @@ def _comparison_dataframe(
         if pred is None:
             row.update(
                 {
-                    "status": "✗ missed",
+                    "status": grading.MISSED,
                     "pred δ (ppm)": "–",
                     "pred H": "–",
+                    "pred J (Hz)": "–",
                     "Δδ (Hz)": "–",
                     "ΔH": "–",
+                    "ΔJ (Hz)": "–",
                     "conf": "–",
                 }
             )
         else:
             dd_hz = abs(float(pred["chemical_shift_ppm"]) - gt["shift_ppm"]) * sp.BASE_FREQ_MHZ
             dh = int(pred["proton_count"]) - gt["proton_count"]
+            pred_j = _predicted_max_j(pred)
+            dj = (
+                None if (pred_j is None or gt["max_j_hz"] is None) else abs(pred_j - gt["max_j_hz"])
+            )
             row.update(
                 {
-                    "status": "✓ match" if (dd_hz <= tol_hz and dh == 0) else "~ off",
+                    "status": grading.grade_shift(dd_hz),
                     "pred δ (ppm)": f"{float(pred['chemical_shift_ppm']):.3f}",
                     "pred H": int(pred["proton_count"]),
+                    "pred J (Hz)": "–" if pred_j is None else f"{pred_j:.1f}",
                     "Δδ (Hz)": f"{dd_hz:.2f}",
                     "ΔH": f"{dh:+d}",
+                    "ΔJ (Hz)": "–" if dj is None else f"{dj:.2f}",
                     "conf": f"{float(pred['confidence']):.2f}",
                 }
             )
         rows.append(row)
     for k, pred in enumerate((p for p in preds if id(p) not in matched_ids), len(rows) + 1):
+        pred_j = _predicted_max_j(pred)
         rows.append(
             {
                 "#": k,
-                "status": "+ extra",
+                "status": grading.EXTRA,
                 "GT δ (ppm)": "–",
                 "GT H": "–",
                 "GT J (Hz)": "–",
                 "pred δ (ppm)": f"{float(pred['chemical_shift_ppm']):.3f}",
                 "pred H": int(pred["proton_count"]),
+                "pred J (Hz)": "–" if pred_j is None else f"{pred_j:.1f}",
                 "Δδ (Hz)": "–",
                 "ΔH": "–",
+                "ΔJ (Hz)": "–",
                 "conf": f"{float(pred['confidence']):.2f}",
             }
         )
@@ -802,7 +829,6 @@ def _detect_stage(
         ppm_left=sp.LEFT_PPM,
         ppm_right=sp.RIGHT_PPM,
         base_freq_mhz=sp.BASE_FREQ_MHZ,
-        tol_hz=2.0,
     )
     table = _comparison_dataframe(gt_groups, preds)
     n_match = sum(1 for _g, p in matched if p is not None)
