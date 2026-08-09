@@ -272,3 +272,44 @@ def test_zenodo_add_paper_doi_resolves_the_concept_and_never_reads_the_env():
         "isSupplementTo",
         "False",
     ]
+
+
+@pytest.mark.unit
+def test_zenodo_add_paper_doi_notices_a_put_that_ate_the_metadata():
+    """The preservation check, which only ever executes on the `--confirm` path.
+
+    That path cannot be exercised here — it needs a credential and a record actually missing the
+    relation, and every live record now carries it. So the pure half is tested directly, because
+    the alternative is shipping untested code whose entire job is to notice that an irreversible
+    write to an archival record went wrong.
+
+    A replacing PUT that dropped the creator list or reopened a restricted record would otherwise
+    print a perfectly healthy VERIFY block: the block lists `related_identifiers`, and those would
+    be exactly right.
+    """
+    from scripts.zenodo_add_paper_doi import _fingerprint, _report_preserved
+
+    record = {
+        "title": "MolDeTr",
+        "access_right": "restricted",
+        "license": {"id": "apache-2.0"},
+        "doi": "10.5281/zenodo.21856870",
+        "version": "v1.3.0",
+        "creators": [{"name": f"Author {i}"} for i in range(11)],
+        "related_identifiers": [{"relation": "isSupplementTo", "identifier": "10.1021/x"}],
+    }
+    before = _fingerprint(record)
+    assert before["n_creators"] == 11
+    assert _report_preserved(before, _fingerprint(record)), "an unchanged record must report intact"
+
+    # Each of these is a way a PUT has been observed, or is documented, to go wrong.
+    for field, damage in (
+        ("creators", record["creators"][:1]),  # 10 of 11 authors silently dropped
+        ("access_right", "open"),  # a restricted deposit reopened
+        ("license", None),  # licence lost
+        ("title", ""),  # title blanked
+    ):
+        broken = {**record, field: damage}
+        assert not _report_preserved(before, _fingerprint(broken)), (
+            f"a PUT that changed {field!r} must be reported, not passed over"
+        )
