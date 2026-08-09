@@ -114,12 +114,20 @@ def _newest_published_release_tag() -> str:
     `metadata.version` on the Zenodo side carries the `v` prefix verbatim (`v1.3.0`, verified
     across all six records), so the comparison is a plain equality with no normalisation to get
     subtly wrong.
+
+    The explicit sort is load-bearing and not defensive tidying: GitHub orders this endpoint by
+    `created_at`, Zenodo mints in `published_at` order, and the two already disagree here — real
+    v1.0.0 has `created_at 2026-07-17T08:12:10Z` against `published_at 2026-07-14T20:01:05Z`. See
+    `test_newest_release_is_the_one_published_last` for the case that separates them.
     """
     status, body = _get(RELEASES_API)
     assert status == 200, f"could not list releases (HTTP {status}); the cross-check cannot run"
 
     published = [release for release in json.loads(body) if not release.get("draft")]
     assert published, "no published releases found — the scrape shape changed or the repo has none"
+    # Filter, then sort: drafts carry `published_at: None`, which does not compare against a string.
+    # The timestamps are fixed-width UTC ISO-8601, so lexicographic order is chronological order.
+    published.sort(key=lambda release: release["published_at"], reverse=True)
     return published[0]["tag_name"]
 
 
@@ -203,6 +211,46 @@ def test_paper_relation_predicate_bites():
     assert paper_relation_present(
         {"related_identifiers": [{"relation": "isSupplementTo", "identifier": other}]}, other
     ), "asked about a DOI that IS present, the answer must be True regardless of PAPER_DOI"
+
+
+@pytest.mark.unit
+def test_newest_release_is_the_one_published_last(monkeypatch):
+    """`/releases` is ordered by `created_at`, and that is not the order Zenodo mints in.
+
+    GitHub sorts the list by when the release was *created*; Zenodo archives in the order releases
+    are *published*. Those are different clocks, and they already disagree on this repository: the
+    real v1.0.0 carries `created_at 2026-07-17T08:12:10Z` against `published_at
+    2026-07-14T20:01:05Z`, three days apart and in the opposite direction. They happen to agree at
+    position 0 today, which is precisely why taking `[0]` on trust is latent rather than loud.
+
+    The payload below is the case that separates them: a hotfix cut from an older commit, published
+    *after* the newer minor. Zenodo's newest record is `v1.3.1`; GitHub lists `v1.4.0` first. Read
+    off list position, the cross-check would compare the deposit against a tag that is not the one
+    Zenodo just archived, and fail with a message blaming the relation.
+
+    The draft is in here to pin the order of the two operations. Drafts carry `published_at: None`,
+    so sorting before filtering raises `TypeError` on the comparison rather than answering wrongly —
+    filter first, then sort.
+    """
+    releases = [
+        # created_at descending, exactly as the API returns it.
+        {"tag_name": "v9.9.9", "draft": True, "published_at": None},
+        {"tag_name": "v1.4.0", "draft": False, "published_at": "2026-09-01T00:05:00Z"},
+        {"tag_name": "v1.3.1", "draft": False, "published_at": "2026-09-02T00:00:00Z"},
+    ]
+
+    def _fake_get(url, *, method="GET"):
+        assert "api.github.com" in url, f"the release lookup should not be calling {url}"
+        return 200, json.dumps(releases).encode("utf-8")
+
+    # Patching the module global rather than an attribute path keeps this working under
+    # `importmode=importlib`, where this module is not importable as `tests.test_integrations`.
+    monkeypatch.setitem(globals(), "_get", _fake_get)
+
+    assert _newest_published_release_tag() == "v1.3.1", (
+        "the newest release is the one published last, not the one listed first — a hotfix cut "
+        "from an older commit sorts below a newer minor it was published after"
+    )
 
 
 @pytest.mark.network
