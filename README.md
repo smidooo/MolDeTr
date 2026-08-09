@@ -235,7 +235,7 @@ conda activate moldetr
 ```
 If you prefer pip: `pip install -e ".[app]"` (add `dev` for the tests, `eval` for `evaluate_synthetic.py`).
 For **bit-exact** reproduction of the training environment (CUDA 11.7, linux-64), use the explicit lockfile:
-`conda create --name moldetr --file deploy/requirements-lock-linux64.txt`.
+`conda create --name moldetr --file deploy/conda-lock-linux64.txt`.
 
 > [!IMPORTANT]
 > **PyTorch is an extra, not a base dependency** (since v1.1.0). A bare `pip install -e .` gives you the
