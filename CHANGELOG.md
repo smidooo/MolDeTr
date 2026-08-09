@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The dependency-graph submission has been failing since 2026-07-21, because a conda lockfile was
+  wearing a pip filename.** `deploy/requirements-lock-linux64.txt` is `conda list --explicit`
+  output — line 4 is the literal `@EXPLICIT`, and the body is conda package URLs, not requirement
+  specifiers. Dependabot's pip ecosystem discovers anything matching `requirements*.txt` under the
+  configured directory, parsed it, and died on
+  `InstallationError: Invalid requirement: '@EXPLICIT'`. That aborts the whole `update_graph` job,
+  so **no pip dependency graph has been submitted for three weeks** — a lane that is not a required
+  check and therefore went red without blocking anything or telling anyone. Renamed to
+  `deploy/conda-lock-linux64.txt`, which is both the fix and the honest name: the file has never
+  been installable with pip, and the old name said it was. The three live references
+  (`README.md`'s bit-exact install command, `environment.yml`'s header, a `pyproject.toml` comment)
+  move with it; the two `CHANGELOG.md` mentions are history and stay as written. No CI job
+  referenced the file, and `deploy/requirements-demo.txt` is genuine pip and untouched.
+
 ## [1.3.0] - 2026-08-09
 
 ### Added
