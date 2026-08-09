@@ -250,7 +250,8 @@ def test_zenodo_add_paper_doi_resolves_the_concept_and_never_reads_the_env():
     pinned here rather than left to a comment.
     """
     source = (REPO / "scripts" / "zenodo_add_paper_doi.py").read_text(encoding="utf-8")
-    reads_env = [probe for probe in ("os.environ", "getenv", "import os") if probe in source]
+    probes = ("os.environ", "getenv", "import os", "from os import", "environ[")
+    reads_env = [probe for probe in probes if probe in source]
     assert not reads_env, (
         f"the script reads the environment ({reads_env}). The credential must come from "
         f"--token-file only: a ZENODO_TOKEN variable exists on the maintainer's machine, it is "

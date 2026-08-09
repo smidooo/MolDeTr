@@ -49,15 +49,19 @@ trail, so use it.
 
 **The link to the paper does not survive versioning, and this was never a checklist problem.** The
 `isSupplementTo` relation pointing at the article was present on v0.1.0 and absent from every
-release since — **four for four**, most recently v1.3.0 on 2026-08-09, which was minted four days
-after a tool existed to fix it.
+release since — **five for five**: v1.0.0, v1.1.0, v1.1.1, v1.2.0 and v1.3.0. The last was minted
+on 2026-08-09, four days after a tool existed to fix it. Six Zenodo records exist under the concept
+DOI and only the first was ever born correct; the other five were restored after the fact.
 
 Zenodo is not carrying it forward and does not prefill it from the previous record: **v1.2.0 was
 published without the relation even though v1.1.1 had already been hand-edited to carry it.** That
 single fact rules out both "the last version seeds the next one" and "somebody forgot" — a step
-performed correctly four times and lost four times is a missing automation, not a lapse of
-attention. It was documented here as a manual post-publish check for three releases and dropped on
-all three.
+performed correctly five times and lost five times is a missing automation, not a lapse of
+attention.
+
+Writing it down did not help either, though the sample is smaller than it looks: this file was
+created on 2026-08-03, so only v1.2.0 and v1.3.0 were ever published while the instruction existed.
+It was dropped on both.
 
 So it is no longer a step you perform. `tests/test_integrations.py` asserts it, and
 `.github/workflows/integrations.yml` runs on `release: published` — waiting out Zenodo's

@@ -7,8 +7,9 @@ Adds `isSupplementTo` → `10.1021/acs.analchem.5c03465` to the latest Zenodo so
     python scripts/zenodo_add_paper_doi.py --confirm   # apply
 
 **Why this exists.** Every deposit should point at the paper it accompanies, and the relation does
-not carry forward. It was on v0.1.0 and absent from every release since — **four for four**,
-including v1.3.0, minted four days after this tool was first written to fix the problem. Zenodo is
+not carry forward. It was on v0.1.0 and absent from every release since — **five for five**:
+v1.0.0, v1.1.0, v1.1.1, v1.2.0 and v1.3.0, the last of them minted four days after this tool was
+first written to fix the problem. Zenodo is
 not seeding it from the previous record: v1.2.0 came out without it even though v1.1.1 had already
 been hand-edited to carry it. So this is not a lapse of attention that a checklist can catch, and
 `docs/RELEASING.md` no longer pretends otherwise — `tests/test_integrations.py` watches for it on
@@ -34,8 +35,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import urllib.error
 import urllib.request
 from pathlib import Path
+
+
+class ZenodoError(RuntimeError):
+    """An API call Zenodo refused, carrying the response body that says why."""
+
 
 #: The article this software accompanies.
 PAPER_DOI = "10.1021/acs.analchem.5c03465"
@@ -79,7 +86,15 @@ def paper_relation_present(metadata: dict, doi: str = PAPER_DOI) -> bool:
 
 
 def _api(url: str, *, token: str | None = None, method: str = "GET", payload: dict | None = None):
-    """One JSON round trip. Raises `HTTPError` on any non-2xx, which the write path relies on."""
+    """One JSON round trip, raising `ZenodoError` with the response body on any non-2xx.
+
+    Reading `exc.read()` is the whole point. Zenodo answers a rejected PUT with **400 and a
+    per-field `errors` array naming the metadata key it refused** — precisely the diagnostic you
+    need when a replacing PUT fails, and precisely what a bare `HTTP Error 400: BAD REQUEST`
+    throws away. The same applies to the very first GET: a stale token 403s there, and without the
+    body the operator sees a traceback that looks like Zenodo being down rather than a credential
+    problem, which is the misattribution `_read_token` exists to prevent.
+    """
     data = None
     headers = {"Accept": "application/json", "User-Agent": "MolDeTr-release/1.0"}
     if payload is not None:
@@ -89,8 +104,15 @@ def _api(url: str, *, token: str | None = None, method: str = "GET", payload: di
         headers["Authorization"] = f"Bearer {token}"
 
     request = urllib.request.Request(url, data=data, method=method, headers=headers)
-    with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
-        body = response.read()
+    try:
+        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+            body = response.read()
+    except urllib.error.HTTPError as exc:
+        detail = exc.read().decode("utf-8", "replace")[:2000]
+        hint = " (a 403 here is usually a stale token, not Zenodo)" if exc.code == 403 else ""
+        raise ZenodoError(
+            f"{method} {url}\n  HTTP {exc.code} {exc.reason}{hint}\n  {detail}"
+        ) from exc
     return json.loads(body) if body else None
 
 
@@ -129,6 +151,36 @@ def _show(heading: str, metadata: dict) -> None:
         print(f"  {entry.get('relation')} -> {entry.get('identifier')} [{entry.get('scheme')}]")
 
 
+#: What a replacing PUT must carry through untouched. The docstring above promises restricted
+#: records stay restricted and that creators/licence/title are not disturbed; without a read-back
+#: that checks it, a PUT which silently dropped 11 creators or reopened a restricted record would
+#: print a perfectly healthy VERIFY block listing two correct relations.
+PRESERVED_FIELDS = ("title", "access_right", "license", "doi", "version")
+
+
+def _fingerprint(metadata: dict) -> dict:
+    """The preserved fields, plus creator count rather than the list itself (order is noise)."""
+    snapshot = {field: metadata.get(field) for field in PRESERVED_FIELDS}
+    snapshot["n_creators"] = len(metadata.get("creators") or [])
+    return snapshot
+
+
+def _report_preserved(before: dict, after: dict) -> bool:
+    """Compare two *public* snapshots taken either side of the edit.
+
+    Deliberately public-to-public. The deposit API and the records API disagree on shape for the
+    same field — `license` is a bare string (`apache2.0`) on a deposit and an object (`{"id": ...}`)
+    on a record — so comparing a deposit read against a public read would report a difference on
+    every single run and train the operator to ignore this block.
+    """
+    drift = {k: (v, after.get(k)) for k, v in before.items() if v != after.get(k)}
+    for field, (was, now) in drift.items():
+        print(f"  !! {field}: {was!r} -> {now!r}")
+    if not drift:
+        print(f"  preserved: {', '.join(f'{k}={v!r}'[:46] for k, v in before.items())}")
+    return not drift
+
+
 def _apply(record_id: str, token: str, metadata: dict) -> None:
     """Unlock, replace the metadata wholesale, publish — discarding if anything goes wrong.
 
@@ -142,10 +194,15 @@ def _apply(record_id: str, token: str, metadata: dict) -> None:
         _api(deposit, token=token, method="PUT", payload={"metadata": metadata})
         _api(f"{deposit}/actions/publish", token=token, method="POST")
         print("  published")
-    except Exception:
+    except BaseException as error:
         # An unlocked record left unpublished is stranded in edit state and invisible to citation
         # tools, which is worse than the missing relation this came to fix.
-        print("  FAILED after unlock -- discarding so the record is not left stranded")
+        #
+        # BaseException, not Exception: Ctrl-C during a 60 s PUT raises KeyboardInterrupt, which is
+        # not an Exception. Catching only Exception would let the one interruption a human is most
+        # likely to cause produce the exact outcome this handler exists to prevent.
+        print(f"  FAILED after unlock ({type(error).__name__}: {error})")
+        print("  discarding so the record is not left stranded")
         try:
             _api(f"{deposit}/actions/discard", token=token, method="POST")
             print("  discarded")
@@ -163,8 +220,19 @@ def main() -> int:
     ap.add_argument("--confirm", action="store_true", help="apply; omit for a dry run")
     args = ap.parse_args()
 
+    if args.record_id and str(args.record_id) == str(args.concept_id):
+        # Named in the docstring as the mistake every early handoff made. The concept record has no
+        # independently editable metadata, so editing it is meaningless -- and silently so.
+        print(f"--record-id {args.record_id} is the CONCEPT id, which has no editable metadata.")
+        print("Omit --record-id to auto-resolve the newest version record instead.")
+        return 2
+
     token = _read_token(args.token_file)
-    record_id = args.record_id or _resolve_record_id(args.concept_id)[0]
+    if args.record_id:
+        record_id = str(args.record_id)
+        print(f"target: record {record_id} (from --record-id, not auto-resolved)")
+    else:
+        record_id = _resolve_record_id(args.concept_id)[0]
 
     deposit = _api(DEPOSIT_API.format(record_id=record_id), token=token)
     metadata = deposit["metadata"]
@@ -189,13 +257,27 @@ def main() -> int:
         print("\nDRY RUN -- nothing changed. Re-run with --confirm.")
         return 0
 
+    # Taken before the edit so the read-back below has something to compare against. Public, not
+    # the deposit copy, because the two APIs render the same fields differently.
+    before = _fingerprint(_api(RECORD_API.format(record_id=record_id))["metadata"])
+
     _apply(record_id, token, metadata)
 
     # Read back from the public API, not the edit form: this is what a citation tool sees.
     print("\n--- VERIFY ---")
-    _show("PUBLIC", _api(RECORD_API.format(record_id=record_id))["metadata"])
+    public = _api(RECORD_API.format(record_id=record_id))["metadata"]
+    _show("PUBLIC", public)
     concept = _api(RECORD_API.format(record_id=args.concept_id))
     print(f"  concept -> {concept['metadata'].get('version')}")
+
+    intact = _report_preserved(before, _fingerprint(public))
+    if not paper_relation_present(public, args.paper_doi):
+        print("  !! the relation is NOT on the published record despite a successful publish")
+        return 1
+    if not intact:
+        print("\nThe relation landed but the PUT disturbed fields it should not have.")
+        print("Inspect https://zenodo.org/records/" + str(record_id) + " before releasing again.")
+        return 1
     return 0
 
 

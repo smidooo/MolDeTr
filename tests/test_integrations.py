@@ -156,8 +156,8 @@ def test_every_declared_doi_still_resolves(doi):
 def test_paper_relation_predicate_bites():
     """The network test below cannot prove itself, so this proves the part that decides.
 
-    Every one of the six software records carries the relation today — the last four were
-    backfilled by hand. There is no live record left that *lacks* it, so a purely network-based
+    Every one of the six software records carries the relation today — only v0.1.0 was born with
+    it and the other five were backfilled. There is no live record left that *lacks* it, so a purely network-based
     guard would have gone green on its first run and stayed green whether or not it checked
     anything. This repository has already shipped three guards that never guarded; the crafted
     payloads below are what keep this from being the fourth.
@@ -209,8 +209,9 @@ def test_paper_relation_predicate_bites():
 def test_latest_software_record_supplements_the_article():
     """The newest software deposit must point at the paper it accompanies.
 
-    It never does. The relation has been absent from **every release since v0.1.0 — four for
-    four** — including v1.3.0, minted four days after a script was written to fix the problem.
+    It never does. The relation has been absent from **every release since v0.1.0 — five for
+    five** (v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0) — the last minted four days after a script was
+    written to fix the problem.
     Zenodo does not carry it forward: v1.2.0 was published without it even though v1.1.1 had
     already been hand-edited to carry it, which rules out "the previous record seeds the next one"
     and rules out diligence as the cause. Nothing in the repository could see it, and nothing

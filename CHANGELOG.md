@@ -9,12 +9,14 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - **The deposit's link to the paper is now guarded instead of remembered.** The `isSupplementTo`
   relation pointing a software record at the article was present on v0.1.0 and absent from every
-  release since — **four for four**, most recently v1.3.0, minted four days after a tool existed to
-  fix it. The decisive evidence that this was never a diligence failure: v1.2.0 was published
-  without the relation *even though v1.1.1 had already been hand-edited to carry it*, which rules
-  out Zenodo seeding a new version from the previous one. A step performed correctly four times and
-  lost four times is a missing automation, and `docs/RELEASING.md` had documented it as a manual
-  post-publish check for three of those releases. `integrations.yml` now also runs on
+  release since — **five for five** (v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0), the last minted four
+  days after a tool existed to fix it. The decisive evidence that this was never a diligence
+  failure: v1.2.0 was published without the relation *even though v1.1.1 had already been
+  hand-edited to carry it*, which rules out Zenodo seeding a new version from the previous one. A
+  step performed correctly five times and lost five times is a missing automation. Writing it down
+  did not help either, on the smaller sample available: `docs/RELEASING.md` dates from 2026-08-03,
+  so only v1.2.0 and v1.3.0 were published while the instruction existed, and it was dropped on
+  both. `integrations.yml` now also runs on
   `release: published`, and `tests/test_integrations.py` asserts that the newest software record
   relates the article. Two details carry the check. It **waits out Zenodo's asynchronous webhook**
   first, because a run that fires before minting resolves the concept DOI to the *previous* record,
