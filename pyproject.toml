@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 # Core runtime dependencies (imported by the moldetr package itself).
-# Loosely pinned for portability; see deploy/requirements-lock-linux64.txt for
+# Loosely pinned for portability; see deploy/conda-lock-linux64.txt for
 # the exact CUDA-11.7 conda environment used to train the released checkpoint.
 dependencies = [
     "hydra-core>=1.2",
