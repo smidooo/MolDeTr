@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **`docs/RELEASING.md` linked to a gitignored file**, so the link resolved on the maintainer's disk
+  and 404'd for every actual reader, the docs site included. `docs/ZENODO_DEPOSIT.md` is ignored at
+  `.gitignore:49` and has never been in the repository. It now points at the data deposit's Zenodo
+  record instead. Found the first time `integrations.yml` ever executed: it was added on 2026-08-05
+  with a Monday cron whose first firing was due 2026-08-10, so the lane that owns documentation
+  links had never actually run, and a manual dispatch on 2026-08-09 caught this within two seconds.
+  Worth stating plainly — the check was correct from the day it was written and still found nothing
+  for four days, because *scheduled* is not the same as *run*.
+
 ### Added
 - **The deposit's link to the paper is now guarded instead of remembered.** The `isSupplementTo`
   relation pointing a software record at the article was present on v0.1.0 and absent from every

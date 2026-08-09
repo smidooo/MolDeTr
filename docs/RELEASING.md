@@ -18,9 +18,16 @@ page: 4 of 5 fetches failed, while all nine `img.shields.io` badges returned `20
 The practical consequence: **a tag is not a checkpoint you can move.** Do not tag to "see if it
 works", and do not tag a commit you have not already decided to publish.
 
-This file covers the **software** record only. The separate **data** deposit (concept DOI
-`10.5281/zenodo.21217101`) does not move with a code release — see [Zenodo data
-deposit](ZENODO_DEPOSIT.md).
+This file covers the **software** record only. The separate **data** deposit
+([10.5281/zenodo.21217101](https://zenodo.org/doi/10.5281/zenodo.21217101)) does not move with a
+code release.
+
+That link used to point at `ZENODO_DEPOSIT.md`, which is **gitignored** — so it resolved on the
+maintainer's disk and 404'd for every actual reader, including on the docs site. Nothing noticed,
+because the link checker that owns this file had never had a run: `integrations.yml` was added on
+2026-08-05 with a Monday cron whose first firing was due 2026-08-10, and its first real execution
+was a manual dispatch on 2026-08-09 — which found this immediately. Before adding a docs link here,
+check that the target is actually tracked (`git ls-files`), not merely present.
 
 ## Before tagging
 
