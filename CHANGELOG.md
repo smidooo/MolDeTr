@@ -28,6 +28,27 @@ All notable changes to this project are documented here. The format is based on
   links had never actually run, and a manual dispatch on 2026-08-09 caught this within two seconds.
   Worth stating plainly — the check was correct from the day it was written and still found nothing
   for four days, because *scheduled* is not the same as *run*.
+- **The release cross-check read the newest release off list position, and that is the wrong clock.**
+  `tests/test_integrations.py::_newest_published_release_tag` returned `published[0]["tag_name"]`,
+  trusting GitHub to hand back `/releases` in the order Zenodo mints. GitHub sorts that endpoint by
+  `created_at`; Zenodo archives in `published_at` order. The two already disagree on this
+  repository — v1.0.0 carries `created_at 2026-07-17T08:12:10Z` against `published_at
+  2026-07-14T20:01:05Z`, three days apart and in the opposite direction — and they agree at position
+  0 today only by luck, which is what kept this latent. The case that separates them is a hotfix cut
+  from an older commit and published after a newer minor: Zenodo's newest record would be the
+  hotfix, GitHub would list the minor first, and the guard would compare the deposit against a tag
+  Zenodo never archived, then fail blaming the relation. Now filtered, then sorted by `published_at`
+  descending — in that order, because drafts carry `published_at: None`, which does not compare
+  against a string. `test_newest_release_is_the_one_published_last` is a crafted-payload unit test
+  in which list order and publish order disagree; it was confirmed red before the sort and green
+  after, so it is a test that bites rather than one that merely passes.
+
+### Changed
+- `_api` in `scripts/zenodo_add_paper_doi.py` now declares `-> Any`. Deliberately `Any` and not
+  `dict | list | None`: the function is a generic JSON round trip that never validates the parsed
+  shape, so a narrower annotation would claim something it does not enforce. This file is outside
+  the mypy gate (`pyproject.toml [tool.mypy]` covers the pure-NumPy half only), so this is
+  readability, not a type-check fix.
 
 ### Added
 - **The deposit's link to the paper is now guarded instead of remembered.** The `isSupplementTo`
