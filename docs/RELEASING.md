@@ -108,3 +108,44 @@ A correct v1.3.0 (record `21856870`) reports both relations:
 
 While you are there, confirm the concept DOI still resolves to the new version, and that the
 creator list and licence carried over intact — neither is guarded automatically.
+
+## Why there is no `.zenodo.json` — considered and rejected, 2026-08-09
+
+The obvious-looking improvement is to declare the relation in a `.zenodo.json`, so Zenodo mints the
+record correctly instead of the guard above catching it afterwards. It was investigated and
+**rejected**. The reasoning is recorded here because the idea is attractive enough to be proposed
+again by anyone who has not checked.
+
+**It would silence `CITATION.cff` entirely.** Per Zenodo's documentation, when a repository has
+both, *"Zenodo will only use the `.zenodo.json` metadata. The `CITATION.cff` will be completely
+ignored."* Precedence runs `.zenodo.json` > `CITATION.cff` > GitHub contributor statistics.
+
+That is a bad trade **here specifically**, because `CITATION.cff` is already doing the job. All six
+software records under concept `21214876` carry 11 creators with 2 ORCIDs, matching the file
+exactly. Adding a `.zenodo.json` to fix one field would mean re-declaring the whole author list,
+title, description and licence in a second file that no test covers and that can silently drift from
+the first. `CITATION.cff` is also the single source of truth for `_declared_dois()` in
+`tests/test_integrations.py`, so it cannot simply be deleted in favour of the new file.
+
+**And supplying `related_identifiers` means owning the whole list.** Measured, rather than assumed,
+against records that already exist:
+
+| | `.zenodo.json` `related_identifiers` | GitHub link on the minted records |
+|---|---|---|
+| `citation-file-format/citation-file-format` (11 records) | 3 declared | only their own hand-written `…/releases/tag/<v>` — no auto link |
+| `nipy/nipype` (records incl. 2026-08-07) | none declared | Zenodo's auto `isSupplementTo → …/tree/<tag>` |
+
+So the auto GitHub link that every MolDeTr record currently carries would become a per-release
+string to maintain by hand. That this is a real hazard rather than a theoretical one shows in the
+first repository: record `1242911` has `version: 1.0.3-2` and a link pointing at
+`…/releases/tag/1.0.3-1`, permanently, in an immutable record.
+
+*Caveat, stated so the evidence is not read as stronger than it is:* the "with" arm's records span
+2017–2021 while the control is current, and no recent example could be found to close that gap.
+
+**What is done instead.** The guard above: `integrations.yml` runs on `release: published`, the test
+asserts the relation on the newest record, a failure files an issue, and
+`scripts/zenodo_add_paper_doi.py` repairs it. If that ever becomes too slow a loop, the better next
+step is to run the fixer *from* the release job — it keeps `CITATION.cff` authoritative and
+duplicates no metadata — at the cost of putting a `deposit:write` + `deposit:actions` token into
+Actions secrets.
