@@ -231,3 +231,43 @@ def test_download_weights_verifies_and_pins_the_version_doi(tmp_path):
     assert _md5(p) == hashlib.md5(b"molde-tr").hexdigest()
     assert "21217102" in ZENODO_URL  # pinned to the immutable v1.0.0 version record
     assert len(EXPECTED_MD5) == 32
+
+
+@pytest.mark.unit
+def test_zenodo_add_paper_doi_resolves_the_concept_and_never_reads_the_env():
+    """The release-relation fixer, checked on the three things that would silently break it.
+
+    It imports with no network — `tests/test_integrations.py` depends on that, and so does the
+    weekly job, which installs pytest and nothing else.
+
+    The concept id is the *resolve* target, never the edit target: `21214876` has no independently
+    editable metadata and merely mirrors whichever version is newest. A hardcoded record id is the
+    other half of the same mistake — the one this replaced was obsolete within two releases.
+
+    And it must not grow a `ZENODO_TOKEN` environment fallback. One exists on the maintainer's
+    machine, it is stale, and it 403s even on a read; honouring it would swap a working credential
+    for a broken one and report the failure as Zenodo's. That is a plausible future "fix", so it is
+    pinned here rather than left to a comment.
+    """
+    source = (REPO / "scripts" / "zenodo_add_paper_doi.py").read_text(encoding="utf-8")
+    reads_env = [probe for probe in ("os.environ", "getenv", "import os") if probe in source]
+    assert not reads_env, (
+        f"the script reads the environment ({reads_env}). The credential must come from "
+        f"--token-file only: a ZENODO_TOKEN variable exists on the maintainer's machine, it is "
+        f"stale, and it 403s even on a read, so an env fallback silently swaps a working token "
+        f"for a broken one."
+    )
+
+    r = _run(
+        "-c",
+        "import scripts.zenodo_add_paper_doi as z; "
+        "print(z.ZENODO_CONCEPT_ID, z.PAPER_DOI, z.PAPER_RELATION, "
+        "z.paper_relation_present({}))",
+    )
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.split() == [
+        "21214876",
+        "10.1021/acs.analchem.5c03465",
+        "isSupplementTo",
+        "False",
+    ]

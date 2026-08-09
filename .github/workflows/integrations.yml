@@ -21,6 +21,16 @@ on:
     # on the scale of months. Daily polling would add noise and rate-limit exposure for no signal.
     - cron: "0 6 * * 1"
   workflow_dispatch:
+  release:
+    # The one moment these targets DO change on a scale of minutes. Publishing a release mints a new
+    # Zenodo version, and the `isSupplementTo` relation to the article does not carry over — absent
+    # on every release since v0.1.0, four for four, most recently v1.3.0. Weekly alone would leave a
+    # release unrelated to its own paper for up to six days, and the whole finding is that the
+    # post-publish check is a missing automation rather than a checklist item somebody forgot.
+    #
+    # The cron stays, and not merely as a backstop: it is the only thing that catches a webhook that
+    # succeeded here and was undone later, or a release whose minting failed after this run gave up.
+    types: [published]
 
 permissions:
   contents: read
@@ -39,10 +49,11 @@ jobs:
           cache: pip
 
       - name: Install (no torch needed)
-        # `tests/test_integrations.py` imports only the standard library, so the heavy stack is
-        # pointless here. `.[dev]` pulls torch via `moldetr[model]`, which is why this installs
-        # pytest directly instead: a rot watcher that takes four minutes to install PyTorch before
-        # making nine HTTP requests is a rot watcher nobody will run by hand.
+        # `tests/test_integrations.py` imports the standard library plus one first-party module,
+        # `scripts/zenodo_add_paper_doi.py` — itself stdlib-only, and present because the checkout
+        # is. Nothing here needs the heavy stack. `.[dev]` pulls torch via `moldetr[model]`, which
+        # is why this installs pytest directly instead: a rot watcher that takes four minutes to
+        # install PyTorch before making a dozen HTTP requests is one nobody will run by hand.
         #
         # That reasoning is right about the test module and wrong about the run. pytest loads
         # `tests/conftest.py` before collecting anything under `tests/`, and while that conftest
@@ -54,6 +65,44 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pytest
+
+      - name: Wait for Zenodo to mint the new version
+        if: github.event_name == 'release'
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        # Zenodo's release webhook is asynchronous — GitHub calls the release published well before
+        # the new deposit exists. Without this wait, a release-triggered run resolves the concept
+        # record to the PREVIOUS version, which does carry the paper relation, and passes green
+        # while the release that just went out carries nothing. That vacuous pass is the precise
+        # failure the guard exists to prevent, so the wait is part of the check, not a convenience.
+        #
+        # Exits 0 no matter how it ends, and deliberately: the pytest step below is the single
+        # source of pass/fail. A timeout then surfaces as its own readable "Zenodo's newest record
+        # is vX but the newest published release is vY" instead of an opaque step failure that says
+        # nothing about which of the two is wrong.
+        run: |
+          python - <<'PY'
+          import json, os, time, urllib.request
+
+          tag = os.environ["RELEASE_TAG"]
+          url = "https://zenodo.org/api/records/21214876"  # concept id -> newest version record
+          deadline = time.time() + 6 * 60
+
+          while True:
+              try:
+                  with urllib.request.urlopen(url, timeout=30) as response:
+                      version = json.load(response)["metadata"].get("version")
+              except Exception as exc:
+                  version = f"<unreachable: {exc}>"
+              if version == tag:
+                  print(f"Zenodo has minted {tag}")
+                  break
+              if time.time() >= deadline:
+                  print(f"::warning::Zenodo still reports {version!r} after 6 min, expected {tag!r}")
+                  break
+              print(f"  Zenodo reports {version!r}, waiting for {tag!r} ...")
+              time.sleep(30)
+          PY
 
       - name: Check DOIs, badges and weight mirrors
         env:
@@ -101,7 +150,13 @@ jobs:
             "" \
             "This job watches things this repository cannot fix from inside itself — DOIs, README" \
             "badges as GitHub's camo proxy actually serves them, the Zenodo and Hugging Face weight" \
-            "mirrors, and documentation links." \
+            "mirrors, documentation links, and whether the newest software deposit still relates" \
+            "the article." \
+            "" \
+            "If the failure is the paper relation, the fix is one command and needs a Zenodo token:" \
+            "\`python scripts/zenodo_add_paper_doi.py\` for a dry run, then \`--confirm\`. It has" \
+            "been missing on every release since v0.1.0, so treat it as expected rather than odd;" \
+            "docs/RELEASING.md has the background." \
             "" \
             "Before assuming a real outage, note that the badge check is the one that caught the" \
             "original 2026-08 incident, where Zenodo rate-limited GitHub's shared camo IP pool. A" \

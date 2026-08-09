@@ -45,22 +45,42 @@ Changes reach `main` through numbered PRs, not direct pushes. Admin override wou
 `enforce_admins` is false so a flaky leg can be worked around — but the convention is the audit
 trail, so use it.
 
-## After publishing — re-check the paper relation
+## After publishing — the paper relation, which is checked for you
 
-**The link to the paper does not survive versioning.** Zenodo prefills a new version's metadata from
-the previous version, and the `isSupplementTo` relation pointing at the article is **not** carried
-over. It was present on v0.1.0, then silently absent for three consecutive releases, and had to be
-restored by hand on 2026-08-03.
+**The link to the paper does not survive versioning, and this was never a checklist problem.** The
+`isSupplementTo` relation pointing at the article was present on v0.1.0 and absent from every
+release since — **four for four**, most recently v1.3.0 on 2026-08-09, which was minted four days
+after a tool existed to fix it.
 
-Nothing warns you about this, and the release still looks completely normal without it. So after
-every publish:
+Zenodo is not carrying it forward and does not prefill it from the previous record: **v1.2.0 was
+published without the relation even though v1.1.1 had already been hand-edited to carry it.** That
+single fact rules out both "the last version seeds the next one" and "somebody forgot" — a step
+performed correctly four times and lost four times is a missing automation, not a lapse of
+attention. It was documented here as a manual post-publish check for three releases and dropped on
+all three.
 
-1. Open the new version record on Zenodo.
-2. Confirm it carries `isSupplementTo` → `10.1021/acs.analchem.5c03465`.
-3. If missing, add it and save.
+So it is no longer a step you perform. `tests/test_integrations.py` asserts it, and
+`.github/workflows/integrations.yml` runs on `release: published` — waiting out Zenodo's
+asynchronous webhook first, because a check that fires before minting reads the *previous* record,
+finds the relation there, and passes while the new release carries nothing. The weekly cron still
+runs, and not only as a backstop: it is the only thing that catches a relation undone later, or a
+release whose minting failed after the release-time run gave up waiting.
 
-Verify from the public API rather than the edit form, so you are reading what a citation tool would
-read:
+**When the guard fires** — as an `External reference check failed` issue, or red in the Actions tab:
+
+```bash
+python scripts/zenodo_add_paper_doi.py             # DRY RUN — resolves the newest record, prints
+python scripts/zenodo_add_paper_doi.py --confirm   # apply
+```
+
+It resolves the newest release from the concept DOI, so there is no record id to keep current. It
+appends without replacing, discards the draft if anything fails mid-flight so a record is never
+stranded in edit state, and is idempotent. It needs a Zenodo token at `~/.secrets/.zenodo_token`
+with scopes `deposit:write` + `deposit:actions`. **A metadata edit mints no new DOI** — the record
+id and its DOI are unchanged by this, so neither expect nor fear a new version record.
+
+To check by hand, read the public API rather than the edit form, so you are reading what a citation
+tool would read:
 
 ```bash
 curl -s https://zenodo.org/api/records/<new-version-id> \
@@ -68,12 +88,12 @@ curl -s https://zenodo.org/api/records/<new-version-id> \
 print([(r['relation'], r['identifier']) for r in m.get('related_identifiers', [])])"
 ```
 
-A correct v1.1.1 (record `21757166`) reports both relations:
+A correct v1.3.0 (record `21856870`) reports both relations:
 
 ```
-[('isSupplementTo', 'https://github.com/smidooo/MolDeTr/tree/v1.1.1'),
+[('isSupplementTo', 'https://github.com/smidooo/MolDeTr/tree/v1.3.0'),
  ('isSupplementTo', '10.1021/acs.analchem.5c03465')]
 ```
 
 While you are there, confirm the concept DOI still resolves to the new version, and that the
-creator list and licence carried over intact.
+creator list and licence carried over intact — neither is guarded automatically.

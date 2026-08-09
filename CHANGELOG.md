@@ -6,6 +6,43 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The deposit's link to the paper is now guarded instead of remembered.** The `isSupplementTo`
+  relation pointing a software record at the article was present on v0.1.0 and absent from every
+  release since — **four for four**, most recently v1.3.0, minted four days after a tool existed to
+  fix it. The decisive evidence that this was never a diligence failure: v1.2.0 was published
+  without the relation *even though v1.1.1 had already been hand-edited to carry it*, which rules
+  out Zenodo seeding a new version from the previous one. A step performed correctly four times and
+  lost four times is a missing automation, and `docs/RELEASING.md` had documented it as a manual
+  post-publish check for three of those releases. `integrations.yml` now also runs on
+  `release: published`, and `tests/test_integrations.py` asserts that the newest software record
+  relates the article. Two details carry the check. It **waits out Zenodo's asynchronous webhook**
+  first, because a run that fires before minting resolves the concept DOI to the *previous* record,
+  finds the relation there, and passes while the release that just went out carries nothing. And it
+  **cross-checks the record's version against the newest published GitHub release**, so "Zenodo has
+  not caught up" reports itself rather than hiding as a green tick — prereleases included, since
+  Zenodo archives one like any other release. The weekly cron stays: it is the only thing that
+  catches a relation undone later, or a release whose minting failed after the release-time run
+  gave up waiting.
+- **`scripts/zenodo_add_paper_doi.py`** — what to run when that guard fires, and the first version
+  of this tool to live in the repository rather than on one machine, which is why the checklist
+  could not previously name a command. It resolves the newest release from the concept DOI (no
+  record id to keep current — the hardcoded one it replaces was obsolete within two releases),
+  appends without replacing, is idempotent, and discards the draft if anything fails mid-flight so
+  a record is never stranded in edit state. The credential comes from `--token-file` only: a
+  `ZENODO_TOKEN` variable exists on the maintainer's machine, it is stale, and it 403s even on a
+  read, so an environment fallback would swap a working token for a broken one and blame Zenodo —
+  `tests/test_scripts.py` pins that omission, since it is a plausible future "fix". Editing
+  metadata mints no new DOI, and restricted records stay restricted because the PUT re-sends the
+  whole metadata object.
+
+  Both halves share one `paper_relation_present`. The PowerShell original decided "already present"
+  on the identifier alone, so a record relating the article under `references` would have read as
+  correct to the fixer while a stricter guard kept failing it — a detect/fix pair that cannot
+  converge. Every live record was already backfilled by the time this was written, so there is no
+  longer a Zenodo record that *lacks* the relation to test against: the guard is proven by crafted
+  payloads and mutation instead, which is the only reason it is more than decoration.
+
 ## [1.3.0] - 2026-08-09
 
 ### Added
