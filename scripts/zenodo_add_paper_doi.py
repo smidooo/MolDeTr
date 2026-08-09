@@ -38,6 +38,7 @@ import json
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Any
 
 
 class ZenodoError(RuntimeError):
@@ -85,7 +86,9 @@ def paper_relation_present(metadata: dict, doi: str = PAPER_DOI) -> bool:
     )
 
 
-def _api(url: str, *, token: str | None = None, method: str = "GET", payload: dict | None = None):
+def _api(
+    url: str, *, token: str | None = None, method: str = "GET", payload: dict | None = None
+) -> Any:
     """One JSON round trip, raising `ZenodoError` with the response body on any non-2xx.
 
     Reading `exc.read()` is the whole point. Zenodo answers a rejected PUT with **400 and a
