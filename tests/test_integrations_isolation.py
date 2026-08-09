@@ -176,8 +176,14 @@ def _workflow_pytest_argv() -> list[str]:
     )
 
 
-def _run(args: list[str], shim: Path | None) -> subprocess.CompletedProcess[str]:
-    """Run `python <args>` from the repo root, optionally with the block shim on `PYTHONPATH`.
+def _run(
+    args: list[str], shim: Path | None, executable: str | None = None
+) -> subprocess.CompletedProcess[str]:
+    """Run `<executable> <args>` from the repo root, optionally with the block shim on `PYTHONPATH`.
+
+    `executable` defaults to this interpreter; `_collect` overrides it with the `pytest` console
+    script so the guard runs the job's actual entry point. The shim travels on `PYTHONPATH` either
+    way — `sitecustomize` is imported by the interpreter at startup regardless of entry point.
 
     Plugin autoload is off in both directions: the job's venv has no plugins, while a developer
     machine has nbmake, hypothesis, pytest-cov and playwright. Leaving autoload on would let a
@@ -189,7 +195,7 @@ def _run(args: list[str], shim: Path | None) -> subprocess.CompletedProcess[str]
         existing = env.get("PYTHONPATH", "")
         env["PYTHONPATH"] = os.pathsep.join([str(shim), existing]) if existing else str(shim)
     return subprocess.run(
-        [sys.executable, *args],
+        [executable or sys.executable, *args],
         cwd=REPO,
         env=env,
         capture_output=True,
@@ -198,10 +204,34 @@ def _run(args: list[str], shim: Path | None) -> subprocess.CompletedProcess[str]
     )
 
 
+def _pytest_entrypoint() -> list[str]:
+    """The `pytest` console script, which is what the workflow actually types.
+
+    `python -m pytest` is NOT equivalent, and the difference is the whole reason this matters:
+    `-m` prepends the working directory to `sys.path`, the console script does not. That was inert
+    until `tests/test_integrations.py` began importing `scripts.zenodo_add_paper_doi` at module
+    scope, which resolves only if the repo root is importable. It is today — `tests/__init__.py`
+    makes pytest's prepend mode walk up to the repo root — but a guard that runs a *more permissive*
+    invocation than the job cannot see that break. Remove `tests/__init__.py` or switch to
+    `importmode=importlib` and the job dies at collection while this file stays green, which is
+    precisely the shape of the defect this module exists to catch.
+
+    Falls back to `-m pytest` where no console script exists, rather than skipping: a weaker check
+    beats no check, and the fallback is announced in the failure message via `_collect`.
+    """
+    scripts_dir = Path(sys.executable).parent
+    for name in ("pytest.exe", "pytest"):
+        candidate = scripts_dir / name
+        if candidate.is_file():
+            return [str(candidate)]
+    return [sys.executable, "-m", "pytest"]
+
+
 def _collect(shim: Path | None = None) -> tuple[int, set[str], str]:
     """Collect the integrations lane exactly as the workflow invokes it."""
     argv = _workflow_pytest_argv()
-    proc = _run(["-m", "pytest", *argv[1:], "--collect-only"], shim)
+    executable, *prefix = _pytest_entrypoint()
+    proc = _run([*prefix, *argv[1:], "--collect-only"], shim, executable)
     node_ids = {
         line.strip().replace("\\", "/")
         for line in proc.stdout.splitlines()
