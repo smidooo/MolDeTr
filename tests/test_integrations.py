@@ -240,7 +240,11 @@ def test_newest_release_is_the_one_published_last(monkeypatch):
     ]
 
     def _fake_get(url, *, method="GET"):
-        assert "api.github.com" in url, f"the release lookup should not be calling {url}"
+        # Equality, not `"api.github.com" in url`: a substring test is satisfied by
+        # `https://evil.example/?x=api.github.com`, which is why CodeQL flags the idiom
+        # (py/incomplete-url-substring-sanitization). Pinning the exact endpoint is also the
+        # stronger assertion — it catches the lookup being repointed at all, not just off-host.
+        assert url == RELEASES_API, f"the release lookup should not be calling {url}"
         return 200, json.dumps(releases).encode("utf-8")
 
     # Patching the module global rather than an attribute path keeps this working under
