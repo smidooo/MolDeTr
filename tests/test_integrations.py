@@ -184,14 +184,25 @@ def test_paper_relation_predicate_bites():
         "omits the key entirely on a record that has never had one"
     )
 
+    published = {
+        "related_identifiers": [
+            {"relation": "isSupplementTo", "identifier": tree_url},
+            {"relation": "isSupplementTo", "identifier": PAPER_DOI},
+        ]
+    }
+    assert paper_relation_present(published), "the shape every published record is supposed to have"
+
+    # The DOI is a parameter, and the fixer's idempotency check passes `--paper-doi` through it.
+    # Reading the constant instead would make `--paper-doi <something already present>` append a
+    # duplicate, because the check would be asking about a different DOI than the one being added.
+    assert not paper_relation_present(published, "10.9999/not.in.this.record"), (
+        "asked about a DOI the record does not carry, the answer must be False even though the "
+        "record is otherwise perfectly related"
+    )
+    other = "10.5281/zenodo.21217101"
     assert paper_relation_present(
-        {
-            "related_identifiers": [
-                {"relation": "isSupplementTo", "identifier": tree_url},
-                {"relation": "isSupplementTo", "identifier": PAPER_DOI},
-            ]
-        }
-    ), "the shape every published record is supposed to have"
+        {"related_identifiers": [{"relation": "isSupplementTo", "identifier": other}]}, other
+    ), "asked about a DOI that IS present, the answer must be True regardless of PAPER_DOI"
 
 
 @pytest.mark.network

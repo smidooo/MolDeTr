@@ -59,17 +59,21 @@ DEFAULT_TOKEN_FILE = Path.home() / ".secrets" / ".zenodo_token"
 TIMEOUT = 60
 
 
-def paper_relation_present(metadata: dict) -> bool:
-    """Does this deposit already relate the article correctly?
+def paper_relation_present(metadata: dict, doi: str = PAPER_DOI) -> bool:
+    """Does this deposit already relate `doi` correctly?
 
     The single definition of "present", shared with `tests/test_integrations.py` so the guard that
     detects the gap and the tool that closes it cannot disagree about what they are looking for.
+
+    `doi` is a parameter rather than a constant read directly so that the idempotency check below
+    asks about the DOI actually being added. Hardcoding `PAPER_DOI` here would make
+    `--paper-doi <other>` append unconditionally and duplicate an entry that was already there.
 
     Tolerates a deposit with no `related_identifiers` key at all — Zenodo omits it entirely on a
     record that has never had one.
     """
     return any(
-        entry.get("relation") == PAPER_RELATION and entry.get("identifier") == PAPER_DOI
+        entry.get("relation") == PAPER_RELATION and entry.get("identifier") == doi
         for entry in metadata.get("related_identifiers") or []
     )
 
@@ -171,7 +175,7 @@ def main() -> int:
 
     _show(f"CURRENT ({metadata.get('version')})", metadata)
 
-    if paper_relation_present(metadata) and args.paper_doi == PAPER_DOI:
+    if paper_relation_present(metadata, args.paper_doi):
         print("\nPaper DOI already present. Nothing to do.")
         return 0
 
