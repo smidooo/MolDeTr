@@ -12,6 +12,13 @@ ignored check is worse than none.
 Marked per-test rather than with a module-level `pytestmark`: the Colab test needs no network at all
 (it resolves a URL against the working tree) and belongs in the fast lane, where it can catch a
 renamed notebook on the PR that renames it rather than up to a week later.
+
+Imports are the standard library plus one first-party module, `scripts.zenodo_add_paper_doi`. That
+matters more than it looks: `integrations.yml` installs pytest and nothing else, so a third-party
+import here kills collection and the job files an issue blaming a missing dependency. The script is
+stdlib-only and arrives with the checkout, and `tests/test_integrations_isolation.py` holds that end
+of the contract. It is imported rather than reimplemented so the guard and the fixer cannot drift
+apart about what "the relation is present" means.
 """
 
 from __future__ import annotations
@@ -25,9 +32,20 @@ from pathlib import Path
 
 import pytest
 
+from scripts.zenodo_add_paper_doi import PAPER_DOI, ZENODO_CONCEPT_ID, paper_relation_present
+
 REPO = Path(__file__).resolve().parent.parent
 CITATION = REPO / "CITATION.cff"
 README = REPO / "README.md"
+
+#: Zenodo's record API. GETting the *concept* id returns the newest version record, which is how
+#: both this module and `scripts/zenodo_add_paper_doi.py` find the current release without a
+#: hardcoded record number — the previous hardcoded one was obsolete within two releases.
+ZENODO_RECORD_API = "https://zenodo.org/api/records/{record_id}"
+
+#: Releases newest-first. Deliberately not `/releases/latest`, which hides prereleases; see
+#: `test_latest_software_record_supplements_the_article`.
+RELEASES_API = "https://api.github.com/repos/smidooo/MolDeTr/releases?per_page=10"
 
 #: The Handle System's own resolver API. Deliberately not a GET of `https://doi.org/<doi>`: that
 #: follows the redirect to the publisher, and publishers block generic clients. `pubs.acs.org`
@@ -86,6 +104,25 @@ def _declared_dois() -> list[str]:
     return re.findall(r"^\s*value:\s*(10\.\d{4,}/\S+)\s*$", text, re.M)
 
 
+def _newest_published_release_tag() -> str:
+    """The tag Zenodo most recently archived, as GitHub reports it.
+
+    Drafts are excluded because they fire no webhook and mint nothing. Prereleases are *kept* for
+    the opposite reason: Zenodo archives one exactly like a full release, so skipping them would
+    leave the deposit and this check naming different tags.
+
+    `metadata.version` on the Zenodo side carries the `v` prefix verbatim (`v1.3.0`, verified
+    across all six records), so the comparison is a plain equality with no normalisation to get
+    subtly wrong.
+    """
+    status, body = _get(RELEASES_API)
+    assert status == 200, f"could not list releases (HTTP {status}); the cross-check cannot run"
+
+    published = [release for release in json.loads(body) if not release.get("draft")]
+    assert published, "no published releases found — the scrape shape changed or the repo has none"
+    return published[0]["tag_name"]
+
+
 @pytest.mark.network
 def test_citation_declares_the_dois_we_expect():
     """Guards this module's own premise: the checks below are only as good as what they enumerate.
@@ -112,6 +149,105 @@ def test_every_declared_doi_still_resolves(doi):
     assert code == HANDLE_SUCCESS, (
         f"DOI {doi} did not resolve: Handle responseCode={code} "
         f"({'handle not found — the DOI does not exist' if code == 100 else 'see handle.net docs'})"
+    )
+
+
+@pytest.mark.unit
+def test_paper_relation_predicate_bites():
+    """The network test below cannot prove itself, so this proves the part that decides.
+
+    Every one of the six software records carries the relation today — only v0.1.0 was born with
+    it and the other five were backfilled. There is no live record left that *lacks* it, so a purely network-based
+    guard would have gone green on its first run and stayed green whether or not it checked
+    anything. This repository has already shipped three guards that never guarded; the crafted
+    payloads below are what keep this from being the fourth.
+
+    The third case is the one with teeth. `zenodo_add_paper_doi.ps1` decided "already present" on
+    the *identifier* alone, so a record relating the article under any other verb — `references`,
+    `isCitedBy` — would have read as correct to the fixer while being wrong in the metadata. A
+    guard and a fixer that disagree about what "present" means cannot close a loop between them,
+    which is why both now call this one function.
+    """
+    tree_url = "https://github.com/smidooo/MolDeTr/tree/v1.3.0"
+
+    assert not paper_relation_present({"related_identifiers": []})
+    assert not paper_relation_present(
+        {"related_identifiers": [{"relation": "isSupplementTo", "identifier": tree_url}]}
+    ), (
+        "a record carrying only the GitHub-tree relation is exactly the state this guard exists to catch"
+    )
+    assert not paper_relation_present(
+        {"related_identifiers": [{"relation": "references", "identifier": PAPER_DOI}]}
+    ), "the article must be related as isSupplementTo; the right DOI under the wrong verb is not it"
+    assert not paper_relation_present({}), (
+        "a deposit with no related_identifiers key at all must answer False, not raise — Zenodo "
+        "omits the key entirely on a record that has never had one"
+    )
+
+    published = {
+        "related_identifiers": [
+            {"relation": "isSupplementTo", "identifier": tree_url},
+            {"relation": "isSupplementTo", "identifier": PAPER_DOI},
+        ]
+    }
+    assert paper_relation_present(published), "the shape every published record is supposed to have"
+
+    # The DOI is a parameter, and the fixer's idempotency check passes `--paper-doi` through it.
+    # Reading the constant instead would make `--paper-doi <something already present>` append a
+    # duplicate, because the check would be asking about a different DOI than the one being added.
+    assert not paper_relation_present(published, "10.9999/not.in.this.record"), (
+        "asked about a DOI the record does not carry, the answer must be False even though the "
+        "record is otherwise perfectly related"
+    )
+    other = "10.5281/zenodo.21217101"
+    assert paper_relation_present(
+        {"related_identifiers": [{"relation": "isSupplementTo", "identifier": other}]}, other
+    ), "asked about a DOI that IS present, the answer must be True regardless of PAPER_DOI"
+
+
+@pytest.mark.network
+def test_latest_software_record_supplements_the_article():
+    """The newest software deposit must point at the paper it accompanies.
+
+    It never does. The relation has been absent from **every release since v0.1.0 — five for
+    five** (v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0) — the last minted four days after a script was
+    written to fix the problem.
+    Zenodo does not carry it forward: v1.2.0 was published without it even though v1.1.1 had
+    already been hand-edited to carry it, which rules out "the previous record seeds the next one"
+    and rules out diligence as the cause. Nothing in the repository could see it, and nothing
+    about a release without it looks wrong.
+
+    **The version cross-check is load-bearing, not decoration.** `GET /records/<concept id>`
+    returns the newest *version* record, so a run that fires before Zenodo's webhook has minted
+    resolves to the *previous* release — which does carry the relation — and passes while the new
+    release carries nothing. Comparing against the newest published GitHub release is what turns
+    that silent pass into a readable failure.
+
+    Releases are enumerated rather than read from `/releases/latest`, which excludes prereleases.
+    Zenodo archives a prerelease like any other release, so `latest` would name one tag while the
+    deposit named another and the guard would cry drift over the one release shape it cannot see.
+    """
+    tag = _newest_published_release_tag()
+
+    status, body = _get(ZENODO_RECORD_API.format(record_id=ZENODO_CONCEPT_ID))
+    assert status == 200, (
+        f"the Zenodo concept record {ZENODO_CONCEPT_ID} was unreachable (HTTP {status}), so "
+        f"nothing below was checked"
+    )
+    metadata = json.loads(body)["metadata"]
+    version = metadata.get("version")
+
+    assert version == tag, (
+        f"Zenodo's newest software record is {version!r} but the newest published GitHub release "
+        f"is {tag!r}. Either the release webhook has not minted yet (wait and re-run) or it "
+        f"failed — until they agree, this guard would be checking the wrong record."
+    )
+
+    assert paper_relation_present(metadata), (
+        f"the {version} software record does not relate the article as isSupplementTo → "
+        f"{PAPER_DOI}. Fix it with `python scripts/zenodo_add_paper_doi.py` (dry run) then "
+        f"`--confirm`; see docs/RELEASING.md. Present relations: "
+        f"{[(r.get('relation'), r.get('identifier')) for r in metadata.get('related_identifiers', [])]}"
     )
 
 
