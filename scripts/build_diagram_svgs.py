@@ -100,6 +100,9 @@ LIGHT = {
     "tealText": "#15776a",
     "rule": "#e6ebf2",
     "track": "#eef2f7",
+    # The mark's own ink, on the navy tile. Not `onSolid`: it is a touch cooler than white, and the
+    # extraction shows it does NOT flip in dark -- the tile lightens under it instead.
+    "tileInk": "#eaf1fb",
 }
 #: The dark-figure palette, EXTRACTED rather than invented. `docs/BRAND.md` § Dark-figure palette
 #: names only five roles, which is not enough to render these figures, and the gap was previously
@@ -140,6 +143,7 @@ DARK = {
     "tealText": "#5cc2b0",
     "rule": "#28303f",
     "track": "#262f3d",
+    "tileInk": "#eaf1fb",
 }
 
 SG = "'Space Grotesk','IBM Plex Sans',sans-serif"
@@ -675,12 +679,53 @@ def benchmark(t: dict[str, str]) -> str:
     return c.done()
 
 
+def mark(t: dict[str, str]) -> str:
+    """The app-icon mark: navy tile, tricolor dashes, two peaks, wordmark.
+
+    Referenced by nothing until now, which is why it is here at all -- a finished asset the repo
+    never showed. As vector it can serve as the docs-site favicon, where a 672 px raster is both
+    too big and the wrong shape for the job.
+
+    Its colour mapping is a third independent confirmation of the `navy` fill split: `#1f3a5f`
+    maps to `#31517d` at 100 % over 230_084 px, the same value `input_contract` and `architecture`
+    gave, and nothing like the `#e8eef6` the display text takes.
+    """
+    c = Canvas(
+        672,
+        672,
+        "MolDeTr mark",
+        "The MolDeTr app icon: a rounded navy tile carrying the blue, orange and teal dash triple, "
+        "a two-peak NMR trace, and the MolDeTr wordmark.",
+        faces=("sg700",),
+        ground=t["card"],
+    )
+    # Shadow parameters swept against the reference rather than guessed: dy/stdDeviation/opacity
+    # over a 3x3x3 grid, scored by mean absolute difference. 26/40/0.34 wins at 5.00/255 against
+    # 6.65 for the first guess. The filter region has to be generous -- the reference shadow is
+    # still 18 levels deep 62 px below the tile, and a tight region clips it into a visible edge.
+    c.parts.append(
+        '<defs><filter id="sh" x="-60%" y="-60%" width="220%" height="240%">'
+        '<feDropShadow dx="0" dy="26" stdDeviation="40" flood-color="#3d4a5e" '
+        'flood-opacity="0.34"/></filter></defs>'
+    )
+    c.parts.append(
+        f'<rect x="84" y="84" width="504" height="504" rx="102" fill="{t["navy"]}" '
+        f'filter="url(#sh)"/>'
+    )
+    for i, col in enumerate((t["blue"], t["orange"], t["teal"])):
+        c.rect(198 + 99 * i, 174, 78, 21, 10.5, col)
+    c.spectrum(175, 496, 357.5, ((262, 63, 17), (394, 51, 15)), t["tileInk"], sw=6)
+    c.text(338, 483, "MolDeTr", 63.7, SG, 700, t["tileInk"])
+    return c.done()
+
+
 DIAGRAMS = {
     "pipeline": pipeline,
     "architecture": architecture,
     "input_contract": input_contract,
     "coupling_rule": coupling_rule,
     "benchmark": benchmark,
+    "mark": mark,
 }
 
 

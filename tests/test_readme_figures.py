@@ -256,3 +256,30 @@ def test_a_light_figure_and_its_dark_twin_share_one_geometry():
         "box sized from the <img>, so the twin is stretched and only dark-mode readers see it:\n  "
         + "\n  ".join(drift)
     )
+
+
+@pytest.mark.unit
+def test_the_docs_favicon_points_at_files_that_exist():
+    """`docs/_includes/head-custom.html` is the only place the mark is referenced, so nothing else
+    would notice it rotting.
+
+    Two distinct ways this goes silently wrong. The obvious one: a renamed or deleted asset leaves
+    the site serving a 404 for its icon, which no page test would catch because the page still
+    renders. The subtler one: the file only does anything at all because
+    `jekyll-theme-cayman`'s `_layouts/default.html` ends its `<head>` with
+    `{% include head-custom.html %}` -- drop the theme or switch it and this include becomes inert
+    while still looking correct. That half cannot be asserted from here, so it is written down in
+    the include itself; this test holds the half that can.
+    """
+    include = REPO / "docs" / "_includes" / "head-custom.html"
+    assert include.is_file(), "the favicon include is gone; docs/_config.yml still names a theme"
+    hrefs = re.findall(
+        r"""href=["']?\{\{\s*'([^']+)'\s*\|\s*relative_url\s*\}\}""",
+        include.read_text(encoding="utf-8"),
+    )
+    assert hrefs, "the include declares no icon href; a favicon that names nothing is not a favicon"
+    missing = [h for h in hrefs if not (REPO / "docs" / h.lstrip("/")).is_file()]
+    assert not missing, (
+        f"docs/_includes/head-custom.html points at {missing}, which do not exist under docs/. "
+        "Paths there are site-root-relative, so they resolve against docs/, not the repo root."
+    )
