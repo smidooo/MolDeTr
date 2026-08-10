@@ -207,26 +207,24 @@ def plot_diagnostic_state(page: Page) -> dict:
     return page.evaluate(_PLOT_DIAGNOSTIC_JS)
 
 
-def test_plot_diagnostic_reports_a_loaded_chunk_on_a_healthy_run(
-    page: Page, served_app_url: str
-) -> None:
+def _assert_diagnostic_is_not_vacuous(page: Page) -> None:
     """The failure probe must be able to say "yes", or its "no" means nothing.
 
-    A diagnostic is only trustworthy if it has been seen reporting the healthy case correctly.
-    Reading a bundle and concluding a field cannot work is not the same as measuring it -- that
-    exact reasoning was tried here on 2026-08-10 and was **wrong**: a grep showed the gradio chunk
-    assigning `window.PlotlyGeoAssets` and `window.PlotlyLocales` but never `window.Plotly`, which
-    looked like proof that #53's `plotlyLoaded` was vacuous. Running it says otherwise --
+    Asserted inside the zoom test rather than as a test of its own, deliberately: it needs a drawn
+    canvas, the zoom test has already produced one, and a separate test would add a third full app
+    load to a tier that has now twice shown load sensitivity (#51 on webkit, and
+    `test_container_max_width_comes_from_custom_css` on firefox). Same guarantee, no extra load.
+
+    Why it exists at all: a diagnostic is only trustworthy once it has been *seen* reporting the
+    healthy case. Reading a bundle and concluding a field cannot work is not the same as measuring
+    it -- that exact reasoning was tried on 2026-08-10 and was **wrong**. A grep showed the gradio
+    chunk assigning `window.PlotlyGeoAssets` and `window.PlotlyLocales` but never `window.Plotly`,
+    which looked like proof that #53's `plotlyLoaded` was vacuous. Running it says otherwise:
     `window.Plotly` is defined once the chunk evaluates, so the field was right all along.
 
-    Hence this test rather than an argument. Same non-vacuity discipline as
-    `test_browser_a11y.py::test_button_name_settle_is_not_vacuous`, applied to the failure report
-    instead of to a settle.
+    Same non-vacuity discipline as `test_browser_a11y.py::test_button_name_settle_is_not_vacuous`,
+    applied to the failure report instead of to a settle.
     """
-    _detect_with_example(page, served_app_url, "guajazulene")
-    expect(page.get_by_text("Detected", exact=False)).to_be_visible(timeout=30_000)
-    expect(page.locator("#md-plot .js-plotly-plot")).to_be_visible(timeout=30_000)
-
     state = plot_diagnostic_state(page)
     assert state["hasPlotlyDiv"] is True, f"canvas visible but probe disagrees: {state}"
     assert state["plotlyLoaded"] is True, (
@@ -247,6 +245,7 @@ def test_spectrum_plot_zooms_and_resets(page: Page, served_app_url: str) -> None
     _detect_with_example(page, served_app_url, "guajazulene")
     expect(page.get_by_text("Detected", exact=False)).to_be_visible(timeout=30_000)
     plot = _expect_plotly_or_report(page)
+    _assert_diagnostic_is_not_vacuous(page)
 
     box = plot.bounding_box()
     assert box, "the Plotly canvas has no layout box"
