@@ -148,27 +148,92 @@ def _expect_plotly_or_report(page: Page):
     try:
         expect(plot).to_be_visible(timeout=30_000)
     except AssertionError as exc:
-        state = page.evaluate(
-            """() => {
-                const c = document.querySelector('#md-plot');
-                if (!c) return {container: 'ABSENT'};
-                const r = c.getBoundingClientRect();
-                const cs = getComputedStyle(c);
-                return {
-                    box: `${Math.round(r.width)}x${Math.round(r.height)}`,
-                    display: cs.display,
-                    visibility: cs.visibility,
-                    children: c.childElementCount,
-                    hasPlotlyDiv: !!c.querySelector('.js-plotly-plot'),
-                    plotlyLoaded: typeof window.Plotly !== 'undefined',
-                    html: c.innerHTML.slice(0, 300),
-                };
-            }"""
-        )
+        state = plot_diagnostic_state(page)
         raise AssertionError(
             f"the Plotly canvas never appeared within 30 s. #md-plot at timeout: {state}"
         ) from exc
     return plot
+
+
+_PLOT_DIAGNOSTIC_JS = """() => {
+    const entries = performance.getEntriesByType('resource')
+        .filter(e => /PlotlyPlot-[^/]*\\.js/.test(e.name));
+    const first = entries[0];
+    const chunk = {
+        requested: entries.length,
+        bytes: first ? first.encodedBodySize : null,
+        ms: first ? Math.round(first.duration) : null,
+        geoAssets: typeof window.PlotlyGeoAssets !== 'undefined',
+    };
+    chunk.status = entries.length === 0
+        ? 'never-requested-or-in-flight'
+        : (first.encodedBodySize > 0 ? 'loaded' : 'requested-but-empty');
+    const c = document.querySelector('#md-plot');
+    if (!c) return {container: 'ABSENT', chunk};
+    const r = c.getBoundingClientRect();
+    const cs = getComputedStyle(c);
+    return {
+        box: `${Math.round(r.width)}x${Math.round(r.height)}`,
+        display: cs.display,
+        visibility: cs.visibility,
+        children: c.childElementCount,
+        hasPlotlyDiv: !!c.querySelector('.js-plotly-plot'),
+        plotlyLoaded: typeof window.Plotly !== 'undefined',
+        chunk,
+        html: c.innerHTML.slice(0, 300),
+    };
+}"""
+
+
+def plot_diagnostic_state(page: Page) -> dict:
+    """What `#md-plot` and the lazily-imported Plotly chunk actually are, right now.
+
+    Shared by the failure path above and by the non-vacuity test below, so the thing asserted to
+    discriminate is the same code that runs when a lane goes red.
+
+    `plotlyLoaded` is kept exactly as #53 shipped it. It was checked rather than assumed on
+    2026-08-10: on a healthy webkit run it reports `true`, so it does discriminate and issue #51's
+    close condition that reads `plotlyLoaded: false` as a script/bundle problem is sound.
+
+    `chunk` is the addition. gradio's Plot component lazy-imports `PlotlyPlot-*.js` with no
+    `.catch()` and no retry, memoising only on success, and its failure branch renders the `Empty`
+    placeholder -- which has a non-zero box and a non-zero child count. So `plotlyLoaded: false`
+    says the library is absent but not *why*, and container geometry cannot separate *never
+    mounted* from *mounted and empty*. Resource timing can: no entry means the chunk was never
+    fetched, an entry with zero bytes means it was fetched and rejected, and bytes plus a duration
+    means it arrived and the failure is downstream of the network. Measured on a healthy run:
+    `{'requested': 1, 'bytes': 1275128, 'ms': 285, 'geoAssets': True, 'status': 'loaded'}`.
+    """
+    return page.evaluate(_PLOT_DIAGNOSTIC_JS)
+
+
+def _assert_diagnostic_is_not_vacuous(page: Page) -> None:
+    """The failure probe must be able to say "yes", or its "no" means nothing.
+
+    Asserted inside the zoom test rather than as a test of its own, deliberately: it needs a drawn
+    canvas, the zoom test has already produced one, and a separate test would add a third full app
+    load to a tier that has now twice shown load sensitivity (#51 on webkit, and
+    `test_container_max_width_comes_from_custom_css` on firefox). Same guarantee, no extra load.
+
+    Why it exists at all: a diagnostic is only trustworthy once it has been *seen* reporting the
+    healthy case. Reading a bundle and concluding a field cannot work is not the same as measuring
+    it -- that exact reasoning was tried on 2026-08-10 and was **wrong**. A grep showed the gradio
+    chunk assigning `window.PlotlyGeoAssets` and `window.PlotlyLocales` but never `window.Plotly`,
+    which looked like proof that #53's `plotlyLoaded` was vacuous. Running it says otherwise:
+    `window.Plotly` is defined once the chunk evaluates, so the field was right all along.
+
+    Same non-vacuity discipline as `test_browser_a11y.py::test_button_name_settle_is_not_vacuous`,
+    applied to the failure report instead of to a settle.
+    """
+    state = plot_diagnostic_state(page)
+    assert state["hasPlotlyDiv"] is True, f"canvas visible but probe disagrees: {state}"
+    assert state["plotlyLoaded"] is True, (
+        f"the canvas drew, so `plotlyLoaded` must be true or the field is vacuous: {state}"
+    )
+    assert state["chunk"]["status"] == "loaded", (
+        f"the canvas drew, so the chunk must read as loaded; probe said {state['chunk']}"
+    )
+    assert state["chunk"]["bytes"] > 0, f"a drawn canvas implies non-zero chunk bytes: {state}"
 
 
 def test_spectrum_plot_zooms_and_resets(page: Page, served_app_url: str) -> None:
@@ -180,6 +245,7 @@ def test_spectrum_plot_zooms_and_resets(page: Page, served_app_url: str) -> None
     _detect_with_example(page, served_app_url, "guajazulene")
     expect(page.get_by_text("Detected", exact=False)).to_be_visible(timeout=30_000)
     plot = _expect_plotly_or_report(page)
+    _assert_diagnostic_is_not_vacuous(page)
 
     box = plot.bounding_box()
     assert box, "the Plotly canvas has no layout box"
