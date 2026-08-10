@@ -21,20 +21,42 @@ docs all cite.
 | latent | `#7d92b0` | NN hidden-layer nodes (diagrams) |
 | panel | `#f1f5fa` | panel fill |
 | border | `#d5dfeb` | hairline borders |
-| page | `#eef2f7` | app background |
+| page | `#eef2f7` | app background — **not** the figure ground, see `figure-page` |
+| figure-page | `#f8fafd` | the ground inside a diagram frame (`docs/img/*.svg`) |
 | **brick** | `#9b3128` | errors (the brand has no pure red — this is an oklch-harmonised brick) |
+
+`page` and `figure-page` are separate roles that were briefly conflated. The app background is
+`#eef2f7`; the diagram ground measured `#f8fafd` across every figure. Generators must not
+substitute one for the other.
 
 ### Dark-figure palette (for `prefers-color-scheme: dark` image variants)
 
 | Token | Hex |
 |---|---|
 | bg / card | `#141821` / `#1b2130` |
+| panel / figure-page | `#232c3c` / `#141821` |
 | text / dim | `#e8eef6` / `#93a2b5` |
 | muted / eyebrow | `#9fb0c4` / `#8f9db0` |
 | grid / border | `#28303f` / `#334054` |
 | trace | `#e8eef6` |
+| **navy fill / display text** | `#31517d` / `#e2e9f4` |
+| connector / arrow | `#3a4557` / `#9db0c6` (unchanged) |
+| track / rule | `#262f3d` / `#28303f` |
+| brick / its wash / its edge | `#e08575` / `#241a18` / `#5c3a34` |
+| teal wash / teal edge / teal text | `#16241f` / `#2f5850` / `#5cc2b0` |
 
 The **tricolor stays identical** in dark mode — blue/orange/teal read well on both grounds.
+
+**`navy` is two roles in dark, and only one of them is a colour swap.** In light, the box fill and
+the display type are both `#1f3a5f`. In dark they diverge: a filled box becomes `#31517d` and the
+type it once shared a value with becomes `#e2e9f4`. Carrying one token for both produces a
+near-white box with dark text where the figure wants a blue box with light text — a defect only
+dark-mode readers ever see. `scripts/build_diagram_svgs.py` keeps `navy` and `display` apart.
+
+These dark values were **extracted, not chosen**: three figures shipped light and dark PNGs of
+identical dimensions, so masking the light image by each token and taking the modal colour under
+that mask in the dark image recovers the mapping exactly. Every row agreed at 100 % except the two
+that legitimately split. Prefer re-running that extraction over inventing a value.
 
 ## The multiplet tricolor & colour accessibility
 
