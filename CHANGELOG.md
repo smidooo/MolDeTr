@@ -6,7 +6,60 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **`docs/img/input_contract.png`'s caption was truncated, live on the front page.** It rendered
+  "ependent — 80–600 MHz all map to 1200 Hz (MolDeTr works in Hz)" — the leading "Field-ind" simply
+  absent from the committed asset, while the README's own alt text beside it said
+  "field-independent". Restored in full when the figure was re-authored as vector.
+
+- **The dark figure variants shipped in the previous entry had six wrong colour tokens, and no
+  ground at all.** `docs/BRAND.md` § Dark-figure palette names five roles; rendering these figures
+  needs twenty-six, and the gap had been filled by guessing. Worst of them: `navy` was mapped to
+  `#e8eef6`, which is right for the *title text* and badly wrong for a *filled box* — dark-mode
+  readers got a near-white panel with dark text where the original had a blue panel with light
+  text. `panel`, `connector`, `arrow`, `onSolid` and `warnBg` were also off. Separately, the SVGs
+  painted no background, so where the PNGs were fully opaque `#1b2130` the figures took GitHub's
+  own `#0d1117` instead.
+
+  The fix is a measurement rather than a better guess. `input_contract`, `coupling_rule` and
+  `benchmark` each shipped light and dark PNGs of *identical dimensions*, which makes the pair a
+  pixel-for-pixel colour map: mask the light image by a token, take the modal colour under that
+  mask in the dark image. Every token came back at 100 % agreement except the two that legitimately
+  split — `navy` (fill `#31517d` vs display text `#e2e9f4`, now separate tokens) and `card` (the
+  region-of-interest window interiors go *below* the ground in dark, `#10161f`, not above it).
+  The extracted palette is recorded in BRAND.md. Dark now matches its reference as closely as light
+  does: `benchmark` 95.0 % pixel-identical, `coupling_rule` 94.9 %, `input_contract` 96.6 %.
+
+- **`docs/img/architecture.svg` painted 11 % of its canvas the wrong grey and set its title 19 % too
+  small.** Its wide right-hand panel is `figure-page` `#f8fafd`, not `panel` `#f1f5fa`; its title is
+  the same 39.4 px display size every other figure uses, not 33; its hairlines are 3 px, not 1.5;
+  and its four connector arrows were each ~10 px short. Measured against the PNG it replaced it had
+  been 82.6 % pixel-identical against `pipeline`'s 94.0 %, which is what prompted the check. Now
+  93.5 %. The masthead is a shared helper, so the title size cannot drift per figure again.
+
 ### Changed
+- **The last three README diagrams are vector: `input_contract`, `coupling_rule`, `benchmark`.**
+  Same method as `pipeline` and `architecture` — measure the committed PNG, re-author from the
+  `docs/BRAND.md` tokens, render through an `<img>` tag (the sandboxed mode GitHub uses, where a
+  merely *referenced* font falls back silently), diff. Fidelity against the assets they replace:
+  `input_contract` 96.6 % pixel-identical (mean 2.7/255), `coupling_rule` 94.9 % (4.5), `benchmark`
+  94.8 % (3.1) — at or above the 94.0 % `pipeline` set. Six PNGs (632 KB) become six SVGs, and the
+  light/dark pairs collapse to one geometry each.
+
+  Three things the measurement caught that eyeballing would not have. The proton-class bars are
+  blue → **orange** → teal, matching the BRAND.md marker cycle, not blue → teal → orange. The
+  region-of-interest windows in `coupling_rule` are *filled* — lifting the window off its panel
+  wash is the whole subject of the figure — and leaving them transparent quietly removed the
+  distinction. And neither figure's spectrum is a continuous trace: each multiplet is an
+  independent 86 px segment returning to baseline, with bare ground between, which is also the
+  more honest reading, since what these figures argue about is individual multiplets.
+
+  `benchmark` needed no charting library: it is three stat cards and three progress bars over
+  `#eef2f7` tracks. Its display numerals are tracked in at −2, because matching the original on cap
+  height alone left them 7 % too wide and matching on width alone left them too short; and its
+  percent signs are IBM Plex rather than Space Grotesk, whose `%` is both taller and narrower than
+  its own digits, so one face cannot hold both to the same cap height.
+
 - **The architecture diagram is vector too, and its text colour was failing WCAG AA.** It painted
   the eyebrow and secondary labels in `#74808f` — the token `docs/BRAND.md` explicitly *retired* for
   measuring 4.01:1 on white, under the 4.5:1 that applies to exactly the small labels it was defined
