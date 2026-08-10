@@ -51,3 +51,6 @@ deploy/EXTERNAL_STEPS.md
 
 # stray generated artifacts (regeneratable; not README assets)
 /prediction.png
+
+# Scratch probes written by the SVG render/diff harness (scripts are not committed)
+docs/img/_probe_*.html

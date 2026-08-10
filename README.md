@@ -132,8 +132,8 @@ To skip the install entirely, run it in Colab: the [▶ interactive app](https:/
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/pipeline-dark.png">
-    <img src="docs/img/pipeline.png" alt="Pipeline: a 1H NMR window of up to 1200 Hz is resampled to 6144 points at 5.12 points per Hz, passed through MolDeTr, a Deformable-DETR with an FPN backbone and transformer, which emits one box per multiplet, decoded to chemical shift, coupling, proton count, and line width" width="860">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/pipeline-dark.svg">
+    <img src="docs/img/pipeline.svg" alt="Pipeline: a 1H NMR window of up to 1200 Hz is resampled to 6144 points at 5.12 points per Hz, passed through MolDeTr, a Deformable-DETR with an FPN backbone and transformer, which emits one box per multiplet, decoded to chemical shift, coupling, proton count, and line width" width="860">
   </picture>
 </p>
 
@@ -155,8 +155,8 @@ queries, and per-query heads matched to ground truth by the Hungarian algorithm 
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/architecture-dark.png">
-    <img src="docs/img/architecture.png" alt="MolDeTr architecture: a 6144-point window feeds an FPN backbone (multi-scale P3/P4/P5), a deformable-attention transformer with N object queries, then per-query heads predicting multiplet-or-nothing, chemical shift, a coupling embedding, proton-count class and line width; Hungarian matching is used at training time" width="860">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/architecture-dark.svg">
+    <img src="docs/img/architecture.svg" alt="MolDeTr architecture: a 6144-point window feeds an FPN backbone (multi-scale P3/P4/P5), a deformable-attention transformer with N object queries, then per-query heads predicting multiplet-or-nothing, chemical shift, a coupling embedding, proton-count class and line width; Hungarian matching is used at training time" width="860">
   </picture>
 </p>
 

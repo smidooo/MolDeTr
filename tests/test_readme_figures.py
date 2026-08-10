@@ -37,6 +37,34 @@ README = REPO / "README.md"
 MIN_SCALE = 2.0
 
 
+#: An ``<svg>`` root carrying a four-number ``viewBox``, read off the head of the file. One pattern
+#: serves both the "is it scalable" and the "what shape is it" questions -- a second copy of this
+#: regex was briefly written by a different route, silently acquired a literal backspace where its
+#: ``\b`` should have been, and answered ``None`` for the very files the first copy accepted.
+_VIEWBOX = re.compile(
+    rb"<svg\b[^>]*\bviewBox\s*=\s*[\"']\s*([-\d.]+)[\s,]+([-\d.]+)[\s,]+"
+    rb"([-\d.]+)[\s,]+([-\d.]+)\s*[\"']",
+    re.I | re.S,
+)
+
+
+def _is_scalable_svg(path: Path) -> bool:
+    """True only for an SVG that actually scales: an ``<svg>`` root carrying a four-number viewBox.
+
+    The viewBox is the whole point. An SVG that declares only ``width``/``height`` in pixels has no
+    intrinsic coordinate system to map onto a larger box, so it does not gain the resolution
+    independence this test grants it. Checking the suffix alone would hand out that exemption on
+    the strength of a filename.
+
+    Matched against bytes rather than parsed, for the reason in the module docstring -- this file
+    reads committed bytes and pulls in no parser. It also sidesteps stdlib XML entity expansion,
+    which would be a needless attack surface for a repo-local asset.
+    """
+    if path.suffix.lower() != ".svg":
+        return False
+    return _VIEWBOX.search(path.read_bytes()[:4096]) is not None
+
+
 def _png_or_gif_size(path: Path) -> tuple[int, int] | None:
     """Native pixel dimensions from the file header, or None if it is not a PNG/GIF."""
     header = path.read_bytes()[:33]
@@ -47,6 +75,25 @@ def _png_or_gif_size(path: Path) -> tuple[int, int] | None:
         width, height = struct.unpack("<HH", header[6:10])
         return int(width), int(height)
     return None
+
+
+def _figure_shape(path: Path) -> tuple[float, float] | None:
+    """Intrinsic width and height of a figure -- pixels for a raster, viewBox units for an SVG.
+
+    Returning ``None`` for SVGs here would make the light/dark geometry check pass by *skipping*
+    vector pairs, which is precisely the silent-exemption bug that
+    ``test_every_vector_figure_really_is_scalable`` exists to stop. Converting a drifted pair to
+    SVG would then turn its failure green without fixing anything. A viewBox is directly
+    comparable to a pixel size for aspect-ratio purposes, so both are measured the same way.
+    """
+    raster = _png_or_gif_size(path)
+    if raster is not None:
+        return float(raster[0]), float(raster[1])
+    match = _VIEWBOX.search(path.read_bytes()[:4096])
+    if match is None:
+        return None
+    _, _, width, height = (float(g) for g in match.groups())
+    return (width, height) if width > 0 and height > 0 else None
 
 
 def _local_figures(markdown: str) -> list[tuple[str, int | None]]:
@@ -90,6 +137,8 @@ def test_every_readme_figure_is_at_least_2x_its_rendered_width():
         path = REPO / src
         if not path.is_file():
             pytest.fail(f"README references a figure that does not exist: {src}")
+        if _is_scalable_svg(path):
+            continue  # resolution-independent; owned by the vector test below
         size = _png_or_gif_size(path)
         if size is None or width is None:
             continue  # non-raster or width-less; the companion test owns those
@@ -102,4 +151,68 @@ def test_every_readme_figure_is_at_least_2x_its_rendered_width():
         "README figure(s) below the "
         f"{MIN_SCALE:g}x device-pixel floor, so they will look soft on a HiDPI display:\n  "
         + "\n  ".join(too_small)
+    )
+
+
+@pytest.mark.unit
+def test_every_vector_figure_really_is_scalable():
+    """A ``.svg`` in the README is exempt from the pixel floor -- but only if it can cash the cheque.
+
+    This test exists because of how the exemption is granted. ``_png_or_gif_size`` returns ``None``
+    for anything that is not a PNG or GIF, and the ratio test above skips on ``None``. So before
+    this test, swapping a PNG for an SVG did not *satisfy* the resolution guard -- it silently
+    *removed* that figure from it, and the suite stayed green either way. A named file that is
+    empty, truncated, half-written by a failed generator, or an HTML error page saved with the
+    wrong extension would all have sailed through.
+
+    The check is therefore positive rather than by-suffix: the bytes must contain an ``<svg>`` root
+    with a real four-number ``viewBox``, which is the thing that actually makes it scale.
+    """
+    bad = [
+        src
+        for src, _ in _local_figures(README.read_text(encoding="utf-8"))
+        if src.lower().endswith(".svg") and not _is_scalable_svg(REPO / src)
+    ]
+    assert not bad, (
+        "README figure(s) named .svg but not a scalable SVG (no <svg> root with a four-number "
+        f"viewBox), so they are exempt from the {MIN_SCALE:g}x floor while not being resolution-"
+        f"independent: {bad}"
+    )
+
+
+@pytest.mark.unit
+def test_a_light_figure_and_its_dark_twin_share_one_geometry():
+    """``<picture>`` swaps the source but not the layout, so the twins must be the same shape.
+
+    The browser sizes the block from the ``<img>``, then paints whichever source the colour scheme
+    selects into that same box. A twin with a different aspect ratio is therefore not shown
+    side-by-side with its sibling -- it is *stretched* to the sibling's box, and only dark-mode
+    readers see it. Measured 2026-08-10, two pairs had drifted: ``pipeline`` was 1820x388 light
+    against 1720x370 dark, and ``banner`` 2560x1283 against 2560x1280.
+
+    Compares the aspect ratio rather than the pixel size on purpose: differing native resolutions
+    are fine and sometimes deliberate, a differing *shape* never is.
+    """
+    drift: list[str] = []
+    for src, _ in _local_figures(README.read_text(encoding="utf-8")):
+        if "-dark." in src:
+            continue
+        light = REPO / src
+        stem, _, suffix = src.rpartition(".")
+        dark = REPO / f"{stem}-dark.{suffix}"
+        if not light.is_file() or not dark.is_file():
+            continue
+        pair = [_figure_shape(p) for p in (light, dark)]
+        if any(s is None for s in pair):
+            continue  # neither raster nor SVG; nothing to compare
+        (lw, lh), (dw, dh) = pair
+        if abs(lw / lh - dw / dh) > 0.005:
+            drift.append(
+                f"{src} is {lw}x{lh} (aspect {lw / lh:.3f}) but its dark twin is "
+                f"{dw}x{dh} (aspect {dw / dh:.3f})"
+            )
+    assert not drift, (
+        "light/dark figure pair(s) with different aspect ratios; <picture> paints both into the "
+        "box sized from the <img>, so the twin is stretched and only dark-mode readers see it:\n  "
+        + "\n  ".join(drift)
     )

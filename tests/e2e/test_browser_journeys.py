@@ -89,6 +89,13 @@ def test_threshold_at_maximum_reports_no_multiplets(page: Page, served_app_url: 
     page.goto(served_app_url)
     page.locator("#md-file").wait_for()
     page.locator("#md-examples").get_by_role("button", name="guajazulene").click()
+    # Settle before touching the threshold, exactly as `_detect_with_example` above does. Selecting
+    # an example populates the Detect tab's inputs asynchronously; without this wait the `fill`
+    # below races that population, and when the example lands second it restores the threshold to
+    # its default. Detection then finds multiplets, the empty state never renders, and the
+    # assertion burns its full 30 s. This was the only test in the file that skipped the settle,
+    # and it is why `browser e2e (firefox)` went red on an otherwise docs-only commit.
+    expect(page.locator("#md-check")).to_contain_text("Input check")
     # "Detection threshold" labels BOTH a number box and a range slider (Gradio renders a paired
     # control), and the same label appears again on the Simulate tab — so scope to the Detect tab
     # and pick the number input explicitly rather than relying on a unique label.
