@@ -6,6 +6,32 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **The docs site has an icon, and the repo's own mark finally does something.**
+  `docs/img/mark.png` and `mark-dark.png` — a finished app-icon logo: navy tile, tricolor dash
+  triple, two-peak trace, wordmark — were referenced by **nothing**, in any file, since they were
+  committed. They are now generated as vector by the same `scripts/build_diagram_svgs.py` that
+  builds the README figures, so they cannot drift from `docs/BRAND.md`, and `mark.svg` is wired as
+  the favicon for the GitHub Pages site, which previously had none.
+
+  Vector matters more here than for a diagram: a favicon is rendered at whatever size the client
+  asks for — 16, 32, 48, and a much larger tile when a page is pinned or saved to a home screen —
+  and one SVG serves all of them, at 11.9 KB against the PNG's 79.7 KB. `mark.png` stays as the
+  raster fallback for clients that ignore `image/svg+xml`; `mark-dark.png` had no such role and is
+  removed, superseded by `mark-dark.svg`.
+
+  The wiring goes through `docs/_includes/head-custom.html`, which does something only because
+  `jekyll-theme-cayman`'s layout ends its `<head>` with `{% include head-custom.html %}` — verified
+  against the theme source rather than assumed, since without that line the file would be silently
+  inert. A test holds the half that is checkable: every href in the include must resolve to a file
+  that exists under `docs/`. Mutation-tested by mistyping a filename.
+
+  Its colour mapping is also a third independent confirmation of the `navy` fill split introduced
+  above: `#1f3a5f` → `#31517d` at 100 % agreement over 230,084 px, matching `input_contract` and
+  `architecture`, and nothing like the `#e2e9f4` that display *text* takes. The tile's drop shadow
+  was fitted by sweeping `dy` × `stdDeviation` × `flood-opacity` against the reference rather than
+  guessed — 26/40/0.34 scores 5.00/255 mean absolute difference against 6.65 for the first guess.
+
 ### Fixed
 - **`docs/img/demo.gif` was pinned at exactly 2.00× by a comment that was wrong about its own
   code.** `scripts/capture_gui_media.py` stated that "a GIF frame is stored at the viewport's own
