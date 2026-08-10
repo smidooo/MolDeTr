@@ -208,8 +208,8 @@ is a ready template.
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/input_contract-dark.png">
-    <img src="docs/img/input_contract.png" alt="The input contract: a window up to 1200 Hz resampled to 5.12 points per Hz gives 6144 real-valued points, min-max normalised; field-independent across 80 to 600 MHz" width="760">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/input_contract-dark.svg">
+    <img src="docs/img/input_contract.svg" alt="The input contract: a window up to 1200 Hz resampled to 5.12 points per Hz gives 6144 real-valued points, min-max normalised; field-independent across 80 to 600 MHz" width="760">
   </picture>
 </p>
 
@@ -219,8 +219,8 @@ is a ready template.
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/coupling_rule-dark.png">
-    <img src="docs/img/coupling_rule.png" alt="Two windows side by side: a good one where both coupling partners sit inside so the spin system is complete, and a bad one where a coupling partner falls outside the window, making that multiplet prediction wrong" width="820">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/coupling_rule-dark.svg">
+    <img src="docs/img/coupling_rule.svg" alt="Two windows side by side: a good one where both coupling partners sit inside so the spin system is complete, and a bad one where a coupling partner falls outside the window, making that multiplet prediction wrong" width="820">
   </picture>
 </p>
 
@@ -331,8 +331,8 @@ Ready-to-try inputs are in [`examples/`](examples/).
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/benchmark-dark.png">
-    <img src="docs/img/benchmark.png" alt="Experimental benchmark over 12 spectra at 80 to 600 MHz versus ground truth: median absolute shift error 0.89 Hz, median absolute coupling error 0.20 Hz, 93.5 percent overall proton-count accuracy, with per-class proton accuracy 97, 89 and 75 percent for 1H, 2H and 3H" width="860">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/benchmark-dark.svg">
+    <img src="docs/img/benchmark.svg" alt="Experimental benchmark over 12 spectra at 80 to 600 MHz versus ground truth: median absolute shift error 0.89 Hz, median absolute coupling error 0.20 Hz, 93.5 percent overall proton-count accuracy, with per-class proton accuracy 97, 89 and 75 percent for 1H, 2H and 3H" width="860">
   </picture>
 </p>
 
