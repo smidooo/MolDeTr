@@ -7,6 +7,25 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Fixed
+- **`docs/img/demo.gif` was pinned at exactly 2.00× by a comment that was wrong about its own
+  code.** `scripts/capture_gui_media.py` stated that "a GIF frame is stored at the viewport's own
+  pixel size — `device_scale_factor` does not apply — so the 2× has to come from a physically larger
+  viewport", and the GIF branch accordingly never passed one. It applies: measured, a 344×256
+  viewport at `device_scale_factor=1.5` screenshots to 516×384, and Pillow writes that size straight
+  into the assembled GIF. The comment was describing its own omission.
+
+  The distinction matters, because the workaround the comment implied is the worse one. Enlarging
+  the viewport **re-lays out** the app — wider panes, different wrapping — so the demo would be
+  recomposed rather than sharpened. Scaling the backing store keeps the framing identical and adds
+  only detail. `1720 × 1.5 = 2580`, exactly 3× the 860 the README declares; the GIF is now
+  2580×1920 with the same composition, 697 KB against 377 KB for 2.25× the pixels.
+
+  Guarded by a test written first and confirmed red. The 3× floor is scoped to `gui.png` and
+  `demo.gif` rather than raised globally: they are the only README rasters this script can
+  regenerate on demand. Raising `MIN_SCALE` itself would also fail `example_prediction.png`,
+  `example_prediction_vanillin.png` and `vanillin_spin_systems.png` — all three sitting at 2.00×,
+  and all three with no generator in the tree, since `scripts/gen_molecule_figure.py` was removed in
+  `2827cdb`. Re-plotting those is separate work and is **not** done here.
 - **`docs/img/input_contract.png`'s caption was truncated, live on the front page.** It rendered
   "ependent — 80–600 MHz all map to 1200 Hz (MolDeTr works in Hz)" — the leading "Field-ind" simply
   absent from the committed asset, while the README's own alt text beside it said

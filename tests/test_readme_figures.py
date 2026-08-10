@@ -154,6 +154,46 @@ def test_every_readme_figure_is_at_least_2x_its_rendered_width():
     )
 
 
+#: The two figures `scripts/capture_gui_media.py` owns. They are screenshots of the running app, so
+#: unlike the hand-drawn diagrams they cannot become vector -- and unlike the prediction plots, whose
+#: generators were deliberately removed in 2827cdb, they can be regenerated on demand at any scale.
+#: That makes them the only rasters for which a floor above `MIN_SCALE` is both meaningful and
+#: satisfiable, which is why the stricter bar is scoped here rather than applied globally.
+APP_CAPTURES = ("docs/img/gui.png", "docs/img/demo.gif")
+CAPTURE_MIN_SCALE = 3.0
+
+
+@pytest.mark.unit
+def test_the_app_captures_clear_a_3x_floor():
+    """`gui.png` and `demo.gif` are regenerable, so they are held to more than the global floor.
+
+    The GIF sat at exactly 2.00x because `capture_gui_media.py` believed a `device_scale_factor`
+    could not reach a GIF frame, and therefore never passed one. It can: a 344x256 viewport at
+    dsf=1.5 screenshots to 516x384, and Pillow writes that straight through to the GIF. The comment
+    was describing its own omission. This test pins the outcome rather than the mechanism -- what
+    matters to a reader is the device-pixel ratio, not how the capture achieved it.
+    """
+    soft: list[str] = []
+    for src in APP_CAPTURES:
+        path = REPO / src
+        assert path.is_file(), f"{src} is missing; regenerate with scripts/capture_gui_media.py"
+        width = dict(_local_figures(README.read_text(encoding="utf-8"))).get(src)
+        assert width, f"{src} must declare a width in the README to have a ratio at all"
+        size = _png_or_gif_size(path)
+        assert size is not None, f"{src} is neither a PNG nor a GIF"
+        if size[0] < CAPTURE_MIN_SCALE * width:
+            soft.append(
+                f"{src} is {size[0]}x{size[1]} native but rendered at {width} px "
+                f"({size[0] / width:.2f}x, needs {CAPTURE_MIN_SCALE:g}x = "
+                f"{int(CAPTURE_MIN_SCALE * width)} px)"
+            )
+    assert not soft, (
+        "app capture(s) below the "
+        f"{CAPTURE_MIN_SCALE:g}x floor. Both are regenerable -- "
+        "`python scripts/capture_gui_media.py [--gif]`:\n  " + "\n  ".join(soft)
+    )
+
+
 @pytest.mark.unit
 def test_every_vector_figure_really_is_scalable():
     """A ``.svg`` in the README is exempt from the pixel floor -- but only if it can cash the cheque.
