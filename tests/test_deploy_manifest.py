@@ -35,12 +35,33 @@ else:  # `tomllib` landed in 3.11; this package supports 3.10, so use the backpo
 REPO = Path(__file__).resolve().parent.parent
 DEMO_REQUIREMENTS = REPO / "deploy" / "requirements-demo.txt"
 SPACE_README = REPO / "deploy" / "hf_space" / "README.md"
+ENVIRONMENT_YML = REPO / "environment.yml"
 
 
 def _app_extra() -> list[str]:
     with (REPO / "pyproject.toml").open("rb") as handle:
         config = tomllib.load(handle)
     return config["project"]["optional-dependencies"]["app"]
+
+
+def _model_extra() -> list[str]:
+    """`fastai` and `torch` live in the `model` extra; `app` only pulls it in via `moldetr[model]`."""
+    with (REPO / "pyproject.toml").open("rb") as handle:
+        config = tomllib.load(handle)
+    return config["project"]["optional-dependencies"]["model"]
+
+
+def _environment_dependencies() -> list[str]:
+    """Requirement-like lines from `environment.yml`, read without a YAML parser.
+
+    PyYAML is not a dependency (module docstring); `tests/test_public_api.py` reads `ci.yml` with a
+    regex for the same reason. Conda entries are `  - name<spec>`, optionally with a trailing
+    comment (`pytorch-cuda=11.7  # remove this line ...`), so the comment is stripped or it would
+    become part of the specifier.
+    """
+    lines = ENVIRONMENT_YML.read_text(encoding="utf-8").splitlines()
+    entries = [re.sub(r"^\s*-\s*", "", line) for line in lines if re.match(r"^\s*-\s", line)]
+    return [re.sub(r"\s*#.*$", "", entry).strip() for entry in entries]
 
 
 def _requirement(specs: list[str], distribution: str) -> str:
@@ -85,6 +106,37 @@ def test_space_sdk_version_is_at_or_above_the_packaged_floor():
     floor = _floor(_requirement(_app_extra(), "gradio"))
     assert pinned >= floor, (
         f"sdk_version pins {match.group(1)} but the packaged floor is >={'.'.join(map(str, floor))}"
+    )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("manifest", "read_specs"),
+    [
+        (DEMO_REQUIREMENTS, lambda: DEMO_REQUIREMENTS.read_text(encoding="utf-8").splitlines()),
+        (ENVIRONMENT_YML, _environment_dependencies),
+    ],
+    ids=["requirements-demo", "environment-yml"],
+)
+def test_runtime_manifests_declare_the_same_fastai_requirement_as_the_model_extra(
+    manifest, read_specs
+):
+    """The whole specifier, ceiling included — the gradio lesson applied to the other pinned dep.
+
+    `pyproject.toml` caps fastai deliberately (see the measured `L.starmap` note there): the shipped
+    checkpoint was trained against a specific stack and no CI lane exercises `learner.load()`. Both
+    manifests declared a bare `fastai>=2.7`, so each would admit a fastai the package excludes —
+    `deploy/requirements-demo.txt` is what the Colab demo installs, and `environment.yml` is the
+    documented way to create the environment.
+
+    This is the guard that would have caught the 2026-08-10 drift: when the ceiling moved `<2.8` ->
+    `<2.9`, four surfaces quoted the old value and three were fixed. A test does that job; vigilance
+    demonstrably does not.
+    """
+    packaged = _requirement(_model_extra(), "fastai")
+    declared = _requirement(read_specs(), "fastai")
+    assert declared == packaged, (
+        f"{manifest.name} declares {declared!r} but pyproject's model extra declares {packaged!r}"
     )
 
 

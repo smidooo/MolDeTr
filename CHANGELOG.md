@@ -38,8 +38,31 @@ All notable changes to this project are documented here. The format is based on
   or `torch` decision.
 
 ### Fixed
-- **The dependency-graph submission has been failing since 2026-07-21, because a conda lockfile was
-  wearing a pip filename.** `deploy/requirements-lock-linux64.txt` is `conda list --explicit`
+- **Both runtime manifests admitted a fastai the package excludes.** `deploy/requirements-demo.txt`
+  and `environment.yml` each declared a bare `fastai>=2.7` — no ceiling — while `pyproject.toml`
+  caps it at `<2.9` deliberately. The demo manifest is what the Colab demo installs and
+  `environment.yml` is the documented way to create the environment, so both would have resolved a
+  fastai 2.9+ on a machine the maintainer never sees. Structurally the identical defect
+  `test_demo_manifest_declares_the_same_gradio_requirement_as_the_app_extra` was written to catch on
+  that same file for gradio; it simply was not asserted for the other pinned dependency.
+- **Dependabot's fastai ignore rule could not see the change it was written to block.**
+  `update-types` classifies a *version* change, so it does not fire on a range **widening** — which
+  is exactly how `<2.8` -> `<2.9` arrived unreviewed on 2026-08-10 despite an explicit
+  `version-update:semver-minor` ignore. Both entries now carry `versions:` as well, which is matched
+  against the candidate version itself. `torch` additionally gains the semver-minor ignore it never
+  had: the asymmetry with fastai had no stated reason, and no CI lane can judge either bump. The
+  cost is recorded in the config rather than hidden — this also suppresses a torch security bump
+  that arrives as a minor.
+
+### Added
+- **A drift guard for the fastai specifier**, parametrized over both runtime manifests
+  (`tests/test_deploy_manifest.py`). Confirmed RED on both before the fix and GREEN after, and
+  mutation-tested: changing the packaged ceiling to `<2.99` turns both cases red, so the assertion
+  compares rather than merely runs. This is the durable answer to the 2026-08-10 drift, where four
+  surfaces quoted the old ceiling and three were corrected — a test does that job and vigilance
+  demonstrably does not.
+
+ `deploy/requirements-lock-linux64.txt` is `conda list --explicit`
   output — line 4 is the literal `@EXPLICIT`, and the body is conda package URLs, not requirement
   specifiers. Dependabot's pip ecosystem discovers anything matching `requirements*.txt` under the
   configured directory, parsed it, and died on

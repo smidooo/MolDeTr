@@ -48,13 +48,27 @@ updates:
     # specific stack. An automated major bump of either is not a dependency update, it is a
     # decision about whether the published model still loads. Those two stay manual.
     #
-    # Known gap in the rules below: `update-types` does not catch a range WIDENING. On 2026-08-10
-    # the grouped runtime PR moved the fastai ceiling `<2.8` -> `<2.9` without tripping the
-    # semver-minor ignore, because widening a specifier is not a version update. That particular
-    # bump turned out to be correct on inspection, but it arrived unreviewed by this rule. Close
-    # the gap with `versions: [">=2.9"]` if the ceiling should stop moving on its own.
+    # `versions` AND `update-types` on each entry, because they catch different things and only
+    # together cover the case that actually got through. `update-types` classifies a *version*
+    # change and therefore does not see a range WIDENING: on 2026-08-10 the grouped runtime PR moved
+    # the fastai ceiling `<2.8` -> `<2.9` without tripping the semver-minor ignore, because widening
+    # a specifier is not a version update. `versions` is matched against the candidate version
+    # itself, so it fires regardless of how Dependabot classified the change. That bump turned out
+    # to be correct, but it arrived unreviewed by a rule written to review exactly it.
+    #
+    # torch previously ignored semver-major only, which was an asymmetry with no stated reason: a
+    # torch *minor* sailed through while the same class of bump for fastai was blocked. Nothing in
+    # CI can judge either -- no lane exercises `learner.load()` (see CHANGELOG) -- so they are now
+    # gated the same way.
+    #
+    # Stated cost, not hidden: ignoring torch minors also suppresses a torch security bump that
+    # arrives as a minor. That is a deliberate trade for a repository whose code is frozen at a
+    # paper release and whose checkpoint pins the stack; do not assume `security.yml` compensates,
+    # because its `pip-audit` step is report-only and currently reports on an editable self-install.
     ignore:
       - dependency-name: torch
-        update-types: ["version-update:semver-major"]
+        versions: [">=3"]
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: fastai
+        versions: [">=2.9"]
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
