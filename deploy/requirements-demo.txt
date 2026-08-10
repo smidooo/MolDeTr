@@ -11,4 +11,4 @@ multipledispatch>=0.6
 pandas>=1.5
 gradio>=6.21,<7
 plotly>=5
-huggingface_hub>=0.20
+huggingface_hub>=1.26.1
