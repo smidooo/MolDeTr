@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The `fastai` ceiling moved to `<2.9`, and the comment that guarded it named the wrong pair.**
+  `pyproject.toml` carried `fastai>=2.7,<2.8` annotated *"fastai 2.8.x + fastcore 2.x drops
+  `L.starmap` → `learner.load()` crashes"*. Measured against the wheels on 2026-08-10, the hazard
+  runs the other way round. fastai **2.7.19** — the version that ceiling selected — is the one that
+  calls it: `Optimizer.set_hypers` is `L(kwargs.items()).starmap(self.set_hyper)`
+  (`optimizer.py:46`), and `Learner.load()` reaches it through `create_opt()` (`learner.py:425`).
+  fastcore 2.2.10 contains no `starmap` at all. 2.7.19 survives only because it pins
+  `fastcore<1.8` itself. fastai **2.8.8** replaced the call with `.map(star(...))`
+  (`optimizer.py:47`) and requires `fastcore>=1.14.6` — so 2.8.x with fastcore 2.x is the pairing
+  upstream intends, and the ceiling had been holding this project on the fragile side of the
+  change. The bump is a move away from the defect, not toward it. The corrected reasoning now sits
+  in all three places that quoted the old one: `pyproject.toml`, `.github/dependabot.yml` and the
+  py3.13 note in `.github/workflows/ci.yml` (whose "zero slack" argument rested on 2.7.19's
+  `torch<2.7`; 2.8.8 allows `torch<3`).
+- **`actions/checkout` v4 → v7** in the three failure-reporter jobs — the last `@v4` call sites,
+  the other twelve having already moved. v7's breaking change affects only `pull_request_target`
+  and `workflow_run`, and no workflow here uses either trigger.
+- **`huggingface_hub` floor raised to `>=1.26.1`** in `deploy/requirements-demo.txt`. Inert in
+  practice: CI installs it unconstrained and has been resolving 1.27.0.
+
+### Notes
+- **No CI lane exercises `learner.load()`, in any configuration.** Its only callers are
+  `scripts/evaluate_synthetic.py:917` and `scripts/train.py:39`. The unit suite is weight-free; the
+  nightly `-m model` lane runs `scripts/predict.py` and `scripts/evaluate_experimental.py` through
+  `tests/test_scripts_local.py` and never invokes `evaluate_synthetic.py`; `train.py` is frozen.
+  So the fastai question above could not have been decided by waiting for a lane to go red or
+  green — a green run installing fastai 2.8.8 proves imports work and nothing more. It was decided
+  by reading the two wheels. Recorded because the same blind spot will apply to the next `fastai`
+  or `torch` decision.
+
 ### Fixed
 - **The dependency-graph submission has been failing since 2026-07-21, because a conda lockfile was
   wearing a pip filename.** `deploy/requirements-lock-linux64.txt` is `conda list --explicit`
