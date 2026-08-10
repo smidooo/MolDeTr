@@ -43,10 +43,16 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     # torch and fastai are pinned against each other for a reason recorded in pyproject
-    # (`fastai>=2.7,<2.8` — 2.8.x drops `L.starmap` and `learner.load()` crashes), and the shipped
-    # checkpoint was trained against a specific stack. An automated major bump of either is not a
-    # dependency update, it is a decision about whether the published model still loads. Those two
-    # stay manual.
+    # (`fastai>=2.7,<2.9` — see the measured `L.starmap` note there; the older wording here and in
+    # pyproject named the wrong version pair), and the shipped checkpoint was trained against a
+    # specific stack. An automated major bump of either is not a dependency update, it is a
+    # decision about whether the published model still loads. Those two stay manual.
+    #
+    # Known gap in the rules below: `update-types` does not catch a range WIDENING. On 2026-08-10
+    # the grouped runtime PR moved the fastai ceiling `<2.8` -> `<2.9` without tripping the
+    # semver-minor ignore, because widening a specifier is not a version update. That particular
+    # bump turned out to be correct on inspection, but it arrived unreviewed by this rule. Close
+    # the gap with `versions: [">=2.9"]` if the ceiling should stop moving on its own.
     ignore:
       - dependency-name: torch
         update-types: ["version-update:semver-major"]

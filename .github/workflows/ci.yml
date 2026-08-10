@@ -19,12 +19,17 @@ jobs:
         # asserts this list and the PyPI classifiers stay in agreement, so adding a leg here without
         # advertising it (or vice versa) fails.
         #
-        # 3.13 is deliberately NOT here. It resolves today, but with zero slack: `fastai>=2.7,<2.8`
-        # pins `torch<2.7`, and cp313 torch wheels for Windows/macOS start at 2.6.0 — so torch 2.6.0
-        # is the *only* version satisfying floor ∩ fastai ceiling ∩ 3-OS cp313. One upstream patch
-        # tightening fastai's torch ceiling flips that to unbuildable with no change here. Adding it
-        # would need this leg to also assert the resolved torch version, the way `gradio-floor`
-        # asserts `gradio.__version__`, or it silently degrades into a duplicate of 3.12.
+        # 3.13 is deliberately NOT here, but the reason changed on 2026-08-10 and the old one no
+        # longer holds. It used to be "zero slack": `fastai>=2.7,<2.8` selects 2.7.19, whose
+        # metadata pins `torch<2.7,>=1.10`, and cp313 torch wheels for Windows/macOS start at 2.6.0
+        # — so torch 2.6.0 was the *only* version satisfying floor ∩ fastai ceiling ∩ 3-OS cp313,
+        # and one upstream patch tightening fastai's torch ceiling would have flipped that to
+        # unbuildable with no change here. Under `fastai<2.9` that argument is gone: fastai 2.8.8
+        # requires `torch<3,>=1.10`, so the window is wide rather than a single point.
+        #
+        # What remains is simply that no cp313 leg has ever been run end to end here. Adding one
+        # would still want it to assert the resolved torch version, the way `gradio-floor` asserts
+        # `gradio.__version__`, or it silently degrades into a duplicate of 3.12.
         python-version: ["3.10", "3.11", "3.12"]
     steps:
       - uses: actions/checkout@v7
