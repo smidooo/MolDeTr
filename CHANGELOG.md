@@ -7,6 +7,44 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The pipeline diagram is now vector (`docs/img/pipeline{,-dark}.svg`), and the light/dark pair
+  is generated from one geometry.** The PNGs it replaces were not below the repo's own 2× floor —
+  every README figure passed `tests/test_readme_figures.py` — they read as soft because 2× *is* the
+  floor and displays kept getting denser. Chasing that with a higher `MIN_SCALE` trades bytes for a
+  moving target; vector removes the axis. Re-authored from the `docs/BRAND.md` tokens rather than
+  upscaled, because upscaling flat vector art stays soft: a colour census of the old PNG returned
+  the brand palette exactly (`#f1f5fa` panel, `#1f3a5f` navy, `#d5dfeb` border, `#7d92b0` latent,
+  the blue/orange/teal tricolor), confirming they had been generated from that same table. Geometry
+  was measured off the committed asset, not eyeballed; the result renders **94.0 % pixel-identical**
+  to it (mean absolute difference 2.54/255, the remainder being antialiasing). 46 KB replaces 86 KB.
+- **A light/dark geometry drift is fixed, and it was invisible.** `pipeline.png` was 1820×388 while
+  `pipeline-dark.png` was 1720×370 — a *different aspect ratio*. `<picture>` sizes the block from
+  the `<img>` and paints whichever source matches the colour scheme into that same box, so the dark
+  twin was being stretched, and only dark-mode readers ever saw it. Generating both from one
+  geometry makes the class of bug impossible;
+  `test_a_light_figure_and_its_dark_twin_share_one_geometry` now also asserts it.
+
+### Fixed
+- **`test_every_readme_figure_is_at_least_2x_its_rendered_width` silently exempted vector figures.**
+  It skips whenever `_png_or_gif_size` returns `None`, which is every non-raster file — so swapping
+  a PNG for an SVG did not *satisfy* the resolution guard, it *removed* that figure from it, and the
+  suite stayed green either way. An empty file, a truncated one, or an HTML error page saved as
+  `.svg` would all have passed. `test_every_vector_figure_really_is_scalable` now grants the
+  exemption positively: the bytes must carry an `<svg>` root with a genuine four-number `viewBox`,
+  which is the thing that actually makes a figure scale. Both new tests were mutation-tested — a
+  stripped `viewBox`, a twin given a different aspect ratio, and a zero-byte file each turn them red.
+
+### Added
+- **`scripts/build_diagram_svgs.py`** — regenerates the diagrams from the brand tokens; `--check`
+  fails if a committed SVG has drifted from its source.
+- **`docs/fonts/`** — weight-instanced, glyph-subset builds of Space Grotesk and IBM Plex Sans with
+  their SIL OFL 1.1 licences, embedded as base64 in each SVG. Embedded rather than referenced
+  because GitHub renders README images inside a sandboxed `<img>` where external resources are
+  blocked and a referenced font would silently fall back. Two coverage facts are recorded in
+  `docs/fonts/README.md` because both fail silently: **Space Grotesk has no Greek at all**, so the
+  `δ` in "δ · J" must come through CSS's per-glyph fallback to IBM Plex Sans — the old PNG's
+  generator fell back without anyone noticing, and an SVG naming only one family would have
+  rendered tofu; and neither family carries `⁻` (U+207B).
 - **The `fastai` ceiling moved to `<2.9`, and the comment that guarded it named the wrong pair.**
   `pyproject.toml` carried `fastai>=2.7,<2.8` annotated *"fastai 2.8.x + fastcore 2.x drops
   `L.starmap` → `learner.load()` crashes"*. Measured against the wheels on 2026-08-10, the hazard
