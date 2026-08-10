@@ -155,8 +155,8 @@ queries, and per-query heads matched to ground truth by the Hungarian algorithm 
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/architecture-dark.png">
-    <img src="docs/img/architecture.png" alt="MolDeTr architecture: a 6144-point window feeds an FPN backbone (multi-scale P3/P4/P5), a deformable-attention transformer with N object queries, then per-query heads predicting multiplet-or-nothing, chemical shift, a coupling embedding, proton-count class and line width; Hungarian matching is used at training time" width="860">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/architecture-dark.svg">
+    <img src="docs/img/architecture.svg" alt="MolDeTr architecture: a 6144-point window feeds an FPN backbone (multi-scale P3/P4/P5), a deformable-attention transformer with N object queries, then per-query heads predicting multiplet-or-nothing, chemical shift, a coupling embedding, proton-count class and line width; Hungarian matching is used at training time" width="860">
   </picture>
 </p>
 

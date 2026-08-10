@@ -60,6 +60,12 @@ LIGHT = {
     "connector": "#cdd7e4",
     "arrow": "#9db0c6",
     "onSolid": "#ffffff",
+    # `eyebrow` is BRAND.md's REPLACEMENT token. Every figure this generator
+    # supersedes painted small text in the retired #74808f, which measures 4.01:1 on
+    # white -- under the 4.5:1 WCAG AA threshold that applies to exactly the small
+    # labels it was defined for. BRAND.md replaced it with #666f7d (5.08:1).
+    "eyebrow": "#666f7d",
+    "warnBg": "#fdf5ea",
     "blue": "#2566b0",
     "orange": "#e08a1f",
     "teal": "#1f9e8c",
@@ -78,6 +84,8 @@ DARK = {
     "connector": "#334054",
     "arrow": "#5f708a",
     "onSolid": "#141821",
+    "eyebrow": "#8f9db0",
+    "warnBg": "#241f16",
     "blue": "#2566b0",
     "orange": "#e08a1f",
     "teal": "#1f9e8c",
@@ -85,16 +93,20 @@ DARK = {
 
 SG = "'Space Grotesk','IBM Plex Sans',sans-serif"
 PLEX = "'IBM Plex Sans',sans-serif"
+MONO = "'IBM Plex Mono',ui-monospace,monospace"
 FACES = (
     ("sg700", "Space Grotesk", 700),
     ("plex400", "IBM Plex Sans", 400),
     ("plex600", "IBM Plex Sans", 600),
+    ("mono400", "IBM Plex Mono", 400),
 )
 
 
-def _faces() -> str:
+def _faces(wanted: tuple[str, ...]) -> str:
     out = []
     for stem, family, weight in FACES:
+        if stem not in wanted:
+            continue
         blob = (FONT_DIR / f"{stem}.woff2").read_bytes()
         b64 = base64.b64encode(blob).decode("ascii")
         out.append(
@@ -112,17 +124,26 @@ class Canvas:
     """Minimal SVG emitter. Coordinates are viewBox units, which for these figures are the pixel
     dimensions of the PNGs they replace -- so measurements taken off the old assets transfer 1:1."""
 
-    def __init__(self, width: int, height: int, title: str, desc: str) -> None:
+    def __init__(
+        self,
+        width: int,
+        height: int,
+        title: str,
+        desc: str,
+        faces: tuple[str, ...] = ("sg700", "plex400", "plex600"),
+    ) -> None:
         self.w, self.h = width, height
         self.parts = [
             f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
             f'width="{width}" height="{height}" role="img" aria-labelledby="t d">',
             f'<title id="t">{_esc(title)}</title><desc id="d">{_esc(desc)}</desc>',
-            f"<defs><style>{_faces()}</style></defs>",
+            f"<defs><style>{_faces(faces)}</style></defs>",
         ]
 
-    def rect(self, x, y, w, h, rx, fill, stroke=None, sw=1.5) -> None:
+    def rect(self, x, y, w, h, rx, fill, stroke=None, sw=1.5, dash=None) -> None:
         edge = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
+        if dash:
+            edge += f' stroke-dasharray="{dash}"'
         self.parts.append(
             f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}"{edge}/>'
         )
@@ -149,6 +170,19 @@ class Canvas:
             f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="{family}" '
             f'font-size="{size}" font-weight="{weight}" fill="{fill}">{_esc(s)}</text>'
         )
+
+    def runs(self, x, y, runs: list[tuple[str, str, float, str]]) -> None:
+        """One left-anchored line built from several fonts, e.g. prose followed by a code span.
+
+        Emitted as `<tspan>`s inside a single `<text>` so the runs flow from one advance position.
+        Positioning them as separate `<text>` elements would require knowing each run's rendered
+        width, which depends on the font -- and would drift the moment any label changed.
+        """
+        body = "".join(
+            f'<tspan font-family="{fam}" font-size="{size}" fill="{fill}">{_esc(s)}</tspan>'
+            for s, fam, size, fill in runs
+        )
+        self.parts.append(f'<text x="{x}" y="{y}" text-anchor="start">{body}</text>')
 
     def done(self) -> str:
         return "".join(self.parts) + "</svg>"
@@ -209,7 +243,82 @@ def pipeline(t: dict[str, str]) -> str:
     return c.done()
 
 
-DIAGRAMS = {"pipeline": pipeline}
+def architecture(t: dict[str, str]) -> str:
+    """The "1-D Deformable-DETR" architecture figure.
+
+    Geometry measured off the committed `architecture.png`. Two things change beyond the format.
+    The eyebrow and the secondary labels were `#74808f`, the token `docs/BRAND.md` retired for
+    measuring 4.01:1 on white against the 4.5:1 that small text requires; they now use the
+    replacement `#666f7d` (5.08:1). And the figure had 82px of empty canvas below its content
+    against 52 above, so the viewBox is trimmed to sit evenly.
+    """
+    c = Canvas(
+        1800,
+        678,
+        "MolDeTr architecture: a 1-D Deformable-DETR",
+        "A 6144-point window enters an FPN backbone of eleven residual convolutional blocks, then "
+        "a deformable transformer encoder and decoder with N object queries, trained with "
+        "Hungarian matching. Per-query heads emit multiplet-or-empty, chemical shift, a coupling "
+        "embedding, proton count and line width, giving spin systems in a single forward pass.",
+        faces=("sg700", "plex400", "plex600", "mono400"),
+    )
+    for i, col in enumerate((t["blue"], t["orange"], t["teal"])):
+        c.rect(56 + 40 * i, 52, 32, 8, 4, col)
+
+    c.text(56, 106, "Architecture — a 1-D Deformable-DETR", 33, SG, 700, t["navy"], anchor="start")
+    c.text(
+        1742, 118, "set prediction · single forward pass", 23, MONO, 400, t["eyebrow"], anchor="end"
+    )
+
+    c.rect(58, 350, 220, 112, 18, t["panel"], t["border"])
+    c.text(168, 396, "6144-pt", 25, SG, 700, t["navy"])
+    c.text(168, 432, "window", 21, PLEX, 400, t["mute"])
+
+    c.rect(358, 322, 260, 168, 18, t["panel"], t["border"])
+    c.text(488, 373, "FPN backbone", 25, SG, 700, t["navy"])
+    c.text(488, 408, "conv, multi-scale", 21, PLEX, 400, t["mute"])
+    c.text(488, 440, "11 residual blocks", 19, MONO, 400, t["mute"])
+
+    c.text(846, 277, "Deformable transformer", 25, SG, 700, t["navy"])
+    c.rect(698, 298, 296, 216, 22, t["card"], t["border"])
+    c.text(846, 351, "encoder ↕ decoder", 23, PLEX, 400, t["mute"])
+    for i, col in enumerate((t["blue"], t["orange"], t["teal"], t["latent"])):
+        c.circle(768 + 48 * i, 396, 14, col)
+    c.text(846, 459, "N object queries", 23, PLEX, 400, t["mute"])
+
+    # Training-only path: dashed, because Hungarian matching is not part of a forward pass.
+    c.parts.append(
+        f'<path d="M 846 514 V 558" stroke="{t["orange"]}" stroke-width="2" '
+        f'stroke-dasharray="6 6" fill="none" opacity="0.75"/>'
+    )
+    c.rect(697, 558, 298, 64, 16, t["warnBg"], t["orange"], sw=2, dash="7 7")
+    c.text(846, 597, "Hungarian matching · training", 21, PLEX, 400, t["orange"])
+
+    c.rect(1074, 226, 396, 360, 22, t["panel"], t["border"])
+    c.text(1272, 264, "Per-query heads", 25, SG, 700, t["navy"])
+    bullets = [
+        (320, "• multiplet / ∅", None),
+        (368, "• δ chemical shift", None),
+        (416, "• J embedding ", "[sum,min,max,std]"),
+        (464, "• proton count (class)", None),
+        (512, "• line width", None),
+    ]
+    for y, label, mono in bullets:
+        if mono is None:
+            c.text(1105, y, label, 23, PLEX, 400, t["ink"], anchor="start")
+        else:
+            c.runs(1105, y, [(label, PLEX, 23, t["ink"]), (mono, MONO, 19, t["mute"])])
+
+    for x0, x1 in ((288, 349), (628, 689), (1004, 1065), (1480, 1537)):
+        c.arrow(x0, x1, 406, t["arrow"])
+
+    c.rect(1544, 320, 192, 116, 22, t["navy"])
+    c.text(1640, 368, "spin", 25, SG, 700, t["onSolid"])
+    c.text(1640, 403, "systems", 22, PLEX, 400, t["onSolid"])
+    return c.done()
+
+
+DIAGRAMS = {"pipeline": pipeline, "architecture": architecture}
 
 
 def main() -> int:
