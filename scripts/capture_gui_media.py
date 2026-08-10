@@ -15,7 +15,7 @@ invented numbers. Fetch the weights first if they are absent::
 
     python scripts/download_weights.py           # ~974 MB, Zenodo 10.5281/zenodo.21217102
     python scripts/capture_gui_media.py          # -> docs/img/gui.png   (2850x2364)
-    python scripts/capture_gui_media.py --gif    # -> docs/img/demo.gif  (1720x1424)
+    python scripts/capture_gui_media.py --gif    # -> docs/img/demo.gif  (2580x1920)
 
 **Why a GIF and not a video.** Measured against GitHub's own markdown API on 2026-08-08: a ``<video>``
 tag is stripped from rendered Markdown -- to an empty ``<p>`` -- for both a repo-relative ``src`` and
@@ -44,9 +44,21 @@ sys.path.insert(0, str(ROOT))
 #: device pixels back each one. 1425x1182 reproduces the framing of the figure this replaces.
 VIEWPORT = {"width": 1425, "height": 1182}
 
-#: A GIF frame is stored at the viewport's own pixel size -- ``device_scale_factor`` does not apply --
-#: so the 2x has to come from a physically larger viewport: 1720 is 2x the 860 the README declares.
+#: The GIF's *layout*, in CSS pixels. A previous version of this comment claimed
+#: ``device_scale_factor`` does not reach a GIF frame, and concluded the resolution had to come from
+#: a physically larger viewport. That was false, and it was describing its own omission -- the GIF
+#: branch simply never passed one. Measured: a 344x256 viewport at ``device_scale_factor=1.5``
+#: screenshots to 516x384, and Pillow writes that size straight through into the GIF.
+#:
+#: It matters which way round this is done. Enlarging the viewport re-*lays out* the app -- wider
+#: panes, different wrapping -- so the demo would be recomposed rather than sharpened. Scaling the
+#: backing store keeps the framing identical and only adds detail, which is what is wanted.
 GIF_VIEWPORT = {"width": 1720, "height": 1280}
+
+#: Backing-store multiplier for the GIF. 1720 x 1.5 = 2580, exactly 3x the 860 the README declares.
+#: Kept separate from ``--scale`` because the two capture modes start from different viewports and
+#: therefore need different multipliers to land on the same device-pixel ratio.
+GIF_SCALE = 1.5
 
 #: Which bundled example to detect. `guajazulene` carries a ppm axis, so the table shows δ in ppm
 #: rather than the Hz fallback -- matching the README alt text, which describes a ppm column.
@@ -118,12 +130,12 @@ def capture(out: Path, scale: int, gif: bool) -> None:
     try:
         with sync_playwright() as pw:
             browser = pw.chromium.launch()
-            context = (
-                browser.new_context(viewport=GIF_VIEWPORT)
-                if gif
-                # device_scale_factor multiplies the backing store without changing layout, so the
-                # framing matches VIEWPORT while the file gains real detail.
-                else browser.new_context(viewport=VIEWPORT, device_scale_factor=scale)
+            # `device_scale_factor` multiplies the backing store without changing layout, so the
+            # framing matches the viewport while the file gains real detail. Both modes use it;
+            # they differ only in which viewport and which multiplier.
+            context = browser.new_context(
+                viewport=GIF_VIEWPORT if gif else VIEWPORT,
+                device_scale_factor=GIF_SCALE if gif else scale,
             )
             page = context.new_page()
             _run_demo(
@@ -140,19 +152,27 @@ def capture(out: Path, scale: int, gif: bool) -> None:
 
     if gif:
         _write_gif(frames, out)
-        box = GIF_VIEWPORT
+        box, ratio = GIF_VIEWPORT, GIF_SCALE
     else:
-        box = {"width": VIEWPORT["width"] * scale, "height": VIEWPORT["height"] * scale}
+        box, ratio = VIEWPORT, scale
+    width, height = int(box["width"] * ratio), int(box["height"] * ratio)
     kb = out.stat().st_size // 1024
     detail = f"{len(frames)} frames, " if gif else ""
-    print(f"wrote {out.relative_to(ROOT)} at {box['width']}x{box['height']} ({detail}{kb} KB)")
-    print(f'README should declare width="{box["width"] // 2}" or less to stay >=2x')
+    print(f"wrote {out.relative_to(ROOT)} at {width}x{height} ({detail}{kb} KB)")
+    # `tests/test_readme_figures.py` holds these two to 3x, not the 2x that applies elsewhere:
+    # they are the only README rasters this script can regenerate at will.
+    print(f'README should declare width="{int(width // 3)}" or less to stay >=3x')
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--output", type=Path, default=None)
-    parser.add_argument("--scale", type=int, default=2, help="device pixel ratio (still only)")
+    parser.add_argument(
+        "--scale",
+        type=float,
+        default=2,
+        help="device pixel ratio for the still; --gif uses GIF_SCALE",
+    )
     parser.add_argument("--gif", action="store_true", help="record the demo instead of a still")
     args = parser.parse_args()
     capture(args.output or (DEFAULT_GIF if args.gif else DEFAULT_PNG), args.scale, args.gif)
