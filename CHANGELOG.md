@@ -7,6 +7,19 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The architecture diagram is vector too, and its text colour was failing WCAG AA.** It painted
+  the eyebrow and secondary labels in `#74808f` — the token `docs/BRAND.md` explicitly *retired* for
+  measuring 4.01:1 on white, under the 4.5:1 that applies to exactly the small labels it was defined
+  for. BRAND.md replaced it with `#666f7d` (5.08:1), and the repo enforces the rule with axe-core —
+  but **axe scans the GUI, not PNGs**, so every figure kept the retired colour and nothing noticed.
+  Measured across the set: `architecture` 1424 px, `benchmark` 5540, `coupling_rule` 1355,
+  `input_contract` 1120, `banner` 457; `pipeline` was already clean, which is why converting it
+  first did not surface this. Re-authoring from the current tokens fixes the contrast as a side
+  effect. The figure also carried 82 px of empty canvas below its content against 52 above, so its
+  viewBox is trimmed to 1800×678; content coordinates are unchanged. IBM Plex Mono joins the
+  vendored set for the monospace runs, and faces are now embedded per diagram — adding mono to the
+  shared list had pushed `pipeline.svg` from 46.5 KB to 57.2 KB carrying a font it never uses.
+
 - **The pipeline diagram is now vector (`docs/img/pipeline{,-dark}.svg`), and the light/dark pair
   is generated from one geometry.** The PNGs it replaces were not below the repo's own 2× floor —
   every README figure passed `tests/test_readme_figures.py` — they read as soft because 2× *is* the
@@ -25,6 +38,17 @@ All notable changes to this project are documented here. The format is based on
   `test_a_light_figure_and_its_dark_twin_share_one_geometry` now also asserts it.
 
 ### Fixed
+- **A browser-tier race that turned `browser e2e (firefox)` red on a docs-only commit.**
+  `test_threshold_at_maximum_reports_no_multiplets` was the only test in
+  `tests/e2e/test_browser_journeys.py` that did not settle after selecting an example — every other
+  path goes through `_detect_with_example`, which waits for `#md-check` to read "Input check" first.
+  Selecting an example populates the Detect tab asynchronously, so `fill("1")` on the threshold
+  raced that population; when the example landed second it restored the default threshold,
+  detection found multiplets, and the empty state never rendered. Firefox is simply where the
+  ordering lost. The settle is non-vacuous — swapping the expected text for a marker that never
+  appears turns the test red. What is *not* claimed: that this eliminates the CI failure. The race
+  does not reproduce locally, so the local green proves nothing; the argument is causal, not
+  empirical.
 - **`test_every_readme_figure_is_at_least_2x_its_rendered_width` silently exempted vector figures.**
   It skips whenever `_png_or_gif_size` returns `None`, which is every non-raster file — so swapping
   a PNG for an SVG did not *satisfy* the resolution guard, it *removed* that figure from it, and the
