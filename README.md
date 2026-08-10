@@ -249,8 +249,10 @@ For **bit-exact** reproduction of the training environment (CUDA 11.7, linux-64)
 Inference then uses the pure-PyTorch fallback of the deformable-attention op: no CUDA, no compilation.
 
 **Supported versions:** Python 3.10–3.12 (newer versions may lack compatible PyTorch wheels). The
-`fastai>=2.7,<2.8` pin (required so `learner.load()` works) caps PyTorch at 2.6; that is a downgrade
-from the latest release, but it is benign for CPU inference.
+`fastai>=2.7,<2.9` ceiling is a deliberate manual gate, not a compatibility workaround: the shipped
+checkpoint was trained against a specific stack, and no CI lane exercises `learner.load()`. It no
+longer constrains PyTorch — fastai 2.8.8 requires `torch<3`, where the older `<2.8` ceiling selected
+2.7.19 and capped PyTorch at 2.6.
 
 ### 2. (GPU only) Build the deformable-attention op
 ```bash
@@ -371,7 +373,7 @@ model was trained and evaluated with; see [Scope](docs/SCOPE.md).)
 - **Windows:** supported for inference and the test suite; the Linux `file_system` sharing strategy is
   skipped automatically.
 - CI runs `ruff` + `quick_validation` + `pytest` + the headline reproduction on **ubuntu, macOS, and
-  windows** (Python 3.10 and 3.11).
+  windows** (Python 3.10, 3.11 and 3.12).
 
 ## Glossary (NMR ↔ ML)
 
