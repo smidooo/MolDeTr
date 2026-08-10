@@ -47,7 +47,18 @@ dependencies = [
 # without pulling several hundred megabytes it will never call. Asserted in tests/test_public_api.py.
 model = [
     "torch>=1.13",
-    "fastai>=2.7,<2.9",  # fastai 2.8.x + fastcore 2.x drops L.starmap -> learner.load() crashes; 2.7.x pins fastcore<2
+    # Ceiling is <2.9, and the `L.starmap` note this line used to carry named the wrong pair.
+    # Measured from wheel source 2026-08-10: fastai 2.7.19 is the version that CALLS it --
+    # `Optimizer.set_hypers` is `L(kwargs.items()).starmap(self.set_hyper)` (optimizer.py:46),
+    # reached from `Learner.load()` via `create_opt()` (learner.py:425) -- and fastcore 2.x removed
+    # `starmap` entirely. 2.7.19 survives only because it pins `fastcore<1.8` itself. fastai 2.8.8
+    # replaced the call with `.map(star(...))` (optimizer.py:47) and requires `fastcore>=1.14.6`,
+    # so 2.8.x + fastcore 2.x is the pairing upstream intends, and the old ceiling was holding this
+    # project on the fragile side. Moving to 2.9 stays a manual call: the published checkpoint was
+    # trained against a specific stack, and NO CI lane exercises `learner.load()` -- its only
+    # callers are scripts/evaluate_synthetic.py and scripts/train.py, neither of which runs in CI --
+    # so a regression on that path would be invisible until someone ran the script by hand.
+    "fastai>=2.7,<2.9",
 ]
 # Extra deps used only by the evaluation / plotting scripts in scripts/.
 eval = [
