@@ -44,10 +44,29 @@
       "field_mhz": 500,
       "reproduces_the_superseded_png": true,
       "rows": [
-        {"n": 1, "shift_ppm": 8.221, "max_j_hz": 1.92, "protons": 1, "linewidth_hz": 1.16},
-        {"n": 2, "shift_ppm": 7.699, "max_j_hz": 4.22, "protons": 1, "linewidth_hz": 1.33},
-        {"n": 3, "shift_ppm": 7.314, "max_j_hz": 3.89, "protons": 1, "linewidth_hz": 1.07}
-      ]
+        {
+          "n": 1,
+          "shift_ppm": 8.221,
+          "max_j_hz": 1.92,
+          "protons": 1,
+          "linewidth_hz": 1.16
+        },
+        {
+          "n": 2,
+          "shift_ppm": 7.699,
+          "max_j_hz": 4.22,
+          "protons": 1,
+          "linewidth_hz": 1.33
+        },
+        {
+          "n": 3,
+          "shift_ppm": 7.314,
+          "max_j_hz": 3.89,
+          "protons": 1,
+          "linewidth_hz": 1.07
+        }
+      ],
+      "alt": "MolDeTr detects three aromatic 1H multiplets of guajazulene at 500 MHz; the assignment table lists proton count, chemical shift in ppm, largest coupling max J in Hz, and line width for each"
     },
     "example_prediction_vanillin": {
       "npz": "examples/roi_S8_example.npz",
@@ -55,10 +74,29 @@
       "field_mhz": 300,
       "reproduces_the_superseded_png": false,
       "rows": [
-        {"n": 1, "shift_ppm": 7.419, "max_j_hz": 8.74, "protons": 1, "linewidth_hz": 0.46},
-        {"n": 2, "shift_ppm": 7.388, "max_j_hz": 1.97, "protons": 1, "linewidth_hz": 0.81},
-        {"n": 3, "shift_ppm": 6.961, "max_j_hz": 8.25, "protons": 1, "linewidth_hz": 0.55}
-      ]
+        {
+          "n": 1,
+          "shift_ppm": 7.419,
+          "max_j_hz": 8.74,
+          "protons": 1,
+          "linewidth_hz": 0.46
+        },
+        {
+          "n": 2,
+          "shift_ppm": 7.388,
+          "max_j_hz": 1.97,
+          "protons": 1,
+          "linewidth_hz": 0.81
+        },
+        {
+          "n": 3,
+          "shift_ppm": 6.961,
+          "max_j_hz": 8.25,
+          "protons": 1,
+          "linewidth_hz": 0.55
+        }
+      ],
+      "alt": "MolDeTr detects the three aromatic protons of vanillin at 300 MHz as a classic ABX pattern; the assignment table lists proton count, chemical shift, largest coupling, and line width for each"
     }
   }
 }
