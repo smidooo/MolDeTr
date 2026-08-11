@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-08-11
+
 ### Fixed
 - **The webfont can no longer take the whole stylesheet down with it.** `CUSTOM_CSS` opened with
   `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk…')`, and a *pending* `@import`
