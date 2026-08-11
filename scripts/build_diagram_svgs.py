@@ -260,9 +260,18 @@ def _lorentz_d(x0: float, x1: float, base: float, peaks, step: float = 2.0) -> s
     return "M " + " L ".join(pts)
 
 
-@functools.lru_cache(maxsize=1)
-def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
-    """`BANNER_NPZ` over the banner window: (ppm descending, amplitude normalised 0-1, shifts).
+# maxsize covers the distinct (npz, window) triples the figure set asks for -- the banner's window,
+# and the two prediction figures' full spans -- so each file is still read once per build. It was 1
+# while there was one window; leaving it at 1 would silently re-read and re-normalise on every
+# alternating call, which is slow rather than wrong, and therefore the kind of thing nobody notices.
+@functools.lru_cache(maxsize=8)
+def _spectrum(
+    npz: Path = BANNER_NPZ, left: float = PPM_LEFT, right: float = PPM_RIGHT
+) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+    """One NPZ over one ppm window: (ppm descending, amplitude normalised 0-1, shifts).
+
+    Defaults are the banner's, so every existing call site is unchanged -- `--check` proves it, and
+    that proof is the reason the arguments were added this way rather than by rewriting the callers.
 
     Amplitude is normalised here rather than at each call site so the trace and the multiplet fills
     below it cannot end up on two different scales -- which is exactly the kind of disagreement a
@@ -274,11 +283,15 @@ def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]
     """
     import numpy as np
 
-    # allow_pickle for `ground_truth`, an object array of dicts. Committed to this repo.
-    data = np.load(BANNER_NPZ, allow_pickle=True)
+    # allow_pickle for `ground_truth`, an object array of dicts. Safe because `npz` is never user
+    # input: every caller passes a module-level constant naming a file committed to this repository,
+    # and this script takes no path argument that could reach here. That was self-evident while the
+    # path was hardcoded; it is a constraint worth stating now that it is a parameter, because the
+    # justification lives in the call sites rather than in this line.
+    data = np.load(npz, allow_pickle=True)
     ppm = np.asarray(data["ppm_axis_padded"], dtype=float)
     amp = np.real(data["spectrum_padded"]).astype(float)
-    window = (ppm >= PPM_RIGHT) & (ppm <= PPM_LEFT)
+    window = (ppm >= right) & (ppm <= left)
     order = np.argsort(-ppm[window])  # high ppm first: a 1H axis reads right-to-left
     ppm, amp = ppm[window][order], amp[window][order]
     amp = (amp - float(np.median(amp))) / float(amp.max() - np.median(amp))
@@ -288,7 +301,14 @@ def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]
     return tuple(ppm.tolist()), tuple(amp.tolist()), tuple(shifts)
 
 
-def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, float, float]]]:
+def _multiplets(
+    x0: float,
+    x1: float,
+    height: float,
+    npz: Path = BANNER_NPZ,
+    left: float = PPM_LEFT,
+    right: float = PPM_RIGHT,
+) -> list[list[tuple[float, float, float]]]:
     """Per multiplet, one `(centre_x, height_px, half-width_px)` Lorentzian per line it contains.
 
     This is the shape MolDeTr itself predicts -- a multiplet is a set of lines sharing a shift and
@@ -300,8 +320,8 @@ def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, f
     is wider than the 0.035 ppm between this spectrum's two aromatic doublets, so H_B's window
     reached across and claimed H_A's taller peak as its own.
     """
-    ppm, amp, shifts = _spectrum()
-    span = (x1 - x0) / (PPM_LEFT - PPM_RIGHT)
+    ppm, amp, shifts = _spectrum(npz, left, right)
+    span = (x1 - x0) / (left - right)
     step = abs(ppm[1] - ppm[0])
     out = []
     for shift in shifts:
@@ -325,7 +345,16 @@ def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, f
     return out
 
 
-def _trace_d(x0: float, x1: float, base: float, height: float, mode: str) -> str:
+def _trace_d(
+    x0: float,
+    x1: float,
+    base: float,
+    height: float,
+    mode: str,
+    npz: Path = BANNER_NPZ,
+    left: float = PPM_LEFT,
+    right: float = PPM_RIGHT,
+) -> str:
     """Path data for a banner panel's spectrum, in whichever treatment `mode` names.
 
     `faithful` plots the array. The other two exist because the asset this replaces did not: it was
@@ -335,14 +364,14 @@ def _trace_d(x0: float, x1: float, base: float, height: float, mode: str) -> str
     never a different one.
     """
     if mode != "faithful":
-        peaks = [line for group in _multiplets(x0, x1, height) for line in group]
+        peaks = [line for group in _multiplets(x0, x1, height, npz, left, right) for line in group]
         if mode == "ideal":
             return _lorentz_d(x0, x1, base, peaks, step=1.5)
         return _hybrid_d(x0, x1, base, peaks, height)
 
-    ppm, amp, _ = _spectrum()
-    span = (x1 - x0) / (PPM_LEFT - PPM_RIGHT)
-    pts = [(x0 + (PPM_LEFT - p) * span, base - a * height) for p, a in zip(ppm, amp)]
+    ppm, amp, _ = _spectrum(npz, left, right)
+    span = (x1 - x0) / (left - right)
+    pts = [(x0 + (left - p) * span, base - a * height) for p, a in zip(ppm, amp)]
     return "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in _thin(pts, int(x1 - x0)))
 
 
@@ -728,15 +757,28 @@ def architecture(t: dict[str, str]) -> str:
     return c.done()
 
 
-def _masthead(c: Canvas, t: dict[str, str], title: str, size: float = 39.4) -> None:
+def _masthead(
+    c: Canvas,
+    t: dict[str, str],
+    title: str,
+    size: float = 39.4,
+    x0: float = 56,
+    y0: float = 52,
+    baseline: float = 112,
+) -> None:
     """The tricolor dash triple and the display title every figure but `pipeline` opens with.
 
     `docs/BRAND.md`: "the tricolor dash triple is the recurring mark -- header, figures, banner.
     Reuse it; don't invent new logos." Measured identically on all four PNGs, hence one helper.
+
+    The origin is a parameter because the prediction figures set it 8 px further left and up
+    (dashes from x=48, y=48) -- the same mark, not a different one, so it stays one helper rather
+    than becoming two that can drift. Defaults reproduce the existing four exactly; `--check` holds
+    that.
     """
     for i, col in enumerate((t["blue"], t["orange"], t["teal"])):
-        c.rect(56 + 40 * i, 52, 32, 8, 4, col)
-    c.text(55, 112, title, size, SG, 700, t["display"], anchor="start")
+        c.rect(x0 + 40 * i, y0, 32, 8, 4, col)
+    c.text(x0 - 1, baseline, title, size, SG, 700, t["display"], anchor="start")
 
 
 def input_contract(t: dict[str, str]) -> str:
