@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import functools
 import math
 import sys
 from pathlib import Path
@@ -46,6 +47,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 FONT_DIR = ROOT / "docs" / "fonts"
 OUT_DIR = ROOT / "docs" / "img"
+
+#: The spectrum the hero banner plots. It is the same file the deleted `scripts/gen_banner.py` read
+#: before the design-tool banner replaced it, and its `ground_truth` shifts (6.959 / 7.385 / 7.42)
+#: are the assignment table's 6.96 / 7.39 / 7.42. `tests/test_readme_figures.py` holds the link.
+BANNER_NPZ = ROOT / "examples" / "roi_S8_example.npz"
+
+#: The ppm window both banner panels show, solved from the design-tool banner's own tick labels
+#: (`7.4`/`7.0` centred at x 248.5/620.0 left and 1448.0/2207.0 right). The two panels agreed on
+#: 7.50 -> 6.90 to within 0.004 ppm, so this is one window drawn at two widths, not two crops.
+PPM_LEFT, PPM_RIGHT = 7.50, 6.90
+
+#: Which treatment `banner()` draws its spectra in; `--trace` overrides it. Module state rather than
+#: an argument because `DIAGRAMS` maps a name to a one-argument palette function, and widening that
+#: signature for the one figure that needs it would touch all seven.
+TRACE = "faithful"
 
 #: The figure palette. Ten keys are `docs/BRAND.md` § Palette verbatim -- `panel`, `border`, `navy`,
 #: `ink`, `mute`, `latent`, `eyebrow`, `brick`, and the blue/orange/teal tricolor -- and a colour
@@ -103,6 +119,23 @@ LIGHT = {
     # The mark's own ink, on the navy tile. Not `onSolid`: it is a touch cooler than white, and the
     # extraction shows it does NOT flip in dark -- the tile lightens under it instead.
     "tileInk": "#eaf1fb",
+    # The banner's ground is the one non-flat background in the set: a soft diagonal wash. These
+    # two stops are a least-squares fit over 20_000 ground pixels of the asset they replace, not
+    # its corner samples -- the corners are the least representative points on a wash. The fit
+    # leaves 3.7 levels of residual and adding radial or quadratic terms does not reduce it, so
+    # that residual is texture in the export rather than a shape a gradient could take.
+    "groundTop": "#fafcfd",
+    "groundBottom": "#eef3f8",
+    # A decomposed multiplet, filled under the resolved trace. These are not alpha blends of the
+    # tricolor -- measured off the banner and mapped through its dark twin, which is where they
+    # stop being derivable (`orangeFill` lands on #604325, nothing a formula would produce).
+    "blueFill": "#a8c3e0",
+    "orangeFill": "#e7c7a1",
+    "tealFill": "#a1ccc5",
+    # What a raised panel casts. A shadow is a *darkening*, so this cannot be one value for both
+    # themes: the light figure's blue-grey painted on the dark ground reads as a glow around
+    # every card, which is the opposite of the depth cue it is there for.
+    "shadowInk": "#8494ab",
 }
 #: The dark-figure palette, EXTRACTED rather than invented. `docs/BRAND.md` § Dark-figure palette
 #: names only five roles, which is not enough to render these figures, and the gap was previously
@@ -144,6 +177,12 @@ DARK = {
     "rule": "#28303f",
     "track": "#262f3d",
     "tileInk": "#eaf1fb",
+    "groundTop": "#131923",
+    "groundBottom": "#0d1219",
+    "blueFill": "#1f3d63",
+    "orangeFill": "#604325",
+    "tealFill": "#18474a",
+    "shadowInk": "#01030a",
 }
 
 SG = "'Space Grotesk','IBM Plex Sans',sans-serif"
@@ -183,6 +222,127 @@ def _lorentz_d(x0: float, x1: float, base: float, peaks, step: float = 2.0) -> s
         y = base - sum(h / (1.0 + ((x - c) / w) ** 2) for c, h, w in peaks)
         pts.append(f"{x:g} {y:.1f}")
         x += step
+    return "M " + " L ".join(pts)
+
+
+@functools.lru_cache(maxsize=1)
+def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+    """`BANNER_NPZ` over the banner window: (ppm descending, amplitude normalised 0-1, shifts).
+
+    Amplitude is normalised here rather than at each call site so the trace and the multiplet fills
+    below it cannot end up on two different scales -- which is exactly the kind of disagreement a
+    reader would take for a statement about the data.
+
+    numpy is imported lazily. It is a core dependency of the package, but a docs generator that
+    cannot even print its own `--help` without the scientific stack is a worse thing to hand
+    someone than one that loads it when asked to draw.
+    """
+    import numpy as np
+
+    # allow_pickle for `ground_truth`, an object array of dicts. Committed to this repo.
+    data = np.load(BANNER_NPZ, allow_pickle=True)
+    ppm = np.asarray(data["ppm_axis_padded"], dtype=float)
+    amp = np.real(data["spectrum_padded"]).astype(float)
+    window = (ppm >= PPM_RIGHT) & (ppm <= PPM_LEFT)
+    order = np.argsort(-ppm[window])  # high ppm first: a 1H axis reads right-to-left
+    ppm, amp = ppm[window][order], amp[window][order]
+    amp = (amp - float(np.median(amp))) / float(amp.max() - np.median(amp))
+    shifts = sorted(float(g["chemical_shift_ppm"]) for g in data["ground_truth"])
+    # Cached, so the three call sites per palette read the file once. Returned as tuples for
+    # the same reason: a cached list is one caller away from being mutated for everyone.
+    return tuple(ppm.tolist()), tuple(amp.tolist()), tuple(shifts)
+
+
+def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, float, float]]]:
+    """Per multiplet, one `(centre_x, height_px, half-width_px)` Lorentzian per line it contains.
+
+    This is the shape MolDeTr itself predicts -- a multiplet is a set of lines sharing a shift and
+    a coupling, not a single broad hump -- and drawing it that way is what makes a fill sit *on*
+    the trace. One Lorentzian per multiplet was tried first and floats: with real 300 MHz data the
+    lines are 2 px wide, so a hump spanning the whole group towers over the gaps between them.
+
+    Each sample goes to its *nearest* recorded shift. A fixed +-0.045 ppm window was tried too and
+    is wider than the 0.035 ppm between this spectrum's two aromatic doublets, so H_B's window
+    reached across and claimed H_A's taller peak as its own.
+    """
+    ppm, amp, shifts = _spectrum()
+    span = (x1 - x0) / (PPM_LEFT - PPM_RIGHT)
+    step = abs(ppm[1] - ppm[0])
+    out = []
+    for shift in shifts:
+        idx = [
+            i
+            for i, p in enumerate(ppm)
+            if min(shifts, key=lambda s: abs(p - s)) == shift and abs(p - shift) <= 0.06
+        ]
+        tallest = max(amp[i] for i in idx)
+        lines = []
+        for i in idx:
+            if amp[i] < tallest * 0.12 or amp[i] < max(amp[max(i - 3, 0) : i + 4]):
+                continue
+            # Half-width from the data: walk out until the line drops below half, and cap at the
+            # gap to its neighbour so an unresolved shoulder cannot inflate it.
+            j = next((k for k in range(1, 40) if amp[min(i + k, len(amp) - 1)] < amp[i] * 0.5), 6)
+            lines.append(
+                (x0 + (PPM_LEFT - ppm[i]) * span, amp[i] * height, max(j * step * span, 2.4))
+            )
+        out.append(lines)
+    return out
+
+
+def _trace_d(x0: float, x1: float, base: float, height: float, mode: str) -> str:
+    """Path data for a banner panel's spectrum, in whichever treatment `mode` names.
+
+    `faithful` plots the array. The other two exist because the asset this replaces did not: it was
+    a design-tool redrawing of the same spectrum, only 0.58-0.68 correlated with it. Both of them
+    still take their peak positions, heights and widths from `_multiplets`, so the choice is one of
+    *rendering*, not of what the figure claims -- an idealised trace here is a smoothed spectrum,
+    never a different one.
+    """
+    if mode != "faithful":
+        peaks = [line for group in _multiplets(x0, x1, height) for line in group]
+        if mode == "ideal":
+            return _lorentz_d(x0, x1, base, peaks, step=1.5)
+        return _hybrid_d(x0, x1, base, peaks, height)
+
+    ppm, amp, _ = _spectrum()
+    span = (x1 - x0) / (PPM_LEFT - PPM_RIGHT)
+    pts = [(x0 + (PPM_LEFT - p) * span, base - a * height) for p, a in zip(ppm, amp)]
+    return "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in _thin(pts, int(x1 - x0)))
+
+
+def _thin(pts: list[tuple[float, float]], columns: int) -> list[tuple[float, float]]:
+    """Reduce to at most one min/max pair per output column.
+
+    Plain decimation would *discard* noise rather than shrink it: dropping every other sample of a
+    band-limited-looking wiggle lowers its apparent amplitude, so the trace would flatten as the
+    panel narrows. Keeping each column's extremes preserves the envelope, which is the property a
+    reader judges a spectrum's noise floor by.
+    """
+    if len(pts) <= columns:
+        return pts
+    per, out = len(pts) / columns, []
+    for i in range(columns):
+        chunk = pts[int(i * per) : max(int((i + 1) * per), int(i * per) + 1)]
+        lo, hi = min(chunk, key=lambda p: p[1]), max(chunk, key=lambda p: p[1])
+        out.extend([lo, hi] if lo[0] <= hi[0] else [hi, lo])
+    return out
+
+
+def _hybrid_d(x0: float, x1: float, base: float, peaks, height: float) -> str:
+    """The idealised envelope plus reproducible noise.
+
+    The noise is a fixed sum of incommensurate sinusoids, not a PRNG: `--check` compares committed
+    bytes, so anything reseeded per interpreter run would report the figure stale on every machine.
+    """
+    pts, x = [], float(x0)
+    while x <= x1:
+        y = base - sum(h / (1.0 + ((x - c) / w) ** 2) for c, h, w in peaks)
+        wobble = sum(
+            math.sin(x * f + p) for f, p in ((1.7, 0.0), (4.31, 1.7), (9.13, 3.9), (17.7, 2.2))
+        )
+        pts.append(f"{x:g} {y + wobble * height * 0.011:.1f}")
+        x += 1.5
     return "M " + " L ".join(pts)
 
 
@@ -240,9 +400,16 @@ class Canvas:
             f'<path d="M {x1} {y} L {back} {y - 9} L {back} {y + 9} Z" fill="{colour}"/>'
         )
 
-    def path(self, d, stroke=None, fill="none", sw=1.5, dash=None, cap=None, opacity=None) -> None:
-        """Escape hatch for geometry the named helpers do not cover."""
-        bits = [f'<path d="{d}" fill="{fill}"']
+    def path(
+        self, d, stroke=None, fill="none", sw=1.5, dash=None, cap=None, opacity=None, ident=None
+    ) -> None:
+        """Escape hatch for geometry the named helpers do not cover.
+
+        `ident` is for the few paths a test needs to find again. Naming them beats matching on
+        shape: `tests/test_readme_figures.py` reads the banner's traces back out to check they
+        still plot the committed spectrum, and "the two longest paths" is not a contract.
+        """
+        bits = [f'<path d="{d}"' + (f' id="{ident}"' if ident else "") + f' fill="{fill}"']
         if stroke:
             bits.append(f' stroke="{stroke}" stroke-width="{sw}"')
         if dash:
@@ -303,18 +470,92 @@ class Canvas:
             f'font-size="{size}" font-weight="{weight}" fill="{fill}"{extra}>{_esc(s)}</text>'
         )
 
-    def runs(self, x, y, runs: list[tuple[str, str, float, str]]) -> None:
-        """One left-anchored line built from several fonts, e.g. prose followed by a code span.
+    def gradient(self, ident: str, top: str, bottom: str) -> str:
+        """A corner-to-corner linear wash. Returns the `url(#..)` so it can be used as any fill."""
+        self.parts.append(
+            f'<defs><linearGradient id="{ident}" x1="0" y1="0" x2="1" y2="1">'
+            f'<stop offset="0" stop-color="{top}"/>'
+            f'<stop offset="1" stop-color="{bottom}"/></linearGradient></defs>'
+        )
+        return f"url(#{ident})"
+
+    def shadow(self, ident: str, dy: float, blur: float, colour: str, opacity: float) -> str:
+        """A drop shadow, returned as the `filter` value.
+
+        The region is deliberately far larger than the blur radius. A `feDropShadow` is clipped to
+        its filter region, and a soft wide shadow clipped mid-falloff shows as a straight edge --
+        which is what a default `-10%/120%` region does to these.
+        """
+        self.parts.append(
+            f'<defs><filter id="{ident}" x="-50%" y="-50%" width="200%" height="220%">'
+            f'<feDropShadow dx="0" dy="{dy}" stdDeviation="{blur}" flood-color="{colour}" '
+            f'flood-opacity="{opacity}"/></filter></defs>'
+        )
+        return f"url(#{ident})"
+
+    def panel(self, x, y, w, h, rx, fill, filt) -> None:
+        self.parts.append(
+            f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="{rx}" fill="{fill}" '
+            f'filter="{filt}"/>'
+        )
+
+    def hexagon(self, cx, cy, r, fill, stroke=None, sw=3.0, dash=None) -> None:
+        """A pointy-top hexagon -- vertical left and right edges, vertices at top and bottom.
+
+        This is the orientation both hexagons in the set use, and the one benzene is conventionally
+        drawn in, so `r` is the ring's circumradius and the flat sides are the ones bonds leave.
+        """
+        pts = [
+            (cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a)))
+            for a in (-90, -30, 30, 90, 150, 210)
+        ]
+        d = "M " + " L ".join(f"{px:.1f} {py:.1f}" for px, py in pts) + " Z"
+        self.path(d, stroke=stroke, fill=fill, sw=sw, dash=dash)
+
+    def sub(self, x, y, base, subscript, size, family, weight, fill, anchor="start") -> None:
+        """A label with a subscript, e.g. H_A or T_2, as one `<text>` so the runs share an advance.
+
+        `baseline-shift` is avoided on purpose: Chrome honours it, librsvg and several static
+        rasterisers do not, and a subscript that silently sits on the baseline reads as a second
+        letter. `dy` is universally supported and is undone by the matching negative shift.
+        """
+        drop = size * 0.26
+        self.parts.append(
+            f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="{family}" '
+            f'font-size="{size}" font-weight="{weight}" fill="{fill}">{_esc(base)}'
+            f'<tspan dy="{drop:.1f}" font-size="{size * 0.62:.1f}">{_esc(subscript)}</tspan></text>'
+        )
+
+    def runs(self, x, y, runs: list[tuple], anchor: str = "start") -> None:
+        """One line built from several fonts, e.g. prose followed by a code span.
 
         Emitted as `<tspan>`s inside a single `<text>` so the runs flow from one advance position.
         Positioning them as separate `<text>` elements would require knowing each run's rendered
-        width, which depends on the font -- and would drift the moment any label changed.
+        width, which depends on the font -- and would drift the moment any label changed. That is
+        also why `anchor="end"` is worth having: right-aligning a mixed-font line by computing where
+        to start it is the same measurement problem, and the renderer already knows the answer.
+
+        Each run is `(text, family, size, fill)`, optionally extended with `weight`, `italic` and a
+        baseline `dy`. The `dy` is how a subscript joins a mixed line -- `<tspan>` shifts accumulate,
+        so a shifted run must be followed by one carrying the negation if the line continues.
         """
-        body = "".join(
-            f'<tspan font-family="{fam}" font-size="{size}" fill="{fill}">{_esc(s)}</tspan>'
-            for s, fam, size, fill in runs
-        )
-        self.parts.append(f'<text x="{x}" y="{y}" text-anchor="start">{body}</text>')
+        body = ""
+        for run in runs:
+            s, fam, size, fill = run[:4]
+            weight = run[4] if len(run) > 4 else 400
+            italic = run[5] if len(run) > 5 else False
+            shift = run[6] if len(run) > 6 else 0
+            # Emitted only when it differs from the initial value. The parent <text> sets no
+            # weight, so `font-weight="400"` is a no-op -- and writing it anyway would rewrite
+            # every committed SVG that already uses `runs`, reporting them stale for no change.
+            bold = f' font-weight="{weight}"' if weight != 400 else ""
+            style = ' font-style="italic"' if italic else ""
+            dy = f' dy="{shift}"' if shift else ""
+            body += (
+                f'<tspan font-family="{fam}" font-size="{size}"{bold} '
+                f'fill="{fill}"{style}{dy}>{_esc(s)}</tspan>'
+            )
+        self.parts.append(f'<text x="{x}" y="{y}" text-anchor="{anchor}">{body}</text>')
 
     def done(self) -> str:
         return "".join(self.parts) + "</svg>"
@@ -719,7 +960,305 @@ def mark(t: dict[str, str]) -> str:
     return c.done()
 
 
+def _banner_masthead(c: Canvas, t: dict[str, str]) -> None:
+    """Wordmark and tagline on the left, the claim and the citation right-aligned on the right."""
+    for i, col in enumerate((t["blue"], t["orange"], t["teal"])):
+        c.rect(94 + 40 * i, 83, 29, 7, 3.5, col)
+    c.text(
+        222,
+        96,
+        "CHEMISTRY-INFORMED DEEP LEARNING · ¹H NMR",
+        27.2,
+        SG,
+        700,
+        t["eyebrow"],
+        "start",
+        "1.21",
+    )
+    c.text(101, 219, "MolDeTr", 114.8, SG, 700, t["display"], "start", "-2.2")
+    c.text(
+        94,
+        295,
+        "The spin system, straight from the spectrum.",
+        44.3,
+        SG,
+        700,
+        t["display"],
+        "start",
+        "-3.4",
+    )
+
+    for i, line in enumerate(("Reads spectra beyond", "manual interpretation")):
+        c.text(2461, 119.5 + 52.4 * i, line, 44.5, SG, 700, t["display"], anchor="end")
+    c.text(
+        2462,
+        226.5,
+        "& outperforms leading analysis software on difficult, strongly-coupled spectra",
+        29.5,
+        PLEX,
+        400,
+        t["mute"],
+        anchor="end",
+    )
+    # The journal name is the only italic in the set. It is a title, and the alternative -- setting
+    # it upright and hoping the reader infers it -- is what the citation surfaces elsewhere avoid.
+    c.runs(
+        2461,
+        282,
+        [
+            ("Published in ", PLEX, 30, t["mute"]),
+            ("Analytical Chemistry", PLEX, 30, t["display"], 600, True),
+            (" · 2026", PLEX, 30, t["mute"]),
+        ],
+        anchor="end",
+    )
+
+
+def _banner_axis(c: Canvas, t: dict[str, str], ticks, mid: float) -> None:
+    """The shared ppm scale: two labelled ticks and the axis title, one per panel."""
+    for x, label in ticks:
+        c.text(x, 756, label, 26, PLEX, 400, t["ink"])
+    c.runs(
+        mid,
+        791,
+        [("δ", PLEX, 27.1, t["mute"], 400, True), (" [ppm]", PLEX, 26, t["mute"])],
+        anchor="middle",
+    )
+
+
+def _banner_raw_card(c: Canvas, t: dict[str, str], shade: str, mode: str) -> None:
+    """Left panel: the spectrum as it arrives, and the structure you do not have."""
+    c.panel(97, 333, 675, 806, 32, t["card"], shade)
+    c.text(137, 388, "RAW ¹H NMR", 30.4, SG, 700, t["display"], "start", "1.9")
+    c.text(136, 424, "overlapping · strongly coupled", 26.9, PLEX, 400, t["mute"], anchor="start")
+    c.path("M 133 715.5 H 735", stroke=t["rule"], sw=2)
+    c.path(
+        _trace_d(153, 714, 715.5, 202, mode), stroke=t["ink"], sw=3, cap="round", ident="trace-raw"
+    )
+    _banner_axis(c, t, ((248.5, "7.4"), (620, "7.0")), 434)
+
+    c.path("M 133 808 H 735", stroke=t["border"], sw=2.5, dash="12 10")
+    # The ghost hexagon is `panel`, not the near-white literal the design tool used. That literal
+    # was invisible on white by luck and a solid bright blob on the dark card -- 36 % of the region.
+    c.hexagon(300.8, 966.8, 65.6, t["panel"], t["latent"], sw=3, dash="11 9")
+    for x, y in ((357.5, 934.0), (204.0, 1021.0), (397.5, 1022.5)):
+        c.path(
+            f"M {244 if x < 300 else 357.5} {999.5 if x < 300 else (934 if y < 1000 else 999.5)}"
+            f" L {x} {y}",
+            stroke=t["latent"],
+            sw=3,
+            dash="11 9",
+        )
+    c.text(300.8, 985, "?", 52, SG, 700, t["latent"])
+    c.text(497, 957, "STRUCTURE", 23.2, SG, 700, t["eyebrow"], "start", "2.2")
+    c.text(498, 999, "unknown?", 30.9, SG, 700, t["display"], "start", "-1.1")
+
+
+def _banner_bridge(c: Canvas, t: dict[str, str], shade: str) -> None:
+    """The model between the panels: one grey arrow in, three coloured ones out."""
+    c.arrow(774, 843, 629, t["arrow"])
+    c.panel(882, 528, 200, 202, 55, t["card"], shade)
+    layers = (
+        ([572, 613, 654, 686], 926, 10, t["ink"]),
+        ([560, 596, 634, 670, 703], 983, 8, t["latent"]),
+        ([592, 634, 674], 1040, 12.5, None),
+    )
+    for (ys0, x0, _, _), (ys1, x1, _, _) in zip(layers, layers[1:]):
+        for y0 in ys0:
+            for y1 in ys1:
+                c.line(x0, y0, x1, y1, t["connector"], sw=1)
+    for ys, x, r, fill in layers:
+        for i, y in enumerate(ys):
+            c.circle(x, y, r, fill or (t["blue"], t["orange"], t["teal"])[i])
+    for y, col in ((579, t["blue"]), (628, t["orange"]), (680, t["teal"])):
+        c.arrow(1107, 1172, y, col)
+    c.text(983, 852, "MolDeTr", 37.2, SG, 700, t["display"], spacing="-0.94")
+    c.text(982, 881, "detection transformer", 25.2, PLEX, 400, t["mute"])
+
+
+def _banner_molecule(c: Canvas, t: dict[str, str]) -> None:
+    """Ethyl vanillin, drawn around the ring the three assigned protons sit on.
+
+    The ring is solved rather than eyeballed: the orange, teal and blue dots in the asset this
+    replaces measure (1362.1, 962.3), (1362.0, 1004.2) and (1434.2, 962.4), which for a pointy-top
+    hexagon fixes the centre and circumradius to 0.24 px. Every other vertex follows.
+    """
+    cx, cy, r = 1398.2, 983.3, 41.9
+    top, ur, lr = (cx, cy - r), (cx + 0.866 * r, cy - r / 2), (cx + 0.866 * r, cy + r / 2)
+    bot, ll, ul = (cx, cy + r), (cx - 0.866 * r, cy + r / 2), (cx - 0.866 * r, cy - r / 2)
+    c.hexagon(cx, cy, r, "none", t["ink"], sw=4.5)
+    # Kekulé: alternate edges carry the inner line. Inset 8 units toward the centre and shortened
+    # at both ends, which is how a second bond is drawn rather than a doubled outline.
+    for a, b in ((top, ur), (ul, ll), (bot, lr)):
+        mx, my = (a[0] + b[0]) / 2, (a[1] + b[1]) / 2
+        dx, dy = (cx - mx) / r * 9, (cy - my) / r * 9
+        ax, ay = a[0] + (b[0] - a[0]) * 0.18 + dx, a[1] + (b[1] - a[1]) * 0.18 + dy
+        bx, by = a[0] + (b[0] - a[0]) * 0.82 + dx, a[1] + (b[1] - a[1]) * 0.82 + dy
+        c.path(f"M {ax:.1f} {ay:.1f} L {bx:.1f} {by:.1f}", stroke=t["ink"], sw=4.5, cap="round")
+
+    c.path(
+        f"M {top[0]} {top[1]} L 1398.2 910 L 1369 890 M 1398.2 910 L 1432 890",
+        stroke=t["ink"],
+        sw=4.5,
+        cap="round",
+    )
+    c.path("M 1404 906 L 1436 886", stroke=t["ink"], sw=4.5, cap="round")  # the carbonyl's second
+    c.text(1353, 886, "H", 28.6, SG, 700, t["ink"])
+    c.text(1443, 886, "O", 28.6, SG, 700, t["ink"])
+    c.path(f"M {bot[0]} {bot[1]} L 1398.2 1056", stroke=t["ink"], sw=4.5, cap="round")
+    c.text(1398.5, 1086, "OH", 28.6, SG, 700, t["ink"])
+    c.path(f"M {lr[0]:.1f} {lr[1]:.1f} L 1452 1000", stroke=t["ink"], sw=4.5, cap="round")
+    c.text(1463.5, 1011, "O", 28.6, SG, 700, t["ink"])
+    c.path("M 1476 1006 L 1489 1024 L 1508 1014", stroke=t["ink"], sw=4.5, cap="round")
+    c.sub(1512, 1020, "CH", "3", 28.6, SG, 700, t["ink"])
+
+    # Each label is start-anchored at its own measured left edge. Mirroring the two on the left to
+    # `anchor="end"` looks symmetric and is wrong: it hangs them off the far side of the bond.
+    for (vx, vy), (lx, ly), col, letter, tx, ty in (
+        (ul, (1332, 948), t["orange"], "B", 1299, 950),
+        (ll, (1332, 1014), t["teal"], "C", 1299, 1024),
+        (ur, (1466, 948), t["blue"], "A", 1469, 948),
+    ):
+        c.path(f"M {vx:.1f} {vy:.1f} L {lx} {ly}", stroke=col, sw=4.5, cap="round")
+        c.circle(vx, vy, 6, col)
+        c.sub(tx, ty, "H", letter, 28.6, SG, 700, col)
+    c.text(1411, 1107, "ASSIGNMENT", 21.7, SG, 700, t["eyebrow"], spacing="2.9")
+
+
+def _banner_table(c: Canvas, t: dict[str, str]) -> None:
+    """The per-multiplet answer: one row per spin system, the four quantities MolDeTr returns."""
+    c.text(1626, 863, "SPIN", 23, SG, 700, t["eyebrow"], "start", "1.6")
+    for x, base, unit in ((1896, "δ", " [PPM]"), (2091, "J", " [HZ]"), (2419, "T₂", " [MS]")):
+        c.runs(
+            x,
+            863,
+            [(base, SG, 23, t["eyebrow"], 700, True), (unit, SG, 23, t["eyebrow"], 700)],
+            anchor="end",
+        )
+    c.text(2269, 863, "PROTONS", 23, SG, 700, t["eyebrow"], "end", "1.6")
+    c.path("M 1625 888.5 H 2421", stroke=t["border"], sw=2)
+
+    rows = (
+        ("A", t["blue"], "7.39", "1.5", "557"),
+        ("B", t["orange"], "7.42", "8.7, 1.5", "637"),
+        ("C", t["teal"], "6.96", "8.7", "707"),
+    )
+    for i, (letter, col, shift, coupling, t2) in enumerate(rows):
+        y = 938 + 72 * i
+        if i:
+            c.path(f"M 1625 {y - 49.5} H 2421", stroke=t["rule"], sw=1.5)
+        c.circle(1634.5, y - 12, 10, col)
+        c.text(1663, y - 1, "H", 37, SG, 700, col, anchor="start")
+        c.text(1701, y - 5, letter, 23, SG, 700, col, anchor="start")
+        for x, value in ((1897, shift), (2092, coupling), (2270, "1")):
+            c.text(x, y, value, 34.4, SG, 700, t["ink"], anchor="end")
+        c.text(2419, y, t2, 34.4, SG, 700, t["mute"], anchor="end")
+
+
+def _banner_resolved_card(c: Canvas, t: dict[str, str], shade: str, mode: str) -> None:
+    """Right panel: the same window, decomposed into the three multiplets and their parameters."""
+    c.panel(1193, 333, 1268, 806, 32, t["card"], shade)
+    c.text(1234, 388, "RESOLVED SPIN SYSTEM", 30.4, SG, 700, t["display"], "start", "1.9")
+    c.runs(
+        1234,
+        424,
+        [
+            ("per multiplet — ", PLEX, 27.1, t["mute"]),
+            ("δ", PLEX, 27.1, t["mute"], 400, True),
+            (" · ", PLEX, 27.1, t["mute"]),
+            ("J", PLEX, 27.1, t["mute"], 400, True),
+            (" · protons · ", PLEX, 27.1, t["mute"]),
+            ("T", PLEX, 27.1, t["mute"], 400, True),
+            ("2", PLEX, 16.7, t["mute"], 400, False, 7),
+        ],
+    )
+    c.path("M 1240 717 H 2415", stroke=t["rule"], sw=2)
+
+    # The decomposition, drawn under the trace. Ordered `shifts` ascending, so the fills pair with
+    # C, A, B down the ppm axis -- the colours follow the proton, not the drawing order.
+    fills = (t["tealFill"], t["blueFill"], t["orangeFill"])
+    for lines, fill in zip(_multiplets(1256, 2397, 212), fills):
+        lo = min(cx for cx, _, _ in lines) - 46
+        hi = max(cx for cx, _, _ in lines) + 46
+        d = _lorentz_d(lo, hi, 717, lines, step=1.5)
+        c.path(d + f" L {hi:.0f} 717 Z", fill=fill)
+    c.path(
+        _trace_d(1256, 2397, 717, 212, mode),
+        stroke=t["ink"],
+        sw=2.6,
+        cap="round",
+        ident="trace-resolved",
+    )
+
+    for x, y, letter, col in (
+        (1459, 502, "A", t["blue"]),
+        (1322, 552, "B", t["orange"]),
+        (2264, 572, "C", t["teal"]),
+    ):
+        c.sub(x, y, "H", letter, 34, SG, 700, col)
+    _banner_axis(c, t, ((1448, "7.4"), (2207, "7.0")), 1826.5)
+    c.path("M 1240 808 H 2420", stroke=t["rule"], sw=2)
+    _banner_molecule(c, t)
+    _banner_table(c, t)
+
+
+def banner(t: dict[str, str]) -> str:
+    """The README and docs-site hero.
+
+    Unlike the six diagrams beside it this is a data figure, and its curve is the spectrum in
+    `examples/roi_S8_example.npz` -- vanillin in DMSO-d6 at 300.13 MHz, whose `ground_truth` shifts
+    are the assignment table's three rows. The asset it replaces was a design-tool *redrawing* of
+    that array, recognisable but only 0.58-0.68 correlated with it; here the array is plotted.
+
+    Sharing one geometry between light and dark also retires a defect the tests could not see: the
+    two PNGs were 2560x1283 and 2560x1280, an aspect drift that cleared the 0.005 tolerance by
+    0.0003 while `<picture>` was stretching the dark twin to the light one's box.
+    """
+    c = Canvas(
+        2560,
+        1283,
+        "MolDeTr",
+        "MolDeTr reads a raw 1H NMR spectrum and returns the spin system in it. Left, the "
+        "overlapping, strongly coupled 7.5 to 6.9 ppm window of vanillin at 300 MHz with the "
+        "structure unknown; right, the same window resolved into three multiplets with their "
+        "chemical shifts 7.39, 7.42 and 6.96 ppm, couplings 1.5, 8.7 and 8.7 Hz, one proton each, "
+        "and T2 of 557, 637 and 707 ms, assigned onto ethyl vanillin. Across 12 experimental "
+        "spectra from 80 to 600 MHz the median errors are 0.89 Hz in shift and 0.20 Hz in "
+        "coupling, with 93.5 percent proton-count accuracy.",
+        faces=("sg700", "plex400", "plex600"),
+    )
+    ground = c.gradient("wash", t["groundTop"], t["groundBottom"])
+    c.parts.append(f'<rect width="{c.w}" height="{c.h}" fill="{ground}"/>')
+    shade = c.shadow("lift", 10, 18, t["shadowInk"], 0.30)
+
+    _banner_masthead(c, t)
+    _banner_raw_card(c, t, shade, TRACE)
+    _banner_bridge(c, t, shade)
+    _banner_resolved_card(c, t, shade, TRACE)
+
+    c.runs(
+        210,
+        1195,
+        [
+            (
+                "Experimental benchmark · 12 spectra · 80–600 MHz · vs. ground truth:  ",
+                PLEX,
+                32.7,
+                t["mute"],
+            ),
+            ("0.89 Hz", SG, 32.7, t["blue"], 700),
+            (" median |Δδ|   ·   ", PLEX, 32.7, t["mute"]),
+            ("0.20 Hz", SG, 32.7, t["teal"], 700),
+            (" median |ΔJ|   ·   ", PLEX, 32.7, t["mute"]),
+            ("93.5%", SG, 32.7, t["orange"], 700),
+            (" proton-count accuracy", PLEX, 32.7, t["mute"]),
+        ],
+    )
+    return c.done()
+
+
 DIAGRAMS = {
+    "banner": banner,
     "pipeline": pipeline,
     "architecture": architecture,
     "input_contract": input_contract,
@@ -730,18 +1269,46 @@ DIAGRAMS = {
 
 
 def main() -> int:
+    global TRACE
+
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument(
         "--check",
         action="store_true",
         help="verify the committed SVGs match this source; write nothing",
     )
+    ap.add_argument(
+        "--trace",
+        choices=("faithful", "ideal", "hybrid"),
+        default=TRACE,
+        help="how the banner draws its two spectra (default: %(default)s, which plots the NPZ)",
+    )
+    ap.add_argument(
+        "--out-dir",
+        type=Path,
+        default=OUT_DIR,
+        help="write elsewhere, e.g. to compare --trace variants without touching docs/img",
+    )
+    ap.add_argument("--only", help="build just this diagram")
+    default_trace = TRACE
     args = ap.parse_args()
+    TRACE = args.trace
+    if args.check and (args.trace != default_trace or args.out_dir.resolve() != OUT_DIR):
+        # Otherwise --check would compare the committed bytes against a variant nobody committed
+        # and report every banner stale, which reads as a real staleness failure.
+        print("--check verifies the committed defaults; drop --trace/--out-dir", file=sys.stderr)
+        return 2
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+
+    wanted = {k: v for k, v in DIAGRAMS.items() if args.only in (None, k)}
+    if not wanted:
+        print(f"no such diagram: {args.only}; have {', '.join(DIAGRAMS)}", file=sys.stderr)
+        return 2
 
     stale: list[str] = []
-    for name, fn in DIAGRAMS.items():
+    for name, fn in wanted.items():
         for suffix, palette in (("", LIGHT), ("-dark", DARK)):
-            dest = OUT_DIR / f"{name}{suffix}.svg"
+            dest = args.out_dir / f"{name}{suffix}.svg"
             svg = fn(palette)
             if args.check:
                 current = dest.read_text(encoding="utf-8") if dest.is_file() else ""
@@ -749,13 +1316,13 @@ def main() -> int:
                     stale.append(dest.name)
             else:
                 dest.write_text(svg, encoding="utf-8")
-                print(f"{dest.relative_to(ROOT)}  {len(svg.encode()) / 1024:.1f} KB")
+                print(f"{dest}  {len(svg.encode()) / 1024:.1f} KB")
 
     if args.check:
         if stale:
             print(f"stale, re-run without --check: {', '.join(stale)}", file=sys.stderr)
             return 1
-        print(f"{2 * len(DIAGRAMS)} committed SVG(s) match this source")
+        print(f"{2 * len(wanted)} committed SVG(s) match this source")
     return 0
 
 

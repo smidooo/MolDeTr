@@ -7,6 +7,38 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **The hero banner is vector, and its spectrum is now the committed data rather than a picture of
+  it.** `docs/banner.png` was the last raster figure on the front page and the only one that was
+  never soft — at 2560 px shown at 820 it was already 3.12×, the sharpest image in the README. It
+  is replaced anyway, because it carried four defects that a re-authoring retires by construction
+  and a re-export would not.
+
+  Its curve is the spectrum in `examples/roi_S8_example.npz` — vanillin in DMSO-d6 at 300.13 MHz,
+  the same file the long-deleted `scripts/gen_banner.py` read, whose `ground_truth` shifts
+  (6.959 / 7.385 / 7.42) are the assignment table's three rows. The banner it replaces was a
+  *design-tool redrawing* of that array: recognisable, with its tallest peak at 7.388 ppm against a
+  ground truth of 7.385, but only 0.58–0.68 correlated with it. Solving the axis from the old
+  banner's own tick centroids put both panels on the identical window 7.50 → 6.90 ppm, agreeing to
+  0.004 ppm, so one window is now drawn at two widths.
+
+  Plotting the array rather than tracing the picture changes what the figure shows: the real 300 MHz
+  lines are ~2 px wide, so the multiplets resolve. H_B is visibly a doublet of doublets, H_A and H_C
+  doublets — which is exactly the *J* column beside them (8.7, 1.5 / 1.5 / 8.7). The coloured fills
+  are derived from the same array: one Lorentzian per detected line, each sample assigned to its
+  nearest recorded shift. `--trace {faithful,ideal,hybrid}` renders the idealised and
+  noise-added variants for comparison; `faithful` is what ships.
+
+  `tests/test_readme_figures.py` gains the guard the raster could never have. It reads the trace
+  polylines back out of the SVG, converts them to ppm through the figure's **own tick labels**, and
+  asserts each multiplet's centre of mass lands within 0.02 ppm of the NPZ's recorded shift —
+  three quantities from three independent places, so the check is not circular. Measured, the
+  agreement is 0.003 ppm and the weakest multiplet reaches 0.79 of full scale, against thresholds of
+  0.02 and 0.45. Mutation-tested six ways: shifting the window, ascending the axis, mirroring a
+  trace, flattening a trace, and erasing one multiplet all fail; sliding a trace 0.012 ppm passes.
+  Two of those mutations found real weaknesses in earlier versions of the test rather than
+  confirming it — a mirrored trace passed a tallest-peak check because the mirror maps 6.972 ppm
+  onto 7.429, within 0.009 of H_B.
+
 - **The docs site has an icon, and the repo's own mark finally does something.**
   `docs/img/mark.png` and `mark-dark.png` — a finished app-icon logo: navy tile, tricolor dash
   triple, two-peak trace, wordmark — were referenced by **nothing**, in any file, since they were
@@ -33,6 +65,24 @@ All notable changes to this project are documented here. The format is based on
   guessed — 26/40/0.34 scores 5.00/255 mean absolute difference against 6.65 for the first guess.
 
 ### Fixed
+- **Three near-white values in the dark banner were copied instead of mapped, and only dark-mode
+  readers ever saw the result.** The hexagon that stands for the unknown structure was filled
+  `#eff2f9` in light and `#eef2f7` in dark — the same colour, invisible on a white card and a solid
+  bright blob covering 36 % of that region on `#1b2130`. The right card's divider went `#f3f3f3` →
+  `#eef1f6` and the left card's dashed rule `#d6dbe1` → `#d3dce6`: a whisper on white, a glaring
+  rule on dark. All three are now the existing extracted roles (`panel`, `rule`, `border`), so the
+  mapping cannot go missing again. Same bug class as the `navy` fill regression fixed above.
+
+  The panel shadow was the fourth: one blue-grey value for both themes paints a *glow* around every
+  card on a dark ground, which is the opposite of the depth cue it exists for. `shadowInk` now flips
+  with the palette, and `docs/BRAND.md` records why a shadow token cannot be theme-independent.
+
+- **`docs/banner.png` and `banner-dark.png` were 2560×1283 and 2560×1280, so `<picture>` stretched
+  the dark twin.** The aspect-ratio guard cleared it by 0.0003 against a 0.005 tolerance — the test
+  passed for four days while the defect it exists to catch was live. Both are now one geometry with
+  two palettes, which makes the drift impossible rather than merely absent; the guard's docstring no
+  longer describes the banner pair as currently drifted.
+
 - **`docs/img/demo.gif` was pinned at exactly 2.00× by a comment that was wrong about its own
   code.** `scripts/capture_gui_media.py` stated that "a GIF frame is stored at the viewport's own
   pixel size — `device_scale_factor` does not apply — so the 2× has to come from a physically larger
