@@ -227,8 +227,10 @@ def test_a_light_figure_and_its_dark_twin_share_one_geometry():
     The browser sizes the block from the ``<img>``, then paints whichever source the colour scheme
     selects into that same box. A twin with a different aspect ratio is therefore not shown
     side-by-side with its sibling -- it is *stretched* to the sibling's box, and only dark-mode
-    readers see it. Measured 2026-08-10, two pairs had drifted: ``pipeline`` was 1820x388 light
-    against 1720x370 dark, and ``banner`` 2560x1283 against 2560x1280.
+    readers see it. Both pairs that were drifting when this was written have since been re-authored
+    as one shared geometry, which is why nothing here fails: ``pipeline`` was 1820x388 light against
+    1720x370 dark, and ``banner`` 2560x1283 against 2560x1280 -- the latter clearing the tolerance
+    below by 0.0003, so the guard passed while the stretching was real.
 
     Compares the aspect ratio rather than the pixel size on purpose: differing native resolutions
     are fine and sometimes deliberate, a differing *shape* never is.
@@ -283,3 +285,122 @@ def test_the_docs_favicon_points_at_files_that_exist():
         f"docs/_includes/head-custom.html points at {missing}, which do not exist under docs/. "
         "Paths there are site-root-relative, so they resolve against docs/, not the repo root."
     )
+
+
+#: Every `x y` pair in an `M`/`L`-only path. The banner's traces are emitted as polylines, so this
+#: needs no curve support -- and it deliberately does not gain any, because a `C`/`Q` control point
+#: is not a point the curve passes through and would be read here as if it were.
+_PATH_XY = re.compile(r"[-+]?\d*\.?\d+")
+
+#: `<text x=".." y="..">content</text>`, with the attributes in the order `Canvas.text` writes them.
+_TEXT = re.compile(r"<text\b[^>]*\bx=\"([-\d.]+)\"[^>]*\by=\"([-\d.]+)\"[^>]*>(.*?)</text>", re.S)
+
+
+def _polyline(d: str) -> list[tuple[float, float]]:
+    nums = [float(n) for n in _PATH_XY.findall(d)]
+    return list(zip(nums[::2], nums[1::2]))
+
+
+@pytest.mark.unit
+def test_the_banner_traces_plot_the_committed_spectrum():
+    """The hero's two curves must be the spectrum in ``examples/roi_S8_example.npz``, not a drawing.
+
+    The banner this replaced was a design-tool export, so its curve was a *redrawing* of that
+    spectrum -- recognisable (its tallest peak sat at 7.388 ppm against a ground truth of 7.385)
+    but only 0.58-0.68 correlated with the array. Nothing could have told you that from the repo;
+    a picture of data and a picture of something else are the same kind of file.
+
+    What makes this falsifiable rather than circular: the three quantities compared are produced by
+    three independent things. The **tick labels** are text the generator lays out, and are what a
+    reader actually uses to interpret the figure. The **curve** is a polyline built from the array.
+    The **shifts** come from the NPZ's own ``ground_truth`` record. Inventing a curve, flipping the
+    axis (ppm descends left to right, and nothing in SVG knows that), shifting the window, or
+    swapping the NPZ each breaks the agreement between a different pair of them.
+
+    Every recorded shift is checked, not just the tallest peak. Checking one was tried and is too
+    weak to state the property: mirroring the resolved trace about its own centre -- a flipped axis,
+    exactly what this claims to catch -- moved the tallest peak from 6.972 ppm to 7.429, which lands
+    within 0.009 of H_B and passes. Two of the three multiplets have to disagree before a
+    one-peak test notices, and there is no reason to expect them to.
+    """
+    np = pytest.importorskip("numpy")
+
+    svg = (REPO / "docs" / "img" / "banner.svg").read_text(encoding="utf-8")
+    # Attributes are pulled from the whole tag rather than in one ordered pattern. An `id` before
+    # `d` pattern matched nothing against a generator that emits `d` first, and the resulting
+    # "found 0" read exactly like a missing-attribute failure.
+    traces = [
+        (
+            re.search(r'\bid="(trace-[a-z]+)"', tag).group(1),
+            re.search(r'\bd="([^"]+)"', tag).group(1),
+        )
+        for tag in re.findall(r"<path\b[^>]*>", svg)
+        if re.search(r'\bid="trace-[a-z]+"', tag) and re.search(r'\bd="', tag)
+    ]
+    assert len(traces) == 2, (
+        f'expected the raw and resolved traces to carry id="trace-*", found {len(traces)}'
+    )
+
+    labels = [
+        (float(x), float(y), body.strip())
+        for x, y, body in _TEXT.findall(svg)
+        if re.fullmatch(r"\d\.\d", body.strip())
+    ]
+
+    # allow_pickle for `ground_truth`, which is an object array of dicts. The file is committed to
+    # this repo and is the same one `scripts/plot_deposit_spectrum.py` reads; there is no untrusted
+    # input path here.
+    npz = np.load(REPO / "examples" / "roi_S8_example.npz", allow_pickle=True)
+    shifts = np.array([g["chemical_shift_ppm"] for g in npz["ground_truth"]])
+
+    for name, d in traces:
+        points = _polyline(d)
+        assert len(points) > 200, f"{name} has {len(points)} vertices; that is not a real spectrum"
+        xs = [p[0] for p in points]
+        base = max(p[1] for p in points)
+        # A tick belongs to this panel if it sits under this trace's baseline and within its span.
+        # Matching on the "d.d" shape alone also collects the assignment table's coupling constants,
+        # which are the same shape, in the same file, and would silently redefine the axis.
+        panel = sorted(t for t in labels if min(xs) <= t[0] <= max(xs) and 0 < t[1] - base < 80)
+        assert len(panel) == 2, f"{name} spans {min(xs):.0f}..{max(xs):.0f} with ticks {panel}"
+
+        (x_left, _, left), (x_right, _, right) = panel
+        assert float(left) > float(right), (
+            f"{name}: the tick at x={x_left:.0f} reads {left} and the one at x={x_right:.0f} reads "
+            f"{right}. A 1H axis descends left to right; this one ascends."
+        )
+        per_px = (float(left) - float(right)) / (x_right - x_left)
+        full = base - min(p[1] for p in points)  # this panel's full-scale height, in units
+
+        # Read every vertex back into ppm through the panel's own ticks, keep what rises clear of
+        # the noise, and group by nearest recorded shift. A multiplet's centre of mass IS its
+        # chemical shift -- for the two doublets here the shift falls in the *gap* between lines,
+        # which is why "is there a peak within N units of the shift" cannot state this property.
+        signal = [
+            (float(left) - (x - x_left) * per_px, base - y)
+            for x, y in points
+            if base - y > full * 0.10
+        ]
+        assert signal, f"{name} has no signal above 10% of its own full scale; it is a flat line"
+
+        for shift in shifts:
+            mine = [(p, w) for p, w in signal if min(shifts, key=lambda s: abs(p - s)) == shift]
+            assert mine, (
+                f"{name} puts nothing at all near {shift} ppm, though the spectrum it claims to "
+                f"plot records a multiplet there."
+            )
+            # Height as well as position. Without this, erasing a multiplet outright still passes:
+            # its neighbour's line tails leak across the partition boundary and their centre of
+            # mass lands close enough to the shift that was removed. Measured, the weakest of the
+            # three reaches 0.79 of full scale in both panels, so 0.45 is ~1.75x of headroom.
+            assert max(w for _, w in mine) > full * 0.45, (
+                f"{name}'s multiplet at {shift} ppm reaches only "
+                f"{max(w for _, w in mine) / full:.2f} of the panel's full scale. The assignment "
+                f"table names it, so it has to be visible in the curve beside it."
+            )
+            centre = sum(p * w for p, w in mine) / sum(w for _, w in mine)
+            assert abs(centre - shift) < 0.02, (
+                f"{name}'s multiplet nearest {shift} ppm has its centre of mass at {centre:.3f} "
+                f"ppm, read off the figure's own tick labels. The curve and the spectrum it claims "
+                f"to plot disagree, so at least one of them is not the data."
+            )

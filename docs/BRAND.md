@@ -23,6 +23,9 @@ docs all cite.
 | border | `#d5dfeb` | hairline borders |
 | page | `#eef2f7` | app background — **not** the figure ground, see `figure-page` |
 | figure-page | `#f8fafd` | the ground inside a diagram frame (`docs/img/*.svg`) |
+| banner ground | `#fafcfd` → `#eef3f8` | the hero's diagonal wash, top-left to bottom-right |
+| multiplet fill | `#a8c3e0` / `#e7c7a1` / `#a1ccc5` | a decomposed multiplet under a trace — a tint per tricolor member, measured, **not** an alpha blend |
+| panel shadow | `#8494ab` @ 0.30 | what a raised card casts. A shadow is a darkening, so this token flips with the theme rather than being reused |
 | **brick** | `#9b3128` | errors (the brand has no pure red — this is an oklch-harmonised brick) |
 
 `page` and `figure-page` are separate roles that were briefly conflated. The app background is
@@ -44,6 +47,9 @@ substitute one for the other.
 | track / rule | `#262f3d` / `#28303f` |
 | brick / its wash / its edge | `#e08575` / `#241a18` / `#5c3a34` |
 | teal wash / teal edge / teal text | `#16241f` / `#2f5850` / `#5cc2b0` |
+| banner ground, top → bottom | `#131923` → `#0d1219` |
+| multiplet fill blue / orange / teal | `#1f3d63` / `#604325` / `#18474a` |
+| panel shadow | `#01030a` |
 
 The **tricolor stays identical** in dark mode — blue/orange/teal read well on both grounds.
 

@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/banner-dark.png">
-    <img src="docs/banner.png" alt="MolDeTr: chemistry-informed deep learning for 1H NMR" width="820">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/banner-dark.svg">
+    <img src="docs/img/banner.svg" alt="MolDeTr: chemistry-informed deep learning for 1H NMR" width="820">
   </picture>
 </p>
 
