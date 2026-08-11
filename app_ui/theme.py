@@ -18,7 +18,7 @@ If a `.set(...)` key errors on another version, delete that line — every key i
 
 import gradio as gr
 
-# ---- paper palette (docs/banner.png · TOC graphic) --------------------------
+# ---- paper palette (docs/img/banner.svg · TOC graphic) ----------------------
 BLUE = "#2566b0"  # primary / detections
 BLUE_DARK = "#1f57a0"
 ORANGE = "#e08a1f"  # accent 2 / warnings

@@ -1,5 +1,7 @@
 <p align="center">
-  <img src="banner.png" alt="MolDeTr: chemistry-informed deep learning for ¹H NMR multiplet detection" width="820">
+  <!-- Deliberately a bare <img>, not a <picture>: jekyll-theme-cayman has no dark mode, so a
+       prefers-color-scheme source would serve the dark banner onto a permanently light page. -->
+  <img src="img/banner.svg" alt="MolDeTr: chemistry-informed deep learning for ¹H NMR multiplet detection" width="820">
 </p>
 
 MolDeTr reads a 1-D ¹H NMR spectrum and returns the spin systems in it directly: for each group of
