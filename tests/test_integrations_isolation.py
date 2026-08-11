@@ -23,10 +23,15 @@ refused. That closure is **measured in the running interpreter**, not hardcoded 
 `tomli` and `exceptiongroup` only below Python 3.11, so a list read off one version is wrong on
 another. See `_pytest_closure`.
 
-**The invocation is read from the workflow, not restated here.** A guard that hard-codes
+**The invocations are read from the workflow, not restated here.** A guard that hard-codes
 `tests/test_integrations.py` stops covering the job the moment a second file is added to that step —
 which is the same shape as the defect. `tests/test_marker_hygiene.py` makes this argument about
 itself and already parses these workflows; this follows it.
+
+Plural, and the plural is the point: the job made one pytest call until the automatic
+paper-relation repair was wired, and now makes three. Reading only the first is the same failure
+with the collar loosened one notch — a green guard covering a third of the lane. `_collect` unions
+across all of them for that reason.
 
 The assertion compares collected node IDs against an unblocked baseline rather than a literal count:
 `test_every_declared_doi_still_resolves` is parametrized over `CITATION.cff`, so the count moves
@@ -163,17 +168,26 @@ def _shim_source() -> str:
     )
 
 
-def _workflow_pytest_argv() -> list[str]:
-    """The integrations job's own pytest invocation, read from the workflow rather than restated."""
-    for raw in WORKFLOW.read_text(encoding="utf-8").splitlines():
-        line = raw.strip()
-        if line.startswith("run: pytest ") and "test_integrations" in line:
-            return shlex.split(line.removeprefix("run: "))
-    raise AssertionError(
+def _workflow_pytest_argvs() -> list[list[str]]:
+    """Every pytest invocation the integrations job makes, read from the workflow, not restated.
+
+    **All of them, not the first.** This returned a single argv while the job made a single call.
+    Wiring the automatic paper-relation repair took it to three — a narrow detector, a re-check
+    after the repair, and the broad sweep that `--deselect`s what those two own. Returning the
+    first would have left this guard green while two thirds of the lane went uncovered, which is
+    precisely the defect class this module documents about itself in the header.
+    """
+    argvs = [
+        shlex.split(line.removeprefix("run: "))
+        for line in (raw.strip() for raw in WORKFLOW.read_text(encoding="utf-8").splitlines())
+        if line.startswith("run: pytest ") and "test_integrations" in line
+    ]
+    assert argvs, (
         f"no `run: pytest ... test_integrations ...` step found in {WORKFLOW.name}. The guard can "
         "no longer tell what the job runs, so it fails rather than silently checking a stale "
         "invocation — re-point it at whatever the step became."
     )
+    return argvs
 
 
 def _run(
@@ -228,16 +242,26 @@ def _pytest_entrypoint() -> list[str]:
 
 
 def _collect(shim: Path | None = None) -> tuple[int, set[str], str]:
-    """Collect the integrations lane exactly as the workflow invokes it."""
-    argv = _workflow_pytest_argv()
+    """Collect the integrations lane exactly as the workflow invokes it — every invocation of it.
+
+    The union across invocations is the lane's true coverage: the broad sweep `--deselect`s the
+    paper-relation test, and the two narrow steps are the only ones that name it. Any single
+    invocation is therefore an incomplete picture of what the job collects.
+    """
     executable, *prefix = _pytest_entrypoint()
-    proc = _run([*prefix, *argv[1:], "--collect-only"], shim, executable)
-    node_ids = {
-        line.strip().replace("\\", "/")
-        for line in proc.stdout.splitlines()
-        if "test_integrations.py::" in line
-    }
-    return proc.returncode, node_ids, proc.stdout + proc.stderr
+    returncode, node_ids, output = 0, set[str](), ""
+    # Deduplicated: the detector and the re-check are byte-identical invocations by design, and
+    # collecting the same thing twice adds a subprocess without adding an answer.
+    for argv in dict.fromkeys(tuple(a) for a in _workflow_pytest_argvs()):
+        proc = _run([*prefix, *argv[1:], "--collect-only"], shim, executable)
+        returncode = returncode or proc.returncode
+        node_ids |= {
+            line.strip().replace("\\", "/")
+            for line in proc.stdout.splitlines()
+            if "test_integrations.py::" in line
+        }
+        output += proc.stdout + proc.stderr
+    return returncode, node_ids, output
 
 
 @pytest.fixture
