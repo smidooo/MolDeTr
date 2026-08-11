@@ -6,6 +6,27 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **"Five for five" is now "six for six", and the sixth is the first one measured.** v1.4.0 minted
+  without the `isSupplementTo` relation to the article, exactly as the four surfaces asserting that
+  count predicted — so the prediction is retired and replaced by an observation. Recorded from the
+  release-triggered run of 2026-08-11: Zenodo minted v1.4.0 at 11:40:32, the guard failed at
+  11:40:35 with `Present relations: [('isSupplementTo', '.../tree/v1.4.0')]` — the auto-generated
+  tree link and nothing else — the fixer ran at 11:40:47, and the re-check passed at 11:40:49.
+  **Seventeen seconds, unattended, and the first release in this project's history that no human
+  repaired.** Verified independently afterwards against the public API rather than the job's own
+  verdict: record `21888471`, DOI `10.5281/zenodo.21888471`, exactly two relations, no duplicate.
+
+  Updated in all four places that carried the number — `scripts/zenodo_add_paper_doi.py`,
+  `tests/test_integrations.py`, `docs/RELEASING.md` and two comments in `integrations.yml` — and
+  each now says *why* re-deriving beats incrementing: "six for six" is five inherited observations
+  plus one measurement, not six measurements. This repository has already shipped an inherited
+  "four for four" that was really five.
+
+  The `[1.4.0]` entry below still reads "five for five (…v1.3.0)" and is deliberately untouched: it
+  is a scoped claim about the releases before v1.4.0, it was true when written, and it is the text
+  of a published release.
+
 ## [1.4.0] - 2026-08-11
 
 ### Added

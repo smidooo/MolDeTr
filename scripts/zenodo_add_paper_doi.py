@@ -7,13 +7,20 @@ Adds `isSupplementTo` → `10.1021/acs.analchem.5c03465` to the latest Zenodo so
     python scripts/zenodo_add_paper_doi.py --confirm   # apply
 
 **Why this exists.** Every deposit should point at the paper it accompanies, and the relation does
-not carry forward. It was on v0.1.0 and absent from every release since — **five for five**:
-v1.0.0, v1.1.0, v1.1.1, v1.2.0 and v1.3.0, the last of them minted four days after this tool was
-first written to fix the problem. Zenodo is
+not carry forward. It was on v0.1.0 and absent from every release since — **six for six**:
+v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0 and v1.4.0. Zenodo is
 not seeding it from the previous record: v1.2.0 came out without it even though v1.1.1 had already
 been hand-edited to carry it. So this is not a lapse of attention that a checklist can catch, and
 `docs/RELEASING.md` no longer pretends otherwise — `tests/test_integrations.py` watches for it on
 every release and weekly thereafter, and this is what closes it when that guard fires.
+
+The sixth is the first that was **measured rather than predicted**, and the first no human repaired.
+On 2026-08-11 the release-triggered run recorded: Zenodo minted v1.4.0 at 11:40:32, the guard failed
+three seconds later with `Present relations: [('isSupplementTo', '.../tree/v1.4.0')]`, this script
+ran at 11:40:47, and the re-check passed at 11:40:49. Seventeen seconds, unattended. Before that run
+the count was inherited from five observations and stated as a prediction about the sixth; it is now
+a sixth observation. That distinction is why the number is worth re-deriving each release instead of
+incrementing.
 
 Assume a fresh release LACKS the relation until checked.
 
