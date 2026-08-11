@@ -16,7 +16,44 @@ the three in step).
 If a `.set(...)` key errors on another version, delete that line — every key is cosmetic.
 """
 
+import base64
+from pathlib import Path
+
 import gradio as gr
+
+# ---- webfont, embedded rather than fetched ----------------------------------
+# This used to be `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk...')` at the
+# top of CUSTOM_CSS, and that put a third-party host in the render path of the whole stylesheet.
+#
+# CI run 31390397645 failed `test_container_max_width_comes_from_custom_css` with `max-width: none`
+# on a branch that could not touch styling: the Google Fonts request was issued and never resolved
+# (status -1, still pending 4.8 s later), and a *pending* `@import` withholds the sheet it sits in.
+# A three-condition Firefox probe separated mechanism from correlation — control 1320px @2.30 s,
+# abort 1320px @2.44 s, hang `none` for the full window — so a failed fetch is harmless and only a
+# hanging one does this. A proxy that black-holes the host rather than resetting reproduces it for
+# a real user, and this repo is an archived artifact with a DOI, so the CDN is a liability with no
+# expiry date.
+#
+# Embedding as a data: URI (rather than serving the file) means there is no request to hang at all,
+# and no Gradio static-path plumbing to keep working across versions.
+#
+# Latin subset only: the font is applied to UI chrome (eyebrow labels, primary buttons, ppm pills),
+# all ASCII. δ and friends are Greek, outside both the latin and latin-ext subsets, so they already
+# fell back before this change — see the `text-transform` warning further down.
+_FONT_FILE = Path(__file__).parent / "fonts" / "SpaceGrotesk-latin-var.woff2"
+_FONT_B64 = base64.b64encode(_FONT_FILE.read_bytes()).decode("ascii")
+
+# `font-weight: 500 700` is a range, not a typo: one variable-font file covers every weight the CSS
+# below asks for, which is why Google served the same woff2 URL for 500, 600 and 700.
+FONT_FACE_CSS = f"""
+@font-face {{
+  font-family: 'Space Grotesk';
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url(data:font/woff2;base64,{_FONT_B64}) format('woff2');
+}}
+"""
 
 # ---- paper palette (docs/img/banner.svg · TOC graphic) ----------------------
 BLUE = "#2566b0"  # primary / detections
@@ -99,9 +136,9 @@ MOLDETR_THEME = gr.themes.Base(
 
 # ---- CSS for what the theme API can't express -------------------------------
 # Selectors target Gradio 6.x; adjust if your version renders differently.
-CUSTOM_CSS = """
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap');
-
+CUSTOM_CSS = (
+    FONT_FACE_CSS
+    + """
 .gradio-container { max-width: 1320px !important; margin: 0 auto !important; }
 footer { display: none !important; }
 
@@ -145,6 +182,7 @@ button.primary { font-family: 'Space Grotesk', sans-serif !important;
 
 .md-footnote { font-size: 12px; color: #666f7d; }
 """
+)
 
 HEADER_HTML = """
 <div id="md-header">

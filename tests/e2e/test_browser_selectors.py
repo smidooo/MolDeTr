@@ -11,7 +11,6 @@ stylesheet is covered the moment it is written, with no second place to remember
 
 from __future__ import annotations
 
-import re
 
 import pytest
 
@@ -19,6 +18,11 @@ pytest.importorskip("playwright")
 from playwright.sync_api import Page, expect  # noqa: E402
 
 from app_ui.theme import CUSTOM_CSS  # noqa: E402
+
+from tests.css_at_rules import (  # noqa: E402
+    parse_selectors as _parse_selectors,
+    strip_pseudo as _strip_pseudo,
+)
 
 pytestmark = pytest.mark.browser
 
@@ -29,33 +33,6 @@ KNOWN_UNMATCHABLE = {
     # not make the *rule* verifiable for the others.
     "#md-examples button:hover",
 }
-
-
-def _parse_selectors(css: str) -> list[str]:
-    """Selectors from a stylesheet, minus at-rules, comments, and pseudo-classes.
-
-    Pseudo-classes are stripped rather than skipped so `#md-examples button:hover` still verifies
-    that `#md-examples button` exists — the half of the rule that can rot silently.
-    """
-    css = re.sub(r"/\*.*?\*/", "", css, flags=re.DOTALL)
-    # Drop at-rule statements line-wise. A `@[^;{]+;` regex looks right and is not: the Google
-    # Fonts URL contains `;` (`wght@500;600;700`), so it truncates mid-URL and hands the remainder
-    # `600;700&display=swap');` to the browser as a selector. No nested at-rule blocks (@media)
-    # exist here; those would need brace matching.
-    css = "\n".join(ln for ln in css.splitlines() if not ln.lstrip().startswith("@"))
-
-    selectors: list[str] = []
-    for block in css.split("}"):
-        head = block.split("{")[0].strip()
-        if not head:
-            continue
-        selectors.extend(part.strip() for part in head.split(",") if part.strip())
-    return selectors
-
-
-def _strip_pseudo(selector: str) -> str:
-    """`#md-examples button:hover` -> `#md-examples button`; `a::before` -> `a`."""
-    return re.sub(r"::?[a-zA-Z-]+(\([^)]*\))?", "", selector).strip()
 
 
 def _match_counts(page: Page, selectors: list[str]) -> dict[str, int]:

@@ -6,6 +6,53 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The webfont can no longer take the whole stylesheet down with it.** `CUSTOM_CSS` opened with
+  `@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk…')`, and a *pending* `@import`
+  withholds the stylesheet it sits in — so a font CDN that hangs rather than fails unstyles the
+  entire app. Not hypothetical: CI run `31390397645` failed
+  `test_container_max_width_comes_from_custom_css` with `max-width: none` on a branch whose diff
+  could not touch styling, and its retained Playwright trace shows the Google Fonts request issued
+  at t=32556.8 ms and still unresolved 4.8 s later (status `-1`).
+
+  A three-condition probe in Firefox separated mechanism from correlation — control `1320px` at
+  2.30 s, **abort** `1320px` at 2.44 s, **hang** `none` for the full 6 s window — so a *failed*
+  fetch is harmless and only a *pending* one does this. That is the case a proxy which black-holes
+  the host produces for a real user, which makes this a user-facing bug and not only a CI flake.
+
+  Space Grotesk (SIL OFL 1.1, latin subset, 22 KB, weight axis intact and narrowed to 500–700 by
+  the `@font-face`) is now vendored at `app_ui/fonts/` and embedded as a `data:` URI, so there is no
+  request to hang and no Gradio static-path plumbing to maintain. Licence at `app_ui/fonts/OFL.txt`,
+  provenance at `app_ui/fonts/README.md`, recorded in `THIRD_PARTY.md` — whose font section now
+  covers the `docs/fonts/` diagram subsets and IBM Plex too, rather than reading as though the app
+  font were the whole story.
+
+  Three guards in `tests/e2e/test_browser_branding.py`: every request must be same-origin (an
+  allowlist, not a denylist of Google hosts — `fonts.bunny.net` reproduces the identical bug), the
+  layout CSS must still apply when a font CDN is routed to hang, and the embedded face must actually
+  load. The first two were confirmed red before the fix, the second reproducing the CI symptom
+  exactly (`Actual value: none`); the third exists because the other two are both absences and
+  neither can distinguish a working font from a missing one.
+
+- **The dead-CSS-rule auditor now understands braced at-rules, and is checked outside the browser
+  job.** Its parser dropped at-rules line-wise, which removed a `@font-face {` header while leaving
+  its declarations behind for the browser to reject as selectors — the limitation its own comment
+  predicted (*"those would need brace matching"*). It now brace-matches, string-aware: declaration
+  at-rules are dropped whole, conditional group rules (`@media`, `@supports`, `@layer`,
+  `@container`, `@scope`) are unwrapped so the selectors inside stay audited, and an unrecognised
+  at-rule is left alone rather than guessed at.
+
+  Both of those last two clauses are load-bearing, and review found them by measurement after the
+  first attempt: `content: "a@b"` with no trailing `;`, and `@charset "utf-8"` with no `;`, each
+  made the parser brace-match into the *following* rule and delete it whole — silently, since what
+  came out was still valid CSS.
+
+  The parsing helpers moved to `tests/css_at_rules.py` and are exercised by
+  `tests/test_css_at_rules.py` in the `not browser` lane, so a 100-line hand-rolled state machine is
+  no longer reachable only through the three-browser job. That file also **pins the audited selector
+  set** at its 14 members: the previous check on parser output was `assert selectors`, which one
+  surviving selector out of fourteen satisfies.
+
 ### Changed
 - **"Five for five" is now "six for six", and the sixth is the first one measured.** v1.4.0 minted
   without the `isSupplementTo` relation to the article, exactly as the four surfaces asserting that
