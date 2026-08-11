@@ -102,6 +102,10 @@ LIGHT = {
     "display": "#1f3a5f",
     "ink": "#20242b",
     "mute": "#5b6675",
+    # The line-width column's ink: quieter than `mute` without going as pale as `latent`.
+    # Measured off both prediction PNGs (#6a7686 light, #93a2b5 dark, 100% of the masked
+    # pixels in each) rather than chosen -- BRAND.md publishes the dark value as `dim`.
+    "dim": "#6a7686",
     "latent": "#7d92b0",
     "connector": "#cdd7e4",
     "arrow": "#9db0c6",
@@ -174,6 +178,7 @@ DARK = {
     "display": "#e2e9f4",
     "ink": "#e8eef6",
     "mute": "#9fb0c4",
+    "dim": "#93a2b5",
     "latent": "#7d92b0",
     "connector": "#3a4557",
     "arrow": "#9db0c6",
@@ -260,9 +265,18 @@ def _lorentz_d(x0: float, x1: float, base: float, peaks, step: float = 2.0) -> s
     return "M " + " L ".join(pts)
 
 
-@functools.lru_cache(maxsize=1)
-def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
-    """`BANNER_NPZ` over the banner window: (ppm descending, amplitude normalised 0-1, shifts).
+# maxsize covers the distinct (npz, window) triples the figure set asks for -- the banner's window,
+# and the two prediction figures' full spans -- so each file is still read once per build. It was 1
+# while there was one window; leaving it at 1 would silently re-read and re-normalise on every
+# alternating call, which is slow rather than wrong, and therefore the kind of thing nobody notices.
+@functools.lru_cache(maxsize=8)
+def _spectrum(
+    npz: Path = BANNER_NPZ, left: float = PPM_LEFT, right: float = PPM_RIGHT
+) -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]]:
+    """One NPZ over one ppm window: (ppm descending, amplitude normalised 0-1, shifts).
+
+    Defaults are the banner's, so every existing call site is unchanged -- `--check` proves it, and
+    that proof is the reason the arguments were added this way rather than by rewriting the callers.
 
     Amplitude is normalised here rather than at each call site so the trace and the multiplet fills
     below it cannot end up on two different scales -- which is exactly the kind of disagreement a
@@ -274,11 +288,15 @@ def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]
     """
     import numpy as np
 
-    # allow_pickle for `ground_truth`, an object array of dicts. Committed to this repo.
-    data = np.load(BANNER_NPZ, allow_pickle=True)
+    # allow_pickle for `ground_truth`, an object array of dicts. Safe because `npz` is never user
+    # input: every caller passes a module-level constant naming a file committed to this repository,
+    # and this script takes no path argument that could reach here. That was self-evident while the
+    # path was hardcoded; it is a constraint worth stating now that it is a parameter, because the
+    # justification lives in the call sites rather than in this line.
+    data = np.load(npz, allow_pickle=True)
     ppm = np.asarray(data["ppm_axis_padded"], dtype=float)
     amp = np.real(data["spectrum_padded"]).astype(float)
-    window = (ppm >= PPM_RIGHT) & (ppm <= PPM_LEFT)
+    window = (ppm >= right) & (ppm <= left)
     order = np.argsort(-ppm[window])  # high ppm first: a 1H axis reads right-to-left
     ppm, amp = ppm[window][order], amp[window][order]
     amp = (amp - float(np.median(amp))) / float(amp.max() - np.median(amp))
@@ -288,7 +306,14 @@ def _spectrum() -> tuple[tuple[float, ...], tuple[float, ...], tuple[float, ...]
     return tuple(ppm.tolist()), tuple(amp.tolist()), tuple(shifts)
 
 
-def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, float, float]]]:
+def _multiplets(
+    x0: float,
+    x1: float,
+    height: float,
+    npz: Path = BANNER_NPZ,
+    left: float = PPM_LEFT,
+    right: float = PPM_RIGHT,
+) -> list[list[tuple[float, float, float]]]:
     """Per multiplet, one `(centre_x, height_px, half-width_px)` Lorentzian per line it contains.
 
     This is the shape MolDeTr itself predicts -- a multiplet is a set of lines sharing a shift and
@@ -300,8 +325,8 @@ def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, f
     is wider than the 0.035 ppm between this spectrum's two aromatic doublets, so H_B's window
     reached across and claimed H_A's taller peak as its own.
     """
-    ppm, amp, shifts = _spectrum()
-    span = (x1 - x0) / (PPM_LEFT - PPM_RIGHT)
+    ppm, amp, shifts = _spectrum(npz, left, right)
+    span = (x1 - x0) / (left - right)
     step = abs(ppm[1] - ppm[0])
     out = []
     for shift in shifts:
@@ -325,7 +350,16 @@ def _multiplets(x0: float, x1: float, height: float) -> list[list[tuple[float, f
     return out
 
 
-def _trace_d(x0: float, x1: float, base: float, height: float, mode: str) -> str:
+def _trace_d(
+    x0: float,
+    x1: float,
+    base: float,
+    height: float,
+    mode: str,
+    npz: Path = BANNER_NPZ,
+    left: float = PPM_LEFT,
+    right: float = PPM_RIGHT,
+) -> str:
     """Path data for a banner panel's spectrum, in whichever treatment `mode` names.
 
     `faithful` plots the array. The other two exist because the asset this replaces did not: it was
@@ -335,14 +369,14 @@ def _trace_d(x0: float, x1: float, base: float, height: float, mode: str) -> str
     never a different one.
     """
     if mode != "faithful":
-        peaks = [line for group in _multiplets(x0, x1, height) for line in group]
+        peaks = [line for group in _multiplets(x0, x1, height, npz, left, right) for line in group]
         if mode == "ideal":
             return _lorentz_d(x0, x1, base, peaks, step=1.5)
         return _hybrid_d(x0, x1, base, peaks, height)
 
-    ppm, amp, _ = _spectrum()
-    span = (x1 - x0) / (PPM_LEFT - PPM_RIGHT)
-    pts = [(x0 + (PPM_LEFT - p) * span, base - a * height) for p, a in zip(ppm, amp)]
+    ppm, amp, _ = _spectrum(npz, left, right)
+    span = (x1 - x0) / (left - right)
+    pts = [(x0 + (left - p) * span, base - a * height) for p, a in zip(ppm, amp)]
     return "M " + " L ".join(f"{x:.1f} {y:.1f}" for x, y in _thin(pts, int(x1 - x0)))
 
 
@@ -421,9 +455,14 @@ class Canvas:
     def circle(self, cx, cy, r, fill) -> None:
         self.parts.append(f'<circle cx="{cx}" cy="{cy}" r="{r}" fill="{fill}"/>')
 
-    def line(self, x0, y0, x1, y1, stroke, sw=1.6) -> None:
+    def line(self, x0, y0, x1, y1, stroke, sw=1.6, opacity=None) -> None:
+        """`opacity` rather than a pre-blended hex: the lollipop stems sit at 0.65, and blending
+        them against the light ground by hand would bake the light palette into a shared geometry.
+        """
+        alpha = f' stroke-opacity="{opacity}"' if opacity is not None else ""
         self.parts.append(
-            f'<path d="M {x0} {y0} L {x1} {y1}" stroke="{stroke}" stroke-width="{sw}" fill="none"/>'
+            f'<path d="M {x0} {y0} L {x1} {y1}" stroke="{stroke}" stroke-width="{sw}"'
+            f'{alpha} fill="none"/>'
         )
 
     def arrow(self, x0, x1, y, colour, head=15.0) -> None:
@@ -495,11 +534,30 @@ class Canvas:
         self.path(f"M {x1} {y1} L {pts[0]} L {pts[1]} Z", fill=colour)
 
     def text(
-        self, x, y, s, size, family, weight, fill, anchor="middle", spacing=None, italic=False
+        self,
+        x,
+        y,
+        s,
+        size,
+        family,
+        weight,
+        fill,
+        anchor="middle",
+        spacing=None,
+        italic=False,
+        ident=None,
     ) -> None:
+        """`ident` is for tests, exactly as `path`'s is.
+
+        A figure that prints `8.74` *somewhere* is a different claim from one that prints it in row
+        1's `max J` column, and a value in the wrong row is the defect that actually shipped here.
+        Scraping numbers out of the document cannot tell those apart; a named cell can.
+        """
         extra = f' letter-spacing="{spacing}"' if spacing else ""
         if italic:
             extra += ' font-style="italic"'
+        if ident:
+            extra += f' id="{ident}"'
         self.parts.append(
             f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="{family}" '
             f'font-size="{size}" font-weight="{weight}" fill="{fill}"{extra}>{_esc(s)}</text>'
@@ -728,15 +786,29 @@ def architecture(t: dict[str, str]) -> str:
     return c.done()
 
 
-def _masthead(c: Canvas, t: dict[str, str], title: str, size: float = 39.4) -> None:
+def _masthead(
+    c: Canvas,
+    t: dict[str, str],
+    title: str,
+    size: float = 39.4,
+    x0: float = 56,
+    y0: float = 52,
+    baseline: float = 112,
+    spacing: str | None = None,
+) -> None:
     """The tricolor dash triple and the display title every figure but `pipeline` opens with.
 
     `docs/BRAND.md`: "the tricolor dash triple is the recurring mark -- header, figures, banner.
     Reuse it; don't invent new logos." Measured identically on all four PNGs, hence one helper.
+
+    The origin is a parameter because the prediction figures set it 8 px further left and up
+    (dashes from x=48, y=48) -- the same mark, not a different one, so it stays one helper rather
+    than becoming two that can drift. Defaults reproduce the existing four exactly; `--check` holds
+    that.
     """
     for i, col in enumerate((t["blue"], t["orange"], t["teal"])):
-        c.rect(56 + 40 * i, 52, 32, 8, 4, col)
-    c.text(55, 112, title, size, SG, 700, t["display"], anchor="start")
+        c.rect(x0 + 40 * i, y0, 32, 8, 4, col)
+    c.text(x0 - 1, baseline, title, size, SG, 700, t["display"], "start", spacing)
 
 
 def input_contract(t: dict[str, str]) -> str:
@@ -1304,6 +1376,199 @@ def banner(t: dict[str, str]) -> str:
     return c.done()
 
 
+# --- the two prediction figures ------------------------------------------------------------------
+#
+# Both replace a 1520x996 PNG (exactly 2x a 760x498 design) that sat at the 2.00x device-pixel floor
+# and read soft. There was nothing to re-export from -- no design source is committed or on disk, and
+# the two matplotlib generators that once existed were deleted in `2827cdb` precisely because they
+# were off-brand and would clobber these assets -- so "re-raster" would have meant writing a new
+# generator to emit PNGs. This writes SVG instead, for the reason at the top of this file.
+#
+# Three deliberate departures from the superseded artwork, each because the artwork was wrong:
+#
+# 1. THE TRACE IS THE ARRAY, at full resolution and proportional. The old figures drew the
+#    guajazulene set with C (delta 7.314, amplitude 0.881) TALLER than A (delta 8.221, amplitude
+#    1.000) -- the ordering inverted, most likely by point-sampling that clipped A's narrower apex.
+#    Relative intensity is something a reader takes from a spectrum, so this is a misstatement of the
+#    data, and reproducing it would mean copying a sampling artefact on purpose.
+# 2. NO DECORATIVE BASELINE NOISE. The old wobble is about 7x the array's real noise (max |amp|
+#    outside the peaks is 4.2e-04; it is not identically zero, as a first measurement pass reported).
+#    Plotting the array gives the true noise floor, which is what the trace claims to show.
+# 3. THE TICKS ARE LABELLED. The originals draw ticks every 0.5 ppm and label none of them, so the
+#    scale is unstated and the figure is not interpretable on its own. Labelling them also makes
+#    `tests/test_figure_numbers.py` able to read the curve back into ppm through the figure's own
+#    labels, which is what turns "it plots the right spectrum" into a falsifiable claim.
+#
+# One departure that is not a correction: the eyebrow ships BRAND's `#666f7d`, not the retired
+# `#74808f` these PNGs used, which measures 4.01:1 on white and fails WCAG AA for the small text it
+# was defined for.
+
+#: What the figures print. Read, never hardcoded: `tests/test_figure_numbers.py` holds the committed
+#: SVG to this file and `tests/test_scripts_local.py` holds the file to the published weights, so the
+#: figure cannot drift from the model without one of them failing. Before it existed, these numbers
+#: lived only as pixels -- and one of the two figures was transposing a pair of couplings.
+FIGURE_NUMBERS = ROOT / "docs" / "figure_predictions.json"
+
+#: Measured off the superseded PNGs. `PLOT_TOP` is where normalised amplitude 1.0 lands, so the
+#: tallest peak in the array reaches it by construction whichever spectrum is drawn.
+PLOT_X0, PLOT_X1 = 68.0, 1452.0
+PLOT_BASE, PLOT_TOP = 576.5, 223.0
+AXIS_Y, TICK_Y = 580.0, 590.0
+
+#: `(anchor x, header, anchor side, json field, format, fill key)`. One table drives both figures;
+#: the numerals are tabular, which is why `8.221` and `7.420` occupy identical extents.
+TABLE_COLUMNS = (
+    (530.9, "δ [PPM]", "end", "shift_ppm", "{:.3f}", "ink"),
+    (818.9, "MAX J [HZ]", "end", "max_j_hz", "{:.1f}", "ink"),
+    (1057.0, "PROTONS", "end", "protons", "{} H", "ink"),
+    (1472.9, "LINE WIDTH [HZ]", "end", "linewidth_hz", "{:.2f}", "dim"),
+)
+
+
+@functools.lru_cache(maxsize=1)
+def _figure_numbers() -> dict:
+    """`FIGURE_NUMBERS`, parsed once. Plain JSON -- no pickle, no numpy, importable at --help time."""
+    import json
+
+    return json.loads(FIGURE_NUMBERS.read_text(encoding="utf-8"))["figures"]
+
+
+def _prediction_eyebrow(c: Canvas, t: dict[str, str], head: str, tail: tuple[str, ...]) -> None:
+    """The right-aligned mono caption, with its subscripts composed rather than written.
+
+    `C₆D₆` and `DMSO-d₆` need U+2086, which no vendored subset carries -- see
+    `tests/test_diagram_fonts.py`. The subscript is 0.6x size dropped 3 px, matching the PNGs
+    rather than `Canvas.sub`'s 0.62/0.26, whose drop would be twice as far here.
+
+    The padding run is the part that is easy to miss: in the original the subscript still occupies a
+    full 14.4 px monospace cell, while a 14.4 px glyph advances only 8.64. Without the pad the `D`
+    of `C₆D₆` lands 5.76 px early and the caption stops being monospaced.
+    """
+    size, drop = 24.0, 3.0
+    runs: list[tuple] = [(head, MONO, size, t["eyebrow"])]
+    for piece in tail:
+        runs.append(("6", MONO, size * 0.6, t["eyebrow"], 400, False, drop))
+        runs.append((" ", MONO, size * 0.4, t["eyebrow"], 400, False, -drop))
+        if piece:
+            runs.append((piece, MONO, size, t["eyebrow"]))
+    # 1470.4, not the 1474.4 the PNGs measure as their advance end. That figure assumes the final
+    # subscript occupies a full monospace cell, which it does in a raster and does NOT here: XML
+    # collapses TRAILING whitespace, so the pad above is silently dropped on the last run while the
+    # mid-string ones survive (the C-to-D pitch measures 29 px, one cell, correctly). Padding the
+    # last one unconditionally was tried first and changed nothing, which is what identified this.
+    c.runs(1470.4, 110.0, runs, anchor="end")
+
+
+def _prediction_plot(
+    c: Canvas, t: dict[str, str], npz: Path, left: float, right: float, rows
+) -> None:
+    """The spectrum, its ppm axis, and one lollipop per detected multiplet."""
+    height = PLOT_BASE - PLOT_TOP
+    c.path(
+        _trace_d(PLOT_X0, PLOT_X1, PLOT_BASE, height, "faithful", npz, left, right),
+        stroke=t["ink"],
+        sw=2.2,
+        ident="trace",
+    )
+
+    span = (PLOT_X1 - PLOT_X0) / (left - right)
+    c.path(f"M {PLOT_X0} {AXIS_Y} H {PLOT_X1}", stroke=t["arrow"], sw=2.4)
+    n, tick = 0, math.ceil(right * 2) / 2
+    while tick <= left + 1e-9:
+        x = PLOT_X0 + (left - tick) * span
+        c.path(f"M {x:.1f} {AXIS_Y} V {TICK_Y}", stroke=t["arrow"], sw=2.4)
+        c.text(round(x, 1), 616, f"{tick:.1f}", 22.0, PLEX, 400, t["mute"], ident=f"tick-{n}")
+        n, tick = n + 1, tick + 0.5
+    c.runs(762.5, 656.0, [("δ [ppm]", PLEX, 25.2, t["mute"], 400, True)], anchor="middle")
+
+    # Lollipop height follows the trace, so a marker can never float above or sink into its own peak.
+    #
+    # Markers closer than a diameter are stacked instead of overlapped. The superseded vanillin PNG
+    # is why: its two ortho protons sit 0.031 ppm apart, which is 11 px in a 4 ppm window against
+    # r=21 circles, so it painted the orange marker straight over the blue one and the figure shipped
+    # with one of its three multiplets carrying no visible marker at all. The colour-to-multiplet
+    # link is the whole point of the lollipops, so a hidden one is not a cosmetic loss.
+    ppm, amp, _ = _spectrum(npz, left, right)
+    placed: list[tuple[float, float]] = []
+    for row, colour in zip(rows, (t["blue"], t["orange"], t["teal"])):
+        shift = row["shift_ppm"]
+        near = [a for p, a in zip(ppm, amp) if abs(p - shift) < 0.05]
+        x = PLOT_X0 + (left - shift) * span
+        apex = PLOT_BASE - max(near) * height
+        cy = apex - 52.8
+        # Walk up past anything already occupying this column. One pass over `placed` is enough
+        # because each lift clears a full diameter, so a third marker in the same column lands
+        # above the second rather than back on the first.
+        for px, py in placed:
+            if abs(px - x) < 46 and abs(py - cy) < 46:
+                cy = py - 46
+        placed.append((x, cy))
+        c.line(round(x, 1), round(apex, 1), round(x, 1), round(cy + 21, 1), colour, 2.4, 0.65)
+        c.circle(round(x, 1), round(cy, 1), 21, colour)
+
+
+def _prediction_table(c: Canvas, t: dict[str, str], rows) -> None:
+    """The same four quantities `predict.py` prints, one row per detected multiplet."""
+    c.text(47.5, 706.0, "MULTIPLET", 22.86, SG, 700, t["eyebrow"], "start", "1.3")
+    for x, header, anchor, *_ in TABLE_COLUMNS:
+        c.text(x, 706.0, header, 22.86, SG, 700, t["eyebrow"], anchor, "1.3")
+    c.path("M 48 729 H 1472", stroke=t["connector"], sw=2)
+
+    for i, (row, colour) in enumerate(zip(rows, (t["blue"], t["orange"], t["teal"]))):
+        y = 778.0 + 76.0 * i
+        if i:
+            c.path(f"M 48 {y - 49} H 1472", stroke=t["rule"], sw=2)
+        c.circle(58, y - 10, 10, colour)
+        c.text(83.85, y, str(row["n"]), 28.65, PLEX, 600, t["display"], "start")
+        for x, _, anchor, field, fmt, fill in TABLE_COLUMNS:
+            c.text(
+                x,
+                y,
+                fmt.format(row[field]),
+                28.65,
+                PLEX,
+                600,
+                t[fill],
+                anchor,
+                ident=f"cell-{row['n']}-{field}",
+            )
+
+
+def _prediction_figure(t: dict[str, str], name: str, head: str, tail: tuple[str, ...]) -> str:
+    spec = _figure_numbers()[name]
+    npz = ROOT / spec["npz"]
+    import numpy as np  # only to read the window the file itself declares
+
+    meta = np.load(npz, allow_pickle=True)["metadata"].item()
+    left, right = float(meta["left_ppm"]), float(meta["right_ppm"])
+
+    c = Canvas(
+        1520,
+        996,
+        "MolDeTr — detected multiplets",
+        spec["alt"],
+        faces=("sg700", "plex400", "plex600", "mono400"),
+        ground=t["card"],
+    )
+    _masthead(c, t, "MolDeTr — detected multiplets", 38.0, 48, 48, 104, "-0.37")
+    _prediction_eyebrow(c, t, head, tail)
+    _prediction_plot(c, t, npz, left, right, spec["rows"])
+    _prediction_table(c, t, spec["rows"])
+    return c.done()
+
+
+def example_prediction(t: dict[str, str]) -> str:
+    """Guajazulene at 500 MHz: three well-separated aromatic protons."""
+    return _prediction_figure(t, "example_prediction", "guajazulene · 500 MHz · C", ("D", ""))
+
+
+def example_prediction_vanillin(t: dict[str, str]) -> str:
+    """Vanillin at 300 MHz: the 1,2,4-trisubstituted ABX, two ortho doublets and a meta doublet."""
+    return _prediction_figure(
+        t, "example_prediction_vanillin", "vanillin · 300 MHz · DMSO-d", ("",)
+    )
+
+
 DIAGRAMS = {
     "banner": banner,
     "pipeline": pipeline,
@@ -1312,6 +1577,8 @@ DIAGRAMS = {
     "coupling_rule": coupling_rule,
     "benchmark": benchmark,
     "mark": mark,
+    "example_prediction": example_prediction,
+    "example_prediction_vanillin": example_prediction_vanillin,
 }
 
 

@@ -34,7 +34,8 @@
 
 <p align="center">
   <picture>
-    <img src="docs/img/example_prediction.png" alt="MolDeTr detects three aromatic 1H multiplets of guajazulene at 500 MHz; the assignment table lists proton count, chemical shift in ppm, largest coupling max J in Hz, and line width for each" width="760">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/example_prediction-dark.svg">
+    <img src="docs/img/example_prediction.svg" alt="MolDeTr detects three aromatic 1H multiplets of guajazulene at 500 MHz; the assignment table lists proton count, chemical shift in ppm, largest coupling max J in Hz, and line width for each" width="760">
   </picture>
 </p>
 <p align="center"><b>Guajazulene, 500 MHz.</b> A clean high-field case: three aromatic protons, resolved in one forward pass.</p>
@@ -88,8 +89,8 @@ evaluation entry points, the Hydra configuration, and the ground-truth ROI annot
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/example_prediction_vanillin-dark.png">
-    <img src="docs/img/example_prediction_vanillin.png" alt="MolDeTr detects the three aromatic protons of vanillin at 300 MHz as a classic ABX pattern; the assignment table lists proton count, chemical shift, and largest coupling for each, matching the ground truth" width="760">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/example_prediction_vanillin-dark.svg">
+    <img src="docs/img/example_prediction_vanillin.svg" alt="MolDeTr detects the three aromatic protons of vanillin at 300 MHz as a classic ABX pattern; the assignment table lists proton count, chemical shift, and largest coupling for each, matching the ground truth" width="760">
   </picture>
 </p>
 <p align="center"><b>Vanillin, 300 MHz.</b> The classic 1,2,4-trisubstituted-benzene ABX: two ortho doublets
