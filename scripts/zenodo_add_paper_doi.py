@@ -86,6 +86,19 @@ def paper_relation_present(metadata: dict, doi: str = PAPER_DOI) -> bool:
     )
 
 
+def target_version_matches(metadata: dict[str, Any], expected: str | None) -> bool:
+    """Is this record the one `expected` names? True when nothing is expected.
+
+    Pure, and separate from `main`, for the same reason `paper_relation_present` is: it decides
+    whether an irreversible-feeling write happens, and the live path that would exercise it needs a
+    credential plus a release Zenodo has not minted yet — a state that cannot be arranged on demand.
+
+    The comparison is exact. Zenodo carries the tag verbatim including the `v` prefix (`v1.3.0`,
+    verified across all six records), so there is no normalisation here to get subtly wrong.
+    """
+    return not expected or metadata.get("version") == expected
+
+
 def _api(
     url: str, *, token: str | None = None, method: str = "GET", payload: dict | None = None
 ) -> Any:
@@ -220,6 +233,12 @@ def main() -> int:
     ap.add_argument("--record-id", help="override the auto-resolved target (rarely needed)")
     ap.add_argument("--concept-id", default=ZENODO_CONCEPT_ID)
     ap.add_argument("--paper-doi", default=PAPER_DOI)
+    ap.add_argument(
+        "--expect-version",
+        help="refuse unless the target record carries this version (e.g. v1.4.0). Use it whenever "
+        "a specific release is meant: the concept id resolves to whatever is newest, which is the "
+        "PREVIOUS release until Zenodo's webhook mints.",
+    )
     ap.add_argument("--confirm", action="store_true", help="apply; omit for a dry run")
     args = ap.parse_args()
 
@@ -242,6 +261,21 @@ def main() -> int:
 
     if "access_right" not in metadata:
         print("Not the legacy deposit shape -- aborting rather than guessing field names.")
+        return 2
+
+    # Checked here, after the fetch, rather than at resolve time: this is the one place both the
+    # auto-resolved and the `--record-id` path pass through, so neither can skip it. The read is
+    # harmless; the write it guards is not.
+    if not target_version_matches(metadata, args.expect_version):
+        print(
+            f"\nRefusing: record {record_id} carries version {metadata.get('version')!r}, "
+            f"but {args.expect_version!r} was expected."
+        )
+        print(
+            "On a release this means Zenodo has not minted the new version yet -- the concept id "
+            "still resolves to the previous release. Editing that record would modify a published "
+            "deposit nobody asked about. Wait for the webhook and re-run."
+        )
         return 2
 
     _show(f"CURRENT ({metadata.get('version')})", metadata)

@@ -355,6 +355,53 @@ All notable changes to this project are documented here. The format is based on
   longer a Zenodo record that *lacks* the relation to test against: the guard is proven by crafted
   payloads and mutation instead, which is the only reason it is more than decoration.
 
+- **And now it repairs itself, so the guard above no longer ends in a human typing the fix.**
+  Detecting a fault five times and then asking someone to run a command is not automation; it is the
+  same manual step, moved. `integrations.yml` runs the relation check as its own step, and on
+  failure runs `zenodo_add_paper_doi.py --confirm` with a `ZENODO_DEPOSIT_TOKEN` repository secret —
+  then **re-checks**, because `--confirm` exiting 0 says only that the fixer's own read-back was
+  happy, while the re-check re-answers the whole question including the version cross-check. If the
+  re-check does not pass, a terminal step restores the job's red.
+
+  The write is gated on **that one check**, never on the job: splitting it out of the broad `-m
+  network` sweep is what stops a rate-limited badge or an unreachable weight mirror from reaching a
+  `deposit:write` credential. The events are a positive allowlist rather than `!= 'pull_request'`,
+  so a trigger added to `on:` later stays refused until someone names it. The cron is included
+  deliberately — it is the only thing that can catch a relation *undone after* minting — but a
+  repair that succeeds outside a release **files an issue anyway**, because something mutating a
+  published archival record is worth understanding rather than silently correcting.
+
+  The fixer gains `--expect-version`, and the release path passes the tag. Without it the repair
+  could edit **the wrong record**: the relation check asserts the record's version against the
+  newest published release *before* it looks at the relation, so its failure frequently means "the
+  webhook has not minted yet" — and the wait step ahead of it deliberately gives up after six
+  minutes. The fixer would then resolve the concept id to the *previous* release and unlock, PUT and
+  republish a settled archival record that was never in question. The issue filer names that cause
+  first now, because it is the likeliest one and the only one where nothing is actually wrong.
+
+  Four failure modes were live in drafts of this wiring and are now each held shut by
+  `tests/test_integrations_repair.py` against a named mutation. **`continue-on-error` on the detector
+  silently disarms the issue filer** — `failure()` is False when every failing step is
+  `continue-on-error`, so a relation that could *not* be repaired would have filed nothing, the
+  delivery mechanism vanishing for exactly the fault it exists to report. **A misspelled node id
+  would fire the repair**: `pytest` exits 4 on an unmatched selector, which reads as a failure, so a
+  typo would write to a published record. **The re-check was the one step nothing checked** — point
+  it at a test that passes anyway and every unrepaired deposit ends the job green; it is now
+  addressed by `id`, because a guard that identifies the step *by its contents* stops seeing it at
+  precisely the moment those contents change. And **the terminal red-restoring step could itself
+  take `continue-on-error`**, running, exiting 1, and leaving the job green.
+
+  Nineteen mutations were confirmed to turn the suite red — including two that a first round of
+  nine had missed, and one that survived a fix and needed a second: `&&` binds tighter than `||` in
+  GitHub expressions, so a single swapped operator absorbs the filer's relation clause into a
+  conjunction with `failure()` and `cancelled()` while leaving every substring an assertion looked
+  for exactly where it was.
+
+  `tests/test_integrations_isolation.py` moves with it. Its `_workflow_pytest_argv` returned the
+  **first** `run: pytest …` line in the workflow, which was complete while the job made one call and
+  covered **one node of nine** once the job made three — the same defect class that module documents
+  about itself. It now reads every invocation and unions what they collect.
+
 ## [1.3.0] - 2026-08-09
 
 ### Added

@@ -313,3 +313,41 @@ def test_zenodo_add_paper_doi_notices_a_put_that_ate_the_metadata():
         assert not _report_preserved(before, _fingerprint(broken)), (
             f"a PUT that changed {field!r} must be reported, not passed over"
         )
+
+
+@pytest.mark.unit
+def test_the_version_guard_refuses_a_record_the_release_did_not_mint():
+    """The fixer must not edit whatever happens to be newest when a specific release was meant.
+
+    This closes a real path rather than a hypothetical one. `integrations.yml` gates the repair on
+    the paper-relation check, and that check asserts the record's version against the newest
+    published GitHub release **before** it looks at the relation — so its failure often means
+    "Zenodo has not minted yet". The wait step ahead of it deliberately gives up after six minutes.
+    Without a version guard the fixer would then resolve the concept id to the **previous** release
+    and unlock, PUT and republish a settled archival record that was never in question.
+
+    Tested here rather than end to end because the live path needs a credential *and* a release
+    Zenodo has not yet minted — a race that cannot be arranged on demand. The pure half is the half
+    that decides, so it is the half worth pinning.
+    """
+    from scripts.zenodo_add_paper_doi import target_version_matches
+
+    assert target_version_matches({"version": "v1.4.0"}, "v1.4.0")
+
+    assert not target_version_matches({"version": "v1.3.0"}, "v1.4.0"), (
+        "the previous release is exactly what the concept id resolves to before the webhook mints; "
+        "editing it is the failure this guard exists to prevent"
+    )
+    assert not target_version_matches({}, "v1.4.0"), (
+        "a record with no version at all must not pass as the expected one"
+    )
+    assert not target_version_matches({"version": "1.4.0"}, "v1.4.0"), (
+        "Zenodo stores the tag verbatim with its `v`; a bare number is a different string and "
+        "silently normalising it here would let a mismatch through"
+    )
+
+    assert target_version_matches({"version": "v1.3.0"}, None), (
+        "with no --expect-version the newest record is the intended target, which is what the "
+        "weekly cron relies on"
+    )
+    assert target_version_matches({}, ""), "an empty expectation must behave as no expectation"

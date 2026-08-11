@@ -52,7 +52,7 @@ Changes reach `main` through numbered PRs, not direct pushes. Admin override wou
 `enforce_admins` is false so a flaky leg can be worked around — but the convention is the audit
 trail, so use it.
 
-## After publishing — the paper relation, which is checked for you
+## After publishing — the paper relation, which is repaired for you
 
 **The link to the paper does not survive versioning, and this was never a checklist problem.** The
 `isSupplementTo` relation pointing at the article was present on v0.1.0 and absent from every
@@ -77,7 +77,31 @@ finds the relation there, and passes while the new release carries nothing. The 
 runs, and not only as a backstop: it is the only thing that catches a relation undone later, or a
 release whose minting failed after the release-time run gave up waiting.
 
-**When the guard fires** — as an `External reference check failed` issue, or red in the Actions tab:
+**Since v1.4.0 the repair is automatic too, and there is nothing to do after publishing.** Detecting
+a fault five times and then asking a human to type the fix is still a manual step; it had simply
+moved. The job now runs the relation check as its own step, and if that step fails it runs
+`scripts/zenodo_add_paper_doi.py --confirm` with the `ZENODO_DEPOSIT_TOKEN` repository secret, then
+**re-checks** — a repair exiting 0 proves only that the fixer's own read-back was happy. If the
+re-check does not pass, the job ends red and files the issue as before.
+
+Three properties are load-bearing, and `tests/test_integrations_repair.py` holds each of them shut
+against a named mutation:
+
+- **The repair is gated on that one check**, not on the job. A rate-limited badge or an unreachable
+  weight mirror must never reach a `deposit:write` credential.
+- **The credential is scoped to the single step** that needs it. At job level it would be exported
+  into every step, including the third-party `lychee-action`.
+- **The workflow answers no `pull_request` trigger.** That is what keeps a token in a *public*
+  repository tolerable, and it is now asserted rather than merely intended.
+
+The token is a repository secret named `ZENODO_DEPOSIT_TOKEN` (scopes `deposit:write` +
+`deposit:actions`), deliberately **not** the same one as `~/.secrets/.zenodo_token` — a separate
+token can be revoked without breaking local tooling, and its use is attributable. Zenodo cannot
+scope a token to one deposit, so it can edit every deposit this account owns; that is the accepted
+cost, taken with the mitigations above.
+
+**When the repair itself fails** — an `External reference check failed` issue naming
+`repair=` / `reverify=` outcomes, or red in the Actions tab — the manual path is unchanged:
 
 ```bash
 python scripts/zenodo_add_paper_doi.py             # DRY RUN — resolves the newest record, prints
@@ -145,7 +169,14 @@ first repository: record `1242911` has `version: 1.0.3-2` and a link pointing at
 
 **What is done instead.** The guard above: `integrations.yml` runs on `release: published`, the test
 asserts the relation on the newest record, a failure files an issue, and
-`scripts/zenodo_add_paper_doi.py` repairs it. If that ever becomes too slow a loop, the better next
-step is to run the fixer *from* the release job — it keeps `CITATION.cff` authoritative and
-duplicates no metadata — at the cost of putting a `deposit:write` + `deposit:actions` token into
-Actions secrets.
+`scripts/zenodo_add_paper_doi.py` repairs it.
+
+**That last step was taken on 2026-08-11, before cutting v1.4.0.** This paragraph used to end "if
+that ever becomes too slow a loop, the better next step is to run the fixer *from* the release job
+… at the cost of putting a `deposit:write` + `deposit:actions` token into Actions secrets." Five
+hand-repairs was that loop, and v1.4.0 would have been the sixth. The cost was paid deliberately:
+the token is a repository secret, and the mitigations that make it tolerable in a public repository
+are listed under *After publishing* above and asserted in `tests/test_integrations_repair.py`.
+
+It remains the right shape for the reason given here — it keeps `CITATION.cff` authoritative and
+duplicates no metadata, which is exactly what a `.zenodo.json` would not do.
