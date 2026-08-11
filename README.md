@@ -93,8 +93,10 @@ evaluation entry points, the Hydra configuration, and the ground-truth ROI annot
   </picture>
 </p>
 <p align="center"><b>Vanillin, 300 MHz.</b> The classic 1,2,4-trisubstituted-benzene ABX: two ortho doublets
-(J ≈ 8 Hz) and a meta doublet (J ≈ 2 Hz). The live predictions reproduce the ground truth: proton counts, δ,
-and <code>max J</code> 8.2 / 2.0 / 8.7 vs 8.1 / 2.0 / 8.1 Hz.</p>
+(J ≈ 8 Hz) and a meta doublet (J ≈ 2 Hz). The live predictions recover that pattern — one proton per
+multiplet, both ortho couplings near 8 Hz and the meta one near 2 Hz. Exact values are in the figure's own
+table, and in <a href="docs/figure_predictions.json"><code>docs/figure_predictions.json</code></a>, which the
+test suite ties to the published checkpoint.</p>
 
 <p align="center">
   <picture>
@@ -424,7 +426,8 @@ suppression, mixtures, and non-¹³C heteronuclear artifacts are out of scope; s
 on real spectra.
 
 **How accurate is the coupling (J)?** The live `predict.py`/GUI reproduce the
-paper's largest coupling `max J` closely (e.g. vanillin `max J` 8.2/2.0/8.7 vs 8.1/2.0/8.1 Hz). `max J`
+paper's largest coupling `max J` closely — for vanillin's ABX all three land within **0.7 Hz** of a
+ground truth of 8.1 / 2.0 / 8.1 Hz (measured values in `docs/figure_predictions.json`). `max J`
 is only the *largest* coupling per multiplet; the committed `structured_output` path recovers the full set
 (the paper's per-coupling 0.20 Hz median). Predictions can deviate for inputs outside the trained regime;
 see [Scope → coupling constants](docs/SCOPE.md#about-the-coupling-constants).
