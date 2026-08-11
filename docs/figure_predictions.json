@@ -1,0 +1,64 @@
+{
+  "_comment": [
+    "The numbers the prediction figures print, as data rather than as pixels inside a PNG.",
+    "",
+    "Before this file they existed only in the images. Nothing in the repo would have noticed the",
+    "checkpoint drifting away from what the front page claimed -- tests/test_scripts_local.py",
+    "asserts only that shift is 0-12 ppm and J is 0-30 Hz.",
+    "",
+    "Two tests use this. tests/test_figure_numbers.py (unit, no checkpoint, runs in CI) ties the",
+    "committed SVG's table to this file. tests/test_scripts_local.py (model tier, skip-gated) ties",
+    "this file to the checkpoint. The second one SKIPS in CI, so it can never catch data-vs-",
+    "checkpoint drift there -- read the skip count, do not read a green suite as evidence about it.",
+    "",
+    "Regenerate: python scripts/predict.py --input examples/roi_S<n>_example.npz  (shipped defaults)"
+  ],
+  "provenance": {
+    "generated": "2026-08-11",
+    "checkpoint_md5": "faf842d1a1d8beae67e0544e28f226b5",
+    "checkpoint_md5_source": "scripts/download_weights.py EXPECTED_MD5 -- verified equal to the local file",
+    "torch": "2.13.0+cpu",
+    "seed": 0,
+    "threshold": 0.3,
+    "note": [
+      "Both figures were measured in ONE process against ONE checkpoint. roi_S10 reproduced the",
+      "committed PNG exactly, every field. roi_S8 reproduced none of it beyond an approximate",
+      "delta. That pairing excludes environment drift as the explanation: a version-dependent",
+      "decoder assignment would have to disturb both.",
+      "",
+      "The superseded example_prediction_vanillin.png printed GROUND-TRUTH delta (7.420 / 7.385 /",
+      "6.959 -- the hardcoded ASSIGNMENTS of scripts/gen_molecule_figure.py, deleted in 2827cdb)",
+      "in a column captioned as a prediction, while example_prediction.png printed predicted",
+      "delta. Both now print predicted delta, which is what makes the caption's 'the predictions",
+      "reproduce the ground truth' claim checkable rather than circular.",
+      "",
+      "Its max J was additionally transposed between the two ~8 Hz ortho protons, which was",
+      "invisible because ground truth carries 8.1 twice -- H5 and H6 share one physical coupling,",
+      "so the published comparison read as a good match in either order."
+    ]
+  },
+  "figures": {
+    "example_prediction": {
+      "npz": "examples/roi_S10_example.npz",
+      "compound": "Guajazulene",
+      "field_mhz": 500,
+      "reproduces_the_superseded_png": true,
+      "rows": [
+        {"n": 1, "shift_ppm": 8.221, "max_j_hz": 1.92, "protons": 1, "linewidth_hz": 1.16},
+        {"n": 2, "shift_ppm": 7.699, "max_j_hz": 4.22, "protons": 1, "linewidth_hz": 1.33},
+        {"n": 3, "shift_ppm": 7.314, "max_j_hz": 3.89, "protons": 1, "linewidth_hz": 1.07}
+      ]
+    },
+    "example_prediction_vanillin": {
+      "npz": "examples/roi_S8_example.npz",
+      "compound": "Vanillin",
+      "field_mhz": 300,
+      "reproduces_the_superseded_png": false,
+      "rows": [
+        {"n": 1, "shift_ppm": 7.419, "max_j_hz": 8.74, "protons": 1, "linewidth_hz": 0.46},
+        {"n": 2, "shift_ppm": 7.388, "max_j_hz": 1.97, "protons": 1, "linewidth_hz": 0.81},
+        {"n": 3, "shift_ppm": 6.961, "max_j_hz": 8.25, "protons": 1, "linewidth_hz": 0.55}
+      ]
+    }
+  }
+}

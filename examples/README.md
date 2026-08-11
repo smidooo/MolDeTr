@@ -5,9 +5,15 @@ Three small illustrative spectra (the **full** datasets live on Zenodo, DOI
 
 - `roi_S10_example.npz`: one preprocessed **experimental** ROI (Guajazulene, 500 MHz) with
   `spectrum_padded`, `ppm_axis_padded`, `ground_truth`, `metadata`. Three overlapping aromatic protons.
-- `roi_S8_example.npz`: **vanillin** aromatic ABX (300 MHz), same keys. The live predictions reproduce
-  the ground truth (proton counts, δ, and largest coupling `max J` 8.2/2.0/8.7 vs 8.1/2.0/8.1 Hz);
-  the full coupling set per multiplet is in the committed `structured_output` path.
+- `roi_S8_example.npz`: **vanillin** aromatic ABX (300 MHz), same keys. The live predictions recover
+  the pattern — one proton per multiplet, both ortho couplings near 8 Hz against a ground truth of
+  8.1, and the meta one near 2.0. Exact values are in `docs/figure_predictions.json`, measured from
+  the published checkpoint and tied to it by `tests/test_scripts_local.py`; the full coupling set per
+  multiplet is in the committed `structured_output` path.
+
+  Numbers used to be quoted here and in the main README as a fixed triple. They are not any more, on
+  purpose: the pair that was published did not reproduce from the shipped checkpoint, and nothing in
+  the repo could notice, because the only copy of them was pixels inside a PNG.
 - `synthetic_example.npz`: one **synthetic** spectrum with `spec` + `labels`.
 
 ## Try it

@@ -6,6 +6,30 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **The prediction figures' numbers are data now, not pixels.** `docs/figure_predictions.json`
+  carries what the two prediction figures print, with the provenance that produced them — checkpoint
+  md5, torch build, seed, threshold — and `tests/test_scripts_local.py` ties it to the published
+  weights. Nothing had pinned those numbers before: the only assertion touching them checked that
+  shifts were 0–12 ppm and couplings 0–30 Hz, which the vanillin figure satisfied while transposing
+  two of its three couplings.
+
+  That test is **`model`-tier and skips wherever the 974 MB checkpoint is absent, which is every CI
+  lane** — a green suite says nothing about it. Read the skip count.
+
+- **The README and `docs/SCOPE.md` no longer quote a frozen triple.** `max J` 8.2 / 2.0 / 8.7 had
+  been copied to four places and **does not reproduce** from the shipped checkpoint — a reader
+  following `examples/README.md`'s *Try it* got different numbers than the page claimed. The
+  accuracy claim is now a bound against a stable ground truth ("all three within 0.7 Hz of
+  8.1 / 2.0 / 8.1"), which is checkable and does not age, with the measured values in the JSON.
+
+  Worth recording *why* it did not reproduce, because the obvious explanation is wrong. Both
+  example spectra were re-run in one process against one checkpoint: guajazulene reproduced its
+  committed figure **exactly** — δ to three decimals, line width to two — and vanillin reproduced
+  none of it. That pairing excludes environment drift, which would have to disturb both. The
+  vanillin figure's δ column turns out to be the hardcoded ground-truth `ASSIGNMENTS` of the
+  generator deleted in `2827cdb`, in a column its caption describes as a prediction.
+
 ### Fixed
 - **The banner's `T₂` was a code point no embedded font carries**, so the README hero's assignment
   table rendered its subscript in whatever face the reader's OS supplied. Composed instead, the way
