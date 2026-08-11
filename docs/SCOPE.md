@@ -89,9 +89,15 @@ There are two ways this repo turns that into numbers:
   invert the embedding exactly; this is where the **0.20 Hz** median coupling error comes from.
 - **Live demo (`predict.py`, the GUI).** These report a single **largest coupling, `max J`** (the max
   component of the embedding): the dominant coupling per multiplet, not the full set. They reproduce the
-  paper's proton counts, chemical shifts, and `max J` (e.g. vanillin `max J` 8.2/2.0/8.7 vs ground truth
-  8.1/2.0/8.1 Hz); predictions can deviate for inputs outside the trained regime (the ranges above). For
-  the full coupling set, use the exact `structured_output/` path.
+  paper's proton counts, chemical shifts, and `max J` — for vanillin's ABX all three land within
+  **0.7 Hz** of a ground truth of 8.1 / 2.0 / 8.1 Hz. Predictions can deviate for inputs outside the
+  trained regime (the ranges above). For the full coupling set, use the exact `structured_output/` path.
+
+  The measured values live in `docs/figure_predictions.json`, tied to the published checkpoint by
+  `tests/test_scripts_local.py`, rather than as a triple typed into prose here. The triple that used
+  to sit in this sentence did not reproduce from the shipped checkpoint, and had been copied to four
+  places — a bound against a stable ground truth is the claim worth making, and it is one a reader
+  can check.
 
 Coupling recovery is reliable for **≤ 3 distinct** couplings per multiplet; the paper's evaluation
 centres on the largest coupling, `max J`, for this reason (the full sets stay in `structured_output/`).
