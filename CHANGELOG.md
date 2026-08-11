@@ -53,6 +53,24 @@ All notable changes to this project are documented here. The format is based on
   set** at its 14 members: the previous check on parser output was `assert selectors`, which one
   surviving selector out of fourteen satisfies.
 
+- **`docs/RELEASING.md` stated a CI shape the repository had outgrown.** Its pre-tag checklist said
+  *"`main` is branch-protected with 11 checks, 7 of them required"*. Measured 2026-08-11: the
+  merge-gating family is **fourteen** legs. The "7 required" half was still correct.
+
+  "11" was exactly right when written on 2026-08-03 — 6 matrix legs plus the 5-strong e2e tier — and
+  went stale four days later when `7d9c924` (PR #37) added py3.12 to all three OS. The checklist now
+  carries the measurement **with its date** and names the two `gh api` calls that re-derive it, since
+  a number that has gone stale twice should not be carried forward a third time.
+
+  It also separates two counts that were being conflated: **25** check-runs land on a commit, but
+  only the CI workflow's fourteen can gate a merge — Security and Pages never do.
+
+  The maintainer's requirements doc carried the same drift in a worse form, ticked `[x]` and closed
+  as a 2026-07-26 decision to keep exactly two required legs, which the 2026-08-09 promotion of the
+  e2e tier had already overtaken. It is corrected in the same pass. That file is not in this
+  repository — `docs/requirements/` is gitignored — and is named here only so the two are known to
+  move together.
+
 ### Changed
 - **"Five for five" is now "six for six", and the sixth is the first one measured.** v1.4.0 minted
   without the `isSupplementTo` relation to the article, exactly as the four surfaces asserting that

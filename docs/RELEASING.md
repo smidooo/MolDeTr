@@ -39,9 +39,19 @@ check that the target is actually tracked (`git ls-files`), not merely present.
 - [ ] **Bump `version` in `pyproject.toml` — and nothing else.** `CITATION.cff` deliberately carries
       no `version:` or `date-released:` field, because citation surfaces should pin the *concept*
       DOI, which always resolves to the latest release.
-- [ ] **CI is green on `main`.** `main` is branch-protected with 11 checks, 7 of them required
-      (the two ubuntu legs plus the whole e2e tier). macOS and Windows stay advisory — read them
-      anyway before a release, since advisory means unblocking, not unimportant.
+- [ ] **CI is green on `main`.** The merge-gating family is **14 legs, 7 of them required** (the two
+      ubuntu legs plus the whole e2e tier). macOS and Windows stay advisory — read them anyway before
+      a release, since advisory means unblocking, not unimportant. A commit carries 25 check-runs
+      once Security and Pages are counted; those never gate a merge.
+
+      This read "11 checks" until 2026-08-11, and **that was correct when written on 2026-08-03** —
+      6 matrix legs plus the 5-strong e2e tier. It went stale four days later when `7d9c924` (PR #37)
+      added py3.12 to all three OS. **Re-derive the count** from
+      `gh api repos/smidooo/MolDeTr/branches/main/protection` and
+      `gh api repos/smidooo/MolDeTr/commits/<sha>/check-runs` rather than carrying this number
+      forward — it has now gone stale twice. The maintainer's requirements doc restates these counts
+      and has to be updated in the same pass; it lives under the gitignored `docs/requirements/`, so
+      it is not a link a reader of this repository can follow.
 - [ ] **Check the skip and deselect counts, not just the green tick.** A tier that silently skipped
       reports success. `-rs` is on the browser steps for exactly this reason.
 - [ ] **Anything Python 3.11+-only will pass locally and fail CI.** The local venv is 3.12; CI's
