@@ -111,6 +111,96 @@ jobs:
               time.sleep(30)
           PY
 
+      - name: Check the paper relation
+        id: paper_relation
+        # Split out of the broad sweep below so the repair can be gated on THIS check alone. Gating
+        # a `deposit:write` credential on "some network check failed" would let a rate-limited badge
+        # or an unreachable weight mirror trigger a write to a published archival record.
+        #
+        # No `-m network` here, deliberately. Selecting by node id already picks exactly one test,
+        # and the marker would add a way to select nothing: drop it and pytest exits 5, which
+        # `continue-on-error` renders as `failure` — a vacuous detector that fires the repair.
+        #
+        # `continue-on-error` so the repair below can run; the job's red is restored further down.
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pytest tests/test_integrations.py::test_latest_software_record_supplements_the_article -q -p no:cacheprovider
+
+      - name: Repair the paper relation
+        id: repair
+        # The relation has never survived a mint — absent on every release since v0.1.0. Repairing
+        # it was a documented manual step for five releases running, which is the definition of a
+        # missing automation rather than a checklist item somebody forgot.
+        #
+        # The event allowlist is positive, not `!= 'pull_request'`: if a trigger is ever added to
+        # `on:`, the repair stays refused until someone names it here. The cron is included on
+        # purpose — it is the only thing that can catch a relation *undone after* minting, and a
+        # detector that refuses to fix what it found would reintroduce the manual step on the path
+        # that most needs it. That the cron ever has to act is itself reportable; the issue filer
+        # below says so.
+        if: >-
+          steps.paper_relation.outcome == 'failure' &&
+          contains(fromJSON('["release", "schedule", "workflow_dispatch"]'), github.event_name)
+        # Zenodo can hang. A step that runs long enough to breach the job's `timeout-minutes` gets
+        # the job CANCELLED, and `if: failure()` does not fire on cancellation — so an unbounded
+        # repair could take the issue filer down with it.
+        timeout-minutes: 6
+        env:
+          # Step-scoped, never job-scoped: at job level this is exported into every step, including
+          # the third-party `lychee-action` below. Named `ZENODO_DEPOSIT_TOKEN` rather than
+          # `ZENODO_TOKEN` so it cannot be confused with the stale local variable of that name.
+          ZENODO_DEPOSIT_TOKEN: ${{ secrets.ZENODO_DEPOSIT_TOKEN }}
+          # Empty on the cron and dispatch paths, where there is no release to pin to and the
+          # newest record genuinely is the right target.
+          EXPECT_VERSION: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          # `ran=false` by default, and the filer below keys on it rather than on this step's
+          # outcome. Exiting 0 with no credential would otherwise read as `repair=success`, and the
+          # filer would report a relation that was "removed and put back" when nothing was touched.
+          echo "ran=false" >> "$GITHUB_OUTPUT"
+          if [ -z "${ZENODO_DEPOSIT_TOKEN:-}" ]; then
+            echo "::warning::no ZENODO_DEPOSIT_TOKEN secret is configured, so the relation cannot be repaired"
+            exit 0
+          fi
+          token_file="$RUNNER_TEMP/zenodo.token"
+          trap 'rm -f "$token_file"' EXIT
+          # `umask` in a subshell, not `chmod` after the fact: redirection creates the file with the
+          # default mode and only then would `chmod` narrow it, leaving a readable window.
+          (umask 077; printf '%s' "$ZENODO_DEPOSIT_TOKEN" > "$token_file")
+          # `--token-file`, not a flag carrying the value: argv is readable via `ps`. The script
+          # prints only the token's length, never the token.
+          #
+          # `--expect-version` on the release path is what stops this editing the WRONG record. The
+          # detector fails for four reasons and checks the version FIRST, so its failure often means
+          # "Zenodo has not minted yet" -- and the wait step above deliberately gives up after six
+          # minutes. Without this the fixer would resolve "newest under the concept id" to the
+          # PREVIOUS release and unlock a published archival record that was never in question.
+          python scripts/zenodo_add_paper_doi.py \
+            --token-file "$token_file" \
+            ${EXPECT_VERSION:+--expect-version "$EXPECT_VERSION"} \
+            --confirm
+          echo "ran=true" >> "$GITHUB_OUTPUT"
+
+      - name: Re-check the paper relation
+        id: reverify
+        # The repair must be PROVEN, not assumed. `--confirm` exiting 0 says only that the fixer's
+        # own read-back was happy; this re-answers the whole question, including the cross-check
+        # that the record it edited is the one the newest published release minted.
+        #
+        # Gated on the DETECTOR, not on `steps.repair.outcome != 'skipped'`. A skipped step's
+        # context entry is not reliably `'skipped'` — it can read as an empty string, which would
+        # make that comparison true and run this on the happy path. Reading the detector says the
+        # intended thing directly: re-check exactly when the first check failed. It also keeps the
+        # terminal red correct if the repair is ever narrowed and stops running — an unrepaired
+        # relation must not become a green tick.
+        if: steps.paper_relation.outcome == 'failure'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: pytest tests/test_integrations.py::test_latest_software_record_supplements_the_article -q -p no:cacheprovider
+
       - name: Check DOIs, badges and weight mirrors
         env:
           GH_TOKEN: ${{ github.token }}
@@ -118,7 +208,10 @@ jobs:
         #
         # `-p no:cacheprovider` because nothing else here writes to the workspace and a stray
         # `.pytest_cache` in an otherwise read-only job is noise.
-        run: pytest tests/test_integrations.py -m network -q -rs -p no:cacheprovider
+        #
+        # `--deselect` because the paper relation is owned by the three steps above. Re-running it
+        # here would report the PRE-repair state and contradict the re-verification that just passed.
+        run: pytest tests/test_integrations.py -m network -q -rs -p no:cacheprovider --deselect tests/test_integrations.py::test_latest_software_record_supplements_the_article
 
       - name: Check documentation links
         # lychee for the bulk sweep — README and docs/ prose links, which are numerous, boring, and
@@ -146,10 +239,34 @@ jobs:
         # `failure()` alone is False when the job is CANCELLED -- which is exactly what GitHub does
         # on a `timeout-minutes` overrun. The one failure mode the release-path poll can introduce
         # is the one that would have silently removed the notification.
-        if: always() && (failure() || cancelled() || steps.lychee.outcome == 'failure')
+        #
+        # The two relation clauses are load-bearing for the same reason, and were a live bug in the
+        # first draft of this wiring. `failure()` is False when every failing step is
+        # `continue-on-error` -- which the detector and the re-check both are -- so a relation that
+        # could NOT be repaired would file nothing at all. The delivery mechanism this workflow is
+        # built around would vanish for exactly the fault it exists to catch.
+        #
+        # The second clause reports a repair that ACTUALLY RAN outside a release. At mint time a
+        # missing relation is expected, five for five, and needs no issue. Off the release path it
+        # means something removed a relation from an already-published archival record, and
+        # repairing that silently would erase the only evidence it happened.
+        #
+        # It keys on `outputs.ran`, not on the step's outcome. The step exits 0 when no credential
+        # is configured, so `outcome == 'success'` there would report a record "removed and put
+        # back" on every cron run of a repository that simply has no secret yet -- a paragraph of
+        # confident fiction, weekly.
+        if: >-
+          always() && (
+            failure() || cancelled() || steps.lychee.outcome == 'failure' ||
+            (steps.paper_relation.outcome == 'failure' && steps.reverify.outcome != 'success') ||
+            (steps.repair.outputs.ran == 'true' && github.event_name != 'release')
+          )
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPAIR: ${{ steps.repair.outcome }}
+          REPAIR_RAN: ${{ steps.repair.outputs.ran }}
+          REVERIFY: ${{ steps.reverify.outcome }}
         # Going red is not enough on a weekly job in a quiet repo: nobody is watching the Actions tab
         # of a paper companion between releases. The issue is the delivery mechanism, and it is
         # deduplicated by title so a persistent outage does not open a new one every Monday.
@@ -164,10 +281,31 @@ jobs:
             "mirrors, documentation links, and whether the newest software deposit still relates" \
             "the article." \
             "" \
-            "If the failure is the paper relation, the fix is one command and needs a Zenodo token:" \
-            "\`python scripts/zenodo_add_paper_doi.py\` for a dry run, then \`--confirm\`. It has" \
-            "been missing on every release since v0.1.0, so treat it as expected rather than odd;" \
-            "docs/RELEASING.md has the background." \
+            "**The paper relation now repairs itself**, so if that is the failure here, the repair" \
+            "already ran and did NOT close the gap (repair=\`$REPAIR\`, ran=\`$REPAIR_RAN\`," \
+            "reverify=\`$REVERIFY\`). Four causes, in the order worth checking:" \
+            "" \
+            "1. **Zenodo has not minted the release yet.** The check asserts the record's version" \
+            "   against the newest published release BEFORE it looks at the relation, so this" \
+            "   failure is often about timing rather than metadata. The wait step gives up after" \
+            "   six minutes by design. Nothing is wrong; re-run, or let Monday's cron catch it." \
+            "2. No \`ZENODO_DEPOSIT_TOKEN\` secret (\`ran=false\` with no other error), or one that" \
+            "   expired or lost a scope. A 403 on the very first GET is a stale token, not an" \
+            "   outage." \
+            "3. \`repair=skipped\` on a release — the event allowlist or the detector's gate is" \
+            "   wrong; read the step conditions rather than re-running." \
+            "4. Zenodo refused the PUT. If the log shows a discard that failed, check" \
+            "   https://zenodo.org/me/uploads for a stranded draft before retrying." \
+            "" \
+            "Fallback, unchanged: \`python scripts/zenodo_add_paper_doi.py\` for a dry run, then" \
+            "\`--confirm\`. docs/RELEASING.md has the background." \
+            "" \
+            "If instead \`ran=true\` and this was NOT a release, the relation was removed from an" \
+            "already-published record and put back. Nothing in this repository can do that, so it" \
+            "is worth understanding rather than closing. Note the job may be GREEN in that case:" \
+            "the deposit is correct by the time this is filed, and the issue is the report, not a" \
+            "failure. That is the one deliberate exception to this workflow's rule that a filed" \
+            "issue and a green tick must not disagree." \
             "" \
             "Before assuming a real outage, note that the badge check is the one that caught the" \
             "original 2026-08 incident, where Zenodo rate-limited GitHub's shared camo IP pool. A" \
@@ -182,6 +320,16 @@ jobs:
             gh issue create --title "$title" --body "$body" --label "" || \
               gh issue create --title "$title" --body "$body"
           fi
+
+      - name: Fail the job if the paper relation is still missing
+        # Same argument as the lychee twin below, and the same shape. The detector and the re-check
+        # are both `continue-on-error` so that the repair between them can run at all; without this
+        # step the job ends GREEN over a published deposit that does not point at its own paper.
+        #
+        # `!= 'success'` rather than `== 'failure'` on purpose: the re-check is also `skipped` when
+        # the repair never ran, and a skip here means the relation was never fixed.
+        if: steps.paper_relation.outcome == 'failure' && steps.reverify.outcome != 'success'
+        run: exit 1
 
       - name: Fail the job if the link sweep failed
         # `continue-on-error` above lets the issue get filed; the job must still end red, or the
