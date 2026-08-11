@@ -31,8 +31,15 @@ back to whatever the reader happens to have.
 
 Note `SG`: Space Grotesk has NO Greek coverage at all, so the delta in "δ · J" cannot come from it.
 CSS font fallback is per-glyph, not per-run, so naming IBM Plex Sans second lets the Latin resolve
-to Space Grotesk while delta alone drops through. Without that, delta renders as tofu -- invisible
-in the PNG this replaces, because its generator fell back silently.
+to Space Grotesk while delta alone drops through to a face that has it.
+
+Without that second name, delta does not render as tofu -- this docstring used to say it did, and
+`docs/fonts/README.md` said the same. Measured 2026-08-11: it falls through to whatever the
+reader's OS supplies. Secure static mode blocks external *resource loads*, which is why these faces
+are embedded rather than referenced, but a system font is not a resource load. Reader-dependent
+rendering at the wrong weight is the actual failure, and it is worse to detect than a blank box
+because nobody reports it. `tests/test_diagram_fonts.py` holds every committed SVG against
+`GLYPHS`; `docs/fonts/README.md` carries the probe.
 """
 
 from __future__ import annotations
@@ -58,10 +65,19 @@ BANNER_NPZ = ROOT / "examples" / "roi_S8_example.npz"
 #: 7.50 -> 6.90 to within 0.004 ppm, so this is one window drawn at two widths, not two crops.
 PPM_LEFT, PPM_RIGHT = 7.50, 6.90
 
+#: The committed treatment, and the only one `--check` may compare against. A separate constant from
+#: `TRACE` because `main()` ASSIGNS `TRACE`, so reading the default back out of it gives "whatever
+#: the last call in this process left behind" rather than the shipped value. Harmless while the only
+#: caller was `python build_diagram_svgs.py`, which exits; `tests/test_diagram_svgs.py` now calls
+#: `main()` in-process, where one `--trace ideal` run would leak into every later `--check` and make
+#: it compare the committed banner against a variant nobody committed -- the exact outcome the
+#: guard below exists to prevent, arrived at through the guard passing.
+DEFAULT_TRACE = "faithful"
+
 #: Which treatment `banner()` draws its spectra in; `--trace` overrides it. Module state rather than
 #: an argument because `DIAGRAMS` maps a name to a one-argument palette function, and widening that
 #: signature for the one figure that needs it would touch all seven.
-TRACE = "faithful"
+TRACE = DEFAULT_TRACE
 
 #: The figure palette. Ten keys are `docs/BRAND.md` § Palette verbatim -- `panel`, `border`, `navy`,
 #: `ink`, `mute`, `latent`, `eyebrow`, `brick`, and the blue/orange/teal tricolor -- and a colour
@@ -194,6 +210,25 @@ FACES = (
     ("plex600", "IBM Plex Sans", 600),
     ("mono400", "IBM Plex Mono", 400),
 )
+
+#: What each embedded family carries BEYOND printable ASCII. Measured from the `.woff2` cmaps on
+#: 2026-08-11, not copied from the subsetting recipe -- the recipe in `docs/fonts/README.md` listed
+#: `⁻` as included while its own last bullet said no family has it, and the bullet was the correct
+#: half. All five subsets cover printable ASCII in full, so only this tail differs. Re-derive after
+#: any re-subsetting with:
+#:
+#:     python -c "from fontTools.ttLib import TTFont; f=TTFont('docs/fonts/plex400.woff2'); \
+#:     print(''.join(chr(c) for c in sorted(f.getBestCmap()) if c > 0x7F))"
+#:
+#: Keyed by family rather than unioned, because the asymmetry is load-bearing: `δ` exists in IBM
+#: Plex Sans ONLY. In an `SG` or `PLEX` run CSS's per-glyph fallback supplies it from the Plex face
+#: named second; in a `MONO` run it has nowhere to go, since `MONO` names no Plex face at all. A
+#: single union would call that safe. `tests/test_diagram_fonts.py` holds every committed SVG to it.
+GLYPHS = {
+    "Space Grotesk": "°±²³·¹Å×÷–—‘’“”…→≤≥",
+    "IBM Plex Sans": "°±²³·¹Å×÷δ–—‘’“”…→≤≥",
+    "IBM Plex Mono": "°±²³·¹Å×÷–—‘’“”…→≤≥",
+}
 
 
 def _faces(wanted: tuple[str, ...]) -> str:
@@ -1128,13 +1163,25 @@ def _banner_molecule(c: Canvas, t: dict[str, str]) -> None:
 def _banner_table(c: Canvas, t: dict[str, str]) -> None:
     """The per-multiplet answer: one row per spin system, the four quantities MolDeTr returns."""
     c.text(1626, 863, "SPIN", 23, SG, 700, t["eyebrow"], "start", "1.6")
-    for x, base, unit in ((1896, "δ", " [PPM]"), (2091, "J", " [HZ]"), (2419, "T₂", " [MS]")):
-        c.runs(
-            x,
-            863,
-            [(base, SG, 23, t["eyebrow"], 700, True), (unit, SG, 23, t["eyebrow"], 700)],
-            anchor="end",
-        )
+    # The `2` of `T2` is a composed run, not U+2082. No vendored subset carries a subscript digit,
+    # so the literal dropped out of the font stack and rendered in whatever face the reader's OS
+    # supplied -- at a fixed design size that ignores the run around it. `_banner_resolved_card`
+    # below composes the identical label; the 0.62 / 0.26 ratios here are `Canvas.sub`'s, but that
+    # site hand-types its 16.7 / 7, so the three agree to ~1% BY EYE, not by construction. Deriving
+    # them here rather than typing them is still worth it: `Canvas.runs` does not round, so a
+    # hand-typed `27.1 * 0.62` would have emitted `16.802000000000003` into the file.
+    # `<tspan>` shifts accumulate, so the unit run carries the negation or the line steps down.
+    drop = 23 * 0.26
+    for x, base, sub, unit in (
+        (1896, "δ", "", " [PPM]"),
+        (2091, "J", "", " [HZ]"),
+        (2419, "T", "2", " [MS]"),
+    ):
+        runs = [(base, SG, 23, t["eyebrow"], 700, True)]
+        if sub:
+            runs.append((sub, SG, 23 * 0.62, t["eyebrow"], 700, False, drop))
+        runs.append((unit, SG, 23, t["eyebrow"], 700, False, -drop if sub else 0))
+        c.runs(x, 863, runs, anchor="end")
     c.text(2269, 863, "PROTONS", 23, SG, 700, t["eyebrow"], "end", "1.6")
     c.path("M 1625 888.5 H 2421", stroke=t["border"], sw=2)
 
@@ -1280,7 +1327,7 @@ def main() -> int:
     ap.add_argument(
         "--trace",
         choices=("faithful", "ideal", "hybrid"),
-        default=TRACE,
+        default=DEFAULT_TRACE,
         help="how the banner draws its two spectra (default: %(default)s, which plots the NPZ)",
     )
     ap.add_argument(
@@ -1290,10 +1337,11 @@ def main() -> int:
         help="write elsewhere, e.g. to compare --trace variants without touching docs/img",
     )
     ap.add_argument("--only", help="build just this diagram")
-    default_trace = TRACE
     args = ap.parse_args()
     TRACE = args.trace
-    if args.check and (args.trace != default_trace or args.out_dir.resolve() != OUT_DIR):
+    # Both sides resolved: an 8.3-shortened or symlinked TEMP would otherwise make an --out-dir
+    # that IS this directory compare unequal, and the run would exit 2 blaming the caller.
+    if args.check and (args.trace != DEFAULT_TRACE or args.out_dir.resolve() != OUT_DIR.resolve()):
         # Otherwise --check would compare the committed bytes against a variant nobody committed
         # and report every banner stale, which reads as a real staleness failure.
         print("--check verifies the committed defaults; drop --trace/--out-dir", file=sys.stderr)

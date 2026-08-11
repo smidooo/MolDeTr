@@ -6,6 +6,37 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The banner's `T₂` was a code point no embedded font carries**, so the README hero's assignment
+  table rendered its subscript in whatever face the reader's OS supplied. Composed instead, the way
+  the same generator already built the identical label forty lines below.
+
+  A guard written for that one defect found **eight more characters across five figures** —
+  `Δ` in `median |Δδ|` / `median |ΔJ|` on the banner and benchmark, `✓`/`✕` in `coupling_rule`,
+  `•`/`↕`/`∅` in `architecture`, `−` in `input_contract`. Those need the vendored binaries
+  re-subsetted, which rewrites every committed SVG's base64 payload, so they are inventoried in
+  [#84](https://github.com/smidooo/MolDeTr/issues/84) rather than fixed here.
+
+  Along the way this settled a contradiction between two of the repo's own documents, both of which
+  had been quoted as fact: a missing glyph does **not** render as tofu inside GitHub's sandboxed
+  `<img>`. Measured with a probe SVG embedding a single face — the browser falls through per glyph
+  to a system font. Both claims could stand because secure static mode blocks external *resource
+  loads*, which is why these faces are embedded, while a system font is not a resource load. The
+  practical effect is worse than tofu, not better: nobody reports a `✓` in the wrong weight, and the
+  character vanishes outright only for readers whose OS lacks it.
+
+- **`scripts/build_diagram_svgs.py --check` had never been run by anything** — not CI, not any test;
+  every reference in the tree was prose. All fourteen committed SVGs could have drifted from the
+  generator indefinitely, and the existing figure tests could not have noticed: a stale file has a
+  viewBox, parses, matches its twin's geometry, and still plots its NPZ. Now wired, with a test that
+  proves `--check` discriminates by corrupting and deleting files in an isolated directory.
+
+- **`--check` could report a false staleness after an in-process `--trace` run.** `main()` assigns
+  the module's `TRACE` and then read its own default back out of it, so one variant run poisoned
+  every later check into comparing the committed banner against a variant nobody committed — the
+  exact failure that guard exists to prevent, arrived at *through* the guard passing. Split into a
+  separate `DEFAULT_TRACE` constant.
+
 ## [1.4.1] - 2026-08-11
 
 ### Fixed
