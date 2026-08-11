@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-08-11
+
 ### Added
 - **The hero banner is vector, and its spectrum is now the committed data rather than a picture of
   it.** `docs/banner.png` was the last raster figure on the front page and the only one that was
@@ -38,7 +40,6 @@ All notable changes to this project are documented here. The format is based on
   Two of those mutations found real weaknesses in earlier versions of the test rather than
   confirming it — a mirrored trace passed a tallest-peak check because the mirror maps 6.972 ppm
   onto 7.429, within 0.009 of H_B.
-
 - **The docs site has an icon, and the repo's own mark finally does something.**
   `docs/img/mark.png` and `mark-dark.png` — a finished app-icon logo: navy tile, tricolor dash
   triple, two-peak trace, wordmark — were referenced by **nothing**, in any file, since they were
@@ -63,150 +64,6 @@ All notable changes to this project are documented here. The format is based on
   `architecture`, and nothing like the `#e2e9f4` that display *text* takes. The tile's drop shadow
   was fitted by sweeping `dy` × `stdDeviation` × `flood-opacity` against the reference rather than
   guessed — 26/40/0.34 scores 5.00/255 mean absolute difference against 6.65 for the first guess.
-
-### Fixed
-- **Three near-white values in the dark banner were copied instead of mapped, and only dark-mode
-  readers ever saw the result.** The hexagon that stands for the unknown structure was filled
-  `#eff2f9` in light and `#eef2f7` in dark — the same colour, invisible on a white card and a solid
-  bright blob covering 36 % of that region on `#1b2130`. The right card's divider went `#f3f3f3` →
-  `#eef1f6` and the left card's dashed rule `#d6dbe1` → `#d3dce6`: a whisper on white, a glaring
-  rule on dark. All three are now the existing extracted roles (`panel`, `rule`, `border`), so the
-  mapping cannot go missing again. Same bug class as the `navy` fill regression fixed above.
-
-  The panel shadow was the fourth: one blue-grey value for both themes paints a *glow* around every
-  card on a dark ground, which is the opposite of the depth cue it exists for. `shadowInk` now flips
-  with the palette, and `docs/BRAND.md` records why a shadow token cannot be theme-independent.
-
-- **`docs/banner.png` and `banner-dark.png` were 2560×1283 and 2560×1280, so `<picture>` stretched
-  the dark twin.** The aspect-ratio guard cleared it by 0.0003 against a 0.005 tolerance — the test
-  passed for four days while the defect it exists to catch was live. Both are now one geometry with
-  two palettes, which makes the drift impossible rather than merely absent; the guard's docstring no
-  longer describes the banner pair as currently drifted.
-
-- **`docs/img/demo.gif` was pinned at exactly 2.00× by a comment that was wrong about its own
-  code.** `scripts/capture_gui_media.py` stated that "a GIF frame is stored at the viewport's own
-  pixel size — `device_scale_factor` does not apply — so the 2× has to come from a physically larger
-  viewport", and the GIF branch accordingly never passed one. It applies: measured, a 344×256
-  viewport at `device_scale_factor=1.5` screenshots to 516×384, and Pillow writes that size straight
-  into the assembled GIF. The comment was describing its own omission.
-
-  The distinction matters, because the workaround the comment implied is the worse one. Enlarging
-  the viewport **re-lays out** the app — wider panes, different wrapping — so the demo would be
-  recomposed rather than sharpened. Scaling the backing store keeps the framing identical and adds
-  only detail. `1720 × 1.5 = 2580`, exactly 3× the 860 the README declares; the GIF is now
-  2580×1920 with the same composition, 697 KB against 377 KB for 2.25× the pixels.
-
-  Guarded by a test written first and confirmed red. The 3× floor is scoped to `gui.png` and
-  `demo.gif` rather than raised globally: they are the only README rasters this script can
-  regenerate on demand. Raising `MIN_SCALE` itself would also fail `example_prediction.png`,
-  `example_prediction_vanillin.png` and `vanillin_spin_systems.png` — all three sitting at 2.00×,
-  and all three with no generator in the tree, since `scripts/gen_molecule_figure.py` was removed in
-  `2827cdb`. Re-plotting those is separate work and is **not** done here.
-- **`docs/img/input_contract.png`'s caption was truncated, live on the front page.** It rendered
-  "ependent — 80–600 MHz all map to 1200 Hz (MolDeTr works in Hz)" — the leading "Field-ind" simply
-  absent from the committed asset, while the README's own alt text beside it said
-  "field-independent". Restored in full when the figure was re-authored as vector.
-
-- **The dark figure variants shipped in the previous entry had six wrong colour tokens, and no
-  ground at all.** `docs/BRAND.md` § Dark-figure palette names five roles; rendering these figures
-  needs twenty-six, and the gap had been filled by guessing. Worst of them: `navy` was mapped to
-  `#e8eef6`, which is right for the *title text* and badly wrong for a *filled box* — dark-mode
-  readers got a near-white panel with dark text where the original had a blue panel with light
-  text. `panel`, `connector`, `arrow`, `onSolid` and `warnBg` were also off. Separately, the SVGs
-  painted no background, so where the PNGs were fully opaque `#1b2130` the figures took GitHub's
-  own `#0d1117` instead.
-
-  The fix is a measurement rather than a better guess. `input_contract`, `coupling_rule` and
-  `benchmark` each shipped light and dark PNGs of *identical dimensions*, which makes the pair a
-  pixel-for-pixel colour map: mask the light image by a token, take the modal colour under that
-  mask in the dark image. Every token came back at 100 % agreement except the two that legitimately
-  split — `navy` (fill `#31517d` vs display text `#e2e9f4`, now separate tokens) and `card` (the
-  region-of-interest window interiors go *below* the ground in dark, `#10161f`, not above it).
-  The extracted palette is recorded in BRAND.md. Dark now matches its reference as closely as light
-  does: `benchmark` 95.0 % pixel-identical, `coupling_rule` 94.9 %, `input_contract` 96.6 %.
-
-- **`docs/img/architecture.svg` painted 11 % of its canvas the wrong grey and set its title 19 % too
-  small.** Its wide right-hand panel is `figure-page` `#f8fafd`, not `panel` `#f1f5fa`; its title is
-  the same 39.4 px display size every other figure uses, not 33; its hairlines are 3 px, not 1.5;
-  and its four connector arrows were each ~10 px short. Measured against the PNG it replaced it had
-  been 82.6 % pixel-identical against `pipeline`'s 94.0 %, which is what prompted the check. Now
-  93.5 %. The masthead is a shared helper, so the title size cannot drift per figure again.
-
-### Changed
-- **The last three README diagrams are vector: `input_contract`, `coupling_rule`, `benchmark`.**
-  Same method as `pipeline` and `architecture` — measure the committed PNG, re-author from the
-  `docs/BRAND.md` tokens, render through an `<img>` tag (the sandboxed mode GitHub uses, where a
-  merely *referenced* font falls back silently), diff. Fidelity against the assets they replace:
-  `input_contract` 96.6 % pixel-identical (mean 2.7/255), `coupling_rule` 94.9 % (4.5), `benchmark`
-  94.8 % (3.1) — at or above the 94.0 % `pipeline` set. Six PNGs (632 KB) become six SVGs, and the
-  light/dark pairs collapse to one geometry each.
-
-  Three things the measurement caught that eyeballing would not have. The proton-class bars are
-  blue → **orange** → teal, matching the BRAND.md marker cycle, not blue → teal → orange. The
-  region-of-interest windows in `coupling_rule` are *filled* — lifting the window off its panel
-  wash is the whole subject of the figure — and leaving them transparent quietly removed the
-  distinction. And neither figure's spectrum is a continuous trace: each multiplet is an
-  independent 86 px segment returning to baseline, with bare ground between, which is also the
-  more honest reading, since what these figures argue about is individual multiplets.
-
-  `benchmark` needed no charting library: it is three stat cards and three progress bars over
-  `#eef2f7` tracks. Its display numerals are tracked in at −2, because matching the original on cap
-  height alone left them 7 % too wide and matching on width alone left them too short; and its
-  percent signs are IBM Plex rather than Space Grotesk, whose `%` is both taller and narrower than
-  its own digits, so one face cannot hold both to the same cap height.
-
-- **The architecture diagram is vector too, and its text colour was failing WCAG AA.** It painted
-  the eyebrow and secondary labels in `#74808f` — the token `docs/BRAND.md` explicitly *retired* for
-  measuring 4.01:1 on white, under the 4.5:1 that applies to exactly the small labels it was defined
-  for. BRAND.md replaced it with `#666f7d` (5.08:1), and the repo enforces the rule with axe-core —
-  but **axe scans the GUI, not PNGs**, so every figure kept the retired colour and nothing noticed.
-  Measured across the set: `architecture` 1424 px, `benchmark` 5540, `coupling_rule` 1355,
-  `input_contract` 1120, `banner` 457; `pipeline` was already clean, which is why converting it
-  first did not surface this. Re-authoring from the current tokens fixes the contrast as a side
-  effect. The figure also carried 82 px of empty canvas below its content against 52 above, so its
-  viewBox is trimmed to 1800×678; content coordinates are unchanged. IBM Plex Mono joins the
-  vendored set for the monospace runs, and faces are now embedded per diagram — adding mono to the
-  shared list had pushed `pipeline.svg` from 46.5 KB to 57.2 KB carrying a font it never uses.
-
-- **The pipeline diagram is now vector (`docs/img/pipeline{,-dark}.svg`), and the light/dark pair
-  is generated from one geometry.** The PNGs it replaces were not below the repo's own 2× floor —
-  every README figure passed `tests/test_readme_figures.py` — they read as soft because 2× *is* the
-  floor and displays kept getting denser. Chasing that with a higher `MIN_SCALE` trades bytes for a
-  moving target; vector removes the axis. Re-authored from the `docs/BRAND.md` tokens rather than
-  upscaled, because upscaling flat vector art stays soft: a colour census of the old PNG returned
-  the brand palette exactly (`#f1f5fa` panel, `#1f3a5f` navy, `#d5dfeb` border, `#7d92b0` latent,
-  the blue/orange/teal tricolor), confirming they had been generated from that same table. Geometry
-  was measured off the committed asset, not eyeballed; the result renders **94.0 % pixel-identical**
-  to it (mean absolute difference 2.54/255, the remainder being antialiasing). 46 KB replaces 86 KB.
-- **A light/dark geometry drift is fixed, and it was invisible.** `pipeline.png` was 1820×388 while
-  `pipeline-dark.png` was 1720×370 — a *different aspect ratio*. `<picture>` sizes the block from
-  the `<img>` and paints whichever source matches the colour scheme into that same box, so the dark
-  twin was being stretched, and only dark-mode readers ever saw it. Generating both from one
-  geometry makes the class of bug impossible;
-  `test_a_light_figure_and_its_dark_twin_share_one_geometry` now also asserts it.
-
-### Fixed
-- **A browser-tier race that turned `browser e2e (firefox)` red on a docs-only commit.**
-  `test_threshold_at_maximum_reports_no_multiplets` was the only test in
-  `tests/e2e/test_browser_journeys.py` that did not settle after selecting an example — every other
-  path goes through `_detect_with_example`, which waits for `#md-check` to read "Input check" first.
-  Selecting an example populates the Detect tab asynchronously, so `fill("1")` on the threshold
-  raced that population; when the example landed second it restored the default threshold,
-  detection found multiplets, and the empty state never rendered. Firefox is simply where the
-  ordering lost. The settle is non-vacuous — swapping the expected text for a marker that never
-  appears turns the test red. What is *not* claimed: that this eliminates the CI failure. The race
-  does not reproduce locally, so the local green proves nothing; the argument is causal, not
-  empirical.
-- **`test_every_readme_figure_is_at_least_2x_its_rendered_width` silently exempted vector figures.**
-  It skips whenever `_png_or_gif_size` returns `None`, which is every non-raster file — so swapping
-  a PNG for an SVG did not *satisfy* the resolution guard, it *removed* that figure from it, and the
-  suite stayed green either way. An empty file, a truncated one, or an HTML error page saved as
-  `.svg` would all have passed. `test_every_vector_figure_really_is_scalable` now grants the
-  exemption positively: the bytes must carry an `<svg>` root with a genuine four-number `viewBox`,
-  which is the thing that actually makes a figure scale. Both new tests were mutation-tested — a
-  stripped `viewBox`, a twin given a different aspect ratio, and a zero-byte file each turn them red.
-
-### Added
 - **`scripts/build_diagram_svgs.py`** — regenerates the diagrams from the brand tokens; `--check`
   fails if a committed SVG has drifted from its source.
 - **`docs/fonts/`** — weight-instanced, glyph-subset builds of Space Grotesk and IBM Plex Sans with
@@ -236,37 +93,16 @@ All notable changes to this project are documented here. The format is based on
 - **`actions/checkout` v4 → v7** in the three failure-reporter jobs — the last `@v4` call sites,
   the other twelve having already moved. v7's breaking change affects only `pull_request_target`
   and `workflow_run`, and no workflow here uses either trigger.
-- **`huggingface_hub` floor raised to `>=1.26.1`** in `deploy/requirements-demo.txt`. Inert in
-  practice: CI installs it unconstrained and has been resolving 1.27.0.
+- **`huggingface_hub` floor raised to `>=1.27.0`** in `deploy/requirements-demo.txt`, in two
+  Dependabot steps this cycle: `>=0.20` → `>=1.26.1` (`b8a08ac`), then `>=1.26.1` → `>=1.27.0`
+  (#69). Inert in practice either way, and that is the interesting part: CI installs the package
+  unconstrained, so the floor constrains only the Space, and the resolver was already choosing
+  1.27.0 before the floor named it.
 
-### Notes
-- **No CI lane exercises `learner.load()`, in any configuration.** Its only callers are
-  `scripts/evaluate_synthetic.py:917` and `scripts/train.py:39`. The unit suite is weight-free; the
-  nightly `-m model` lane runs `scripts/predict.py` and `scripts/evaluate_experimental.py` through
-  `tests/test_scripts_local.py` and never invokes `evaluate_synthetic.py`; `train.py` is frozen.
-  So the fastai question above could not have been decided by waiting for a lane to go red or
-  green — a green run installing fastai 2.8.8 proves imports work and nothing more. It was decided
-  by reading the two wheels. Recorded because the same blind spot will apply to the next `fastai`
-  or `torch` decision.
-
-### Fixed
-- **Both runtime manifests admitted a fastai the package excludes.** `deploy/requirements-demo.txt`
-  and `environment.yml` each declared a bare `fastai>=2.7` — no ceiling — while `pyproject.toml`
-  caps it at `<2.9` deliberately. The demo manifest is what the Colab demo installs and
-  `environment.yml` is the documented way to create the environment, so both would have resolved a
-  fastai 2.9+ on a machine the maintainer never sees. Structurally the identical defect
-  `test_demo_manifest_declares_the_same_gradio_requirement_as_the_app_extra` was written to catch on
-  that same file for gradio; it simply was not asserted for the other pinned dependency.
-- **Dependabot's fastai ignore rule could not see the change it was written to block.**
-  `update-types` classifies a *version* change, so it does not fire on a range **widening** — which
-  is exactly how `<2.8` -> `<2.9` arrived unreviewed on 2026-08-10 despite an explicit
-  `version-update:semver-minor` ignore. Both entries now carry `versions:` as well, which is matched
-  against the candidate version itself. `torch` additionally gains the semver-minor ignore it never
-  had: the asymmetry with fastai had no stated reason, and no CI lane can judge either bump. The
-  cost is recorded in the config rather than hidden — this also suppresses a torch security bump
-  that arrives as a minor.
-
-### Added
+  This entry recorded the first bump and not the second, so it went stale where the code moved —
+  the same class of miss the fastai correction above is about, and the reason the release checklist
+  probes `[Unreleased]` for a distinctive string per commit rather than reading it. Found that way,
+  by a probe returning a single `1.27.0` hit that turned out to be this bullet's own prose.
 - **A drift guard for the fastai specifier**, parametrized over both runtime manifests
   (`tests/test_deploy_manifest.py`). Confirmed RED on both before the fix and GREEN after, and
   mutation-tested: changing the packaged ceiling to `<2.99` turns both cases red, so the assertion
@@ -308,15 +144,6 @@ All notable changes to this project are documented here. The format is based on
   against a string. `test_newest_release_is_the_one_published_last` is a crafted-payload unit test
   in which list order and publish order disagree; it was confirmed red before the sort and green
   after, so it is a test that bites rather than one that merely passes.
-
-### Changed
-- `_api` in `scripts/zenodo_add_paper_doi.py` now declares `-> Any`. Deliberately `Any` and not
-  `dict | list | None`: the function is a generic JSON round trip that never validates the parsed
-  shape, so a narrower annotation would claim something it does not enforce. This file is outside
-  the mypy gate (`pyproject.toml [tool.mypy]` covers the pure-NumPy half only), so this is
-  readability, not a type-check fix.
-
-### Added
 - **The deposit's link to the paper is now guarded instead of remembered.** The `isSupplementTo`
   relation pointing a software record at the article was present on v0.1.0 and absent from every
   release since — **five for five** (v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0), the last minted four
@@ -354,7 +181,6 @@ All notable changes to this project are documented here. The format is based on
   converge. Every live record was already backfilled by the time this was written, so there is no
   longer a Zenodo record that *lacks* the relation to test against: the guard is proven by crafted
   payloads and mutation instead, which is the only reason it is more than decoration.
-
 - **And now it repairs itself, so the guard above no longer ends in a human typing the fix.**
   Detecting a fault five times and then asking someone to run a command is not automation; it is the
   same manual step, moved. `integrations.yml` runs the relation check as its own step, and on
@@ -401,6 +227,210 @@ All notable changes to this project are documented here. The format is based on
   **first** `run: pytest …` line in the workflow, which was complete while the job made one call and
   covered **one node of nine** once the job made three — the same defect class that module documents
   about itself. It now reads every invocation and unions what they collect.
+
+### Changed
+- **The last three README diagrams are vector: `input_contract`, `coupling_rule`, `benchmark`.**
+  Same method as `pipeline` and `architecture` — measure the committed PNG, re-author from the
+  `docs/BRAND.md` tokens, render through an `<img>` tag (the sandboxed mode GitHub uses, where a
+  merely *referenced* font falls back silently), diff. Fidelity against the assets they replace:
+  `input_contract` 96.6 % pixel-identical (mean 2.7/255), `coupling_rule` 94.9 % (4.5), `benchmark`
+  94.8 % (3.1) — at or above the 94.0 % `pipeline` set. Six PNGs (632 KB) become six SVGs, and the
+  light/dark pairs collapse to one geometry each.
+
+  Three things the measurement caught that eyeballing would not have. The proton-class bars are
+  blue → **orange** → teal, matching the BRAND.md marker cycle, not blue → teal → orange. The
+  region-of-interest windows in `coupling_rule` are *filled* — lifting the window off its panel
+  wash is the whole subject of the figure — and leaving them transparent quietly removed the
+  distinction. And neither figure's spectrum is a continuous trace: each multiplet is an
+  independent 86 px segment returning to baseline, with bare ground between, which is also the
+  more honest reading, since what these figures argue about is individual multiplets.
+
+  `benchmark` needed no charting library: it is three stat cards and three progress bars over
+  `#eef2f7` tracks. Its display numerals are tracked in at −2, because matching the original on cap
+  height alone left them 7 % too wide and matching on width alone left them too short; and its
+  percent signs are IBM Plex rather than Space Grotesk, whose `%` is both taller and narrower than
+  its own digits, so one face cannot hold both to the same cap height.
+- **The architecture diagram is vector too, and its text colour was failing WCAG AA.** It painted
+  the eyebrow and secondary labels in `#74808f` — the token `docs/BRAND.md` explicitly *retired* for
+  measuring 4.01:1 on white, under the 4.5:1 that applies to exactly the small labels it was defined
+  for. BRAND.md replaced it with `#666f7d` (5.08:1), and the repo enforces the rule with axe-core —
+  but **axe scans the GUI, not PNGs**, so every figure kept the retired colour and nothing noticed.
+  Measured across the set: `architecture` 1424 px, `benchmark` 5540, `coupling_rule` 1355,
+  `input_contract` 1120, `banner` 457; `pipeline` was already clean, which is why converting it
+  first did not surface this. Re-authoring from the current tokens fixes the contrast as a side
+  effect. The figure also carried 82 px of empty canvas below its content against 52 above, so its
+  viewBox is trimmed to 1800×678; content coordinates are unchanged. IBM Plex Mono joins the
+  vendored set for the monospace runs, and faces are now embedded per diagram — adding mono to the
+  shared list had pushed `pipeline.svg` from 46.5 KB to 57.2 KB carrying a font it never uses.
+- **The pipeline diagram is now vector (`docs/img/pipeline{,-dark}.svg`), and the light/dark pair
+  is generated from one geometry.** The PNGs it replaces were not below the repo's own 2× floor —
+  every README figure passed `tests/test_readme_figures.py` — they read as soft because 2× *is* the
+  floor and displays kept getting denser. Chasing that with a higher `MIN_SCALE` trades bytes for a
+  moving target; vector removes the axis. Re-authored from the `docs/BRAND.md` tokens rather than
+  upscaled, because upscaling flat vector art stays soft: a colour census of the old PNG returned
+  the brand palette exactly (`#f1f5fa` panel, `#1f3a5f` navy, `#d5dfeb` border, `#7d92b0` latent,
+  the blue/orange/teal tricolor), confirming they had been generated from that same table. Geometry
+  was measured off the committed asset, not eyeballed; the result renders **94.0 % pixel-identical**
+  to it (mean absolute difference 2.54/255, the remainder being antialiasing). 46 KB replaces 86 KB.
+- **A light/dark geometry drift is fixed, and it was invisible.** `pipeline.png` was 1820×388 while
+  `pipeline-dark.png` was 1720×370 — a *different aspect ratio*. `<picture>` sizes the block from
+  the `<img>` and paints whichever source matches the colour scheme into that same box, so the dark
+  twin was being stretched, and only dark-mode readers ever saw it. Generating both from one
+  geometry makes the class of bug impossible;
+  `test_a_light_figure_and_its_dark_twin_share_one_geometry` now also asserts it.
+- `_api` in `scripts/zenodo_add_paper_doi.py` now declares `-> Any`. Deliberately `Any` and not
+  `dict | list | None`: the function is a generic JSON round trip that never validates the parsed
+  shape, so a narrower annotation would claim something it does not enforce. This file is outside
+  the mypy gate (`pyproject.toml [tool.mypy]` covers the pure-NumPy half only), so this is
+  readability, not a type-check fix.
+
+### Fixed
+- **Three near-white values in the dark banner were copied instead of mapped, and only dark-mode
+  readers ever saw the result.** The hexagon that stands for the unknown structure was filled
+  `#eff2f9` in light and `#eef2f7` in dark — the same colour, invisible on a white card and a solid
+  bright blob covering 36 % of that region on `#1b2130`. The right card's divider went `#f3f3f3` →
+  `#eef1f6` and the left card's dashed rule `#d6dbe1` → `#d3dce6`: a whisper on white, a glaring
+  rule on dark. All three are now the existing extracted roles (`panel`, `rule`, `border`), so the
+  mapping cannot go missing again. Same bug class as the `navy` fill regression fixed above.
+
+  The panel shadow was the fourth: one blue-grey value for both themes paints a *glow* around every
+  card on a dark ground, which is the opposite of the depth cue it exists for. `shadowInk` now flips
+  with the palette, and `docs/BRAND.md` records why a shadow token cannot be theme-independent.
+- **`docs/banner.png` and `banner-dark.png` were 2560×1283 and 2560×1280, so `<picture>` stretched
+  the dark twin.** The aspect-ratio guard cleared it by 0.0003 against a 0.005 tolerance — the test
+  passed for four days while the defect it exists to catch was live. Both are now one geometry with
+  two palettes, which makes the drift impossible rather than merely absent; the guard's docstring no
+  longer describes the banner pair as currently drifted.
+- **`docs/img/demo.gif` was pinned at exactly 2.00× by a comment that was wrong about its own
+  code.** `scripts/capture_gui_media.py` stated that "a GIF frame is stored at the viewport's own
+  pixel size — `device_scale_factor` does not apply — so the 2× has to come from a physically larger
+  viewport", and the GIF branch accordingly never passed one. It applies: measured, a 344×256
+  viewport at `device_scale_factor=1.5` screenshots to 516×384, and Pillow writes that size straight
+  into the assembled GIF. The comment was describing its own omission.
+
+  The distinction matters, because the workaround the comment implied is the worse one. Enlarging
+  the viewport **re-lays out** the app — wider panes, different wrapping — so the demo would be
+  recomposed rather than sharpened. Scaling the backing store keeps the framing identical and adds
+  only detail. `1720 × 1.5 = 2580`, exactly 3× the 860 the README declares; the GIF is now
+  2580×1920 with the same composition, 697 KB against 377 KB for 2.25× the pixels.
+
+  Guarded by a test written first and confirmed red. The 3× floor is scoped to `gui.png` and
+  `demo.gif` rather than raised globally: they are the only README rasters this script can
+  regenerate on demand. Raising `MIN_SCALE` itself would also fail `example_prediction.png`,
+  `example_prediction_vanillin.png` and `vanillin_spin_systems.png` — all three sitting at 2.00×,
+  and all three with no generator in the tree, since `scripts/gen_molecule_figure.py` was removed in
+  `2827cdb`. Re-plotting those is separate work and is **not** done here.
+- **`docs/img/input_contract.png`'s caption was truncated, live on the front page.** It rendered
+  "ependent — 80–600 MHz all map to 1200 Hz (MolDeTr works in Hz)" — the leading "Field-ind" simply
+  absent from the committed asset, while the README's own alt text beside it said
+  "field-independent". Restored in full when the figure was re-authored as vector.
+- **The dark figure variants shipped in the previous entry had six wrong colour tokens, and no
+  ground at all.** `docs/BRAND.md` § Dark-figure palette names five roles; rendering these figures
+  needs twenty-six, and the gap had been filled by guessing. Worst of them: `navy` was mapped to
+  `#e8eef6`, which is right for the *title text* and badly wrong for a *filled box* — dark-mode
+  readers got a near-white panel with dark text where the original had a blue panel with light
+  text. `panel`, `connector`, `arrow`, `onSolid` and `warnBg` were also off. Separately, the SVGs
+  painted no background, so where the PNGs were fully opaque `#1b2130` the figures took GitHub's
+  own `#0d1117` instead.
+
+  The fix is a measurement rather than a better guess. `input_contract`, `coupling_rule` and
+  `benchmark` each shipped light and dark PNGs of *identical dimensions*, which makes the pair a
+  pixel-for-pixel colour map: mask the light image by a token, take the modal colour under that
+  mask in the dark image. Every token came back at 100 % agreement except the two that legitimately
+  split — `navy` (fill `#31517d` vs display text `#e2e9f4`, now separate tokens) and `card` (the
+  region-of-interest window interiors go *below* the ground in dark, `#10161f`, not above it).
+  The extracted palette is recorded in BRAND.md. Dark now matches its reference as closely as light
+  does: `benchmark` 95.0 % pixel-identical, `coupling_rule` 94.9 %, `input_contract` 96.6 %.
+- **`docs/img/architecture.svg` painted 11 % of its canvas the wrong grey and set its title 19 % too
+  small.** Its wide right-hand panel is `figure-page` `#f8fafd`, not `panel` `#f1f5fa`; its title is
+  the same 39.4 px display size every other figure uses, not 33; its hairlines are 3 px, not 1.5;
+  and its four connector arrows were each ~10 px short. Measured against the PNG it replaced it had
+  been 82.6 % pixel-identical against `pipeline`'s 94.0 %, which is what prompted the check. Now
+  93.5 %. The masthead is a shared helper, so the title size cannot drift per figure again.
+- **A browser-tier race that turned `browser e2e (firefox)` red on a docs-only commit.**
+  `test_threshold_at_maximum_reports_no_multiplets` was the only test in
+  `tests/e2e/test_browser_journeys.py` that did not settle after selecting an example — every other
+  path goes through `_detect_with_example`, which waits for `#md-check` to read "Input check" first.
+  Selecting an example populates the Detect tab asynchronously, so `fill("1")` on the threshold
+  raced that population; when the example landed second it restored the default threshold,
+  detection found multiplets, and the empty state never rendered. Firefox is simply where the
+  ordering lost. The settle is non-vacuous — swapping the expected text for a marker that never
+  appears turns the test red. What is *not* claimed: that this eliminates the CI failure. The race
+  does not reproduce locally, so the local green proves nothing; the argument is causal, not
+  empirical.
+- **`test_every_readme_figure_is_at_least_2x_its_rendered_width` silently exempted vector figures.**
+  It skips whenever `_png_or_gif_size` returns `None`, which is every non-raster file — so swapping
+  a PNG for an SVG did not *satisfy* the resolution guard, it *removed* that figure from it, and the
+  suite stayed green either way. An empty file, a truncated one, or an HTML error page saved as
+  `.svg` would all have passed. `test_every_vector_figure_really_is_scalable` now grants the
+  exemption positively: the bytes must carry an `<svg>` root with a genuine four-number `viewBox`,
+  which is the thing that actually makes a figure scale. Both new tests were mutation-tested — a
+  stripped `viewBox`, a twin given a different aspect ratio, and a zero-byte file each turn them red.
+- **Both runtime manifests admitted a fastai the package excludes.** `deploy/requirements-demo.txt`
+  and `environment.yml` each declared a bare `fastai>=2.7` — no ceiling — while `pyproject.toml`
+  caps it at `<2.9` deliberately. The demo manifest is what the Colab demo installs and
+  `environment.yml` is the documented way to create the environment, so both would have resolved a
+  fastai 2.9+ on a machine the maintainer never sees. Structurally the identical defect
+  `test_demo_manifest_declares_the_same_gradio_requirement_as_the_app_extra` was written to catch on
+  that same file for gradio; it simply was not asserted for the other pinned dependency.
+- **Dependabot's fastai ignore rule could not see the change it was written to block.**
+  `update-types` classifies a *version* change, so it does not fire on a range **widening** — which
+  is exactly how `<2.8` -> `<2.9` arrived unreviewed on 2026-08-10 despite an explicit
+  `version-update:semver-minor` ignore. Both entries now carry `versions:` as well, which is matched
+  against the candidate version itself. `torch` additionally gains the semver-minor ignore it never
+  had: the asymmetry with fastai had no stated reason, and no CI lane can judge either bump. The
+  cost is recorded in the config rather than hidden — this also suppresses a torch security bump
+  that arrives as a minor.
+
+### Tests
+- **The webkit plot diagnostic now carries network-level evidence, and the probe proves it can say
+  "yes".** #51 still does not reproduce — six local runs of the exact CI command, three idle
+  (37.7 / 22.0 / 22.0 s) and three under six-way CPU load (25.1 / 26.0 / 29.1 s), the load chosen
+  because the ResizeObserver drop at ~1.9 s is a main-thread-pressure signature. All six passed. So
+  this changes the **failure report**, not the app.
+
+  `plotlyLoaded: false` says the library is absent without saying why. Gradio's Plot component
+  lazy-imports `PlotlyPlot-*.js` with no `.catch()` and no retry, memoises only on success, and
+  renders the `Empty` placeholder on failure — a non-zero box with non-zero child count. So neither
+  the flag nor the container geometry separates *never fetched* from *fetched and rejected* from
+  *arrived and failed to evaluate*. Resource timing does, and occurrence #3 will now report request
+  count, bytes and duration.
+
+  **Recorded because the wrong version nearly shipped.** The change was first written on the premise
+  that `plotlyLoaded` was *vacuous*: grepping the gradio bundle showed it assigning
+  `window.PlotlyGeoAssets` and `window.PlotlyLocales` but never `window.Plotly`, which read as proof
+  the field always reports false — and therefore that #51's close condition would misdiagnose its
+  own next occurrence. Measured on a healthy webkit run instead: `legacyProbe_windowPlotly: True`.
+  `window.Plotly` **is** defined once the chunk evaluates. Reading a bundle is not measuring it, and
+  the field was left exactly as it was. `_assert_diagnostic_is_not_vacuous()` now makes that mistake
+  unable to recur silently: it asserts the probe reports the healthy case *on the same code path the
+  failure report uses*, because a diagnostic that cannot say "yes" when the answer is yes cannot be
+  trusted when it says "no".
+
+  No settle was added and no timeout raised. With nothing reproducing, either would be a speculative
+  change that makes the next green lane unreadable — which is the argument #51 itself makes.
+
+### Notes
+- **There is no `.zenodo.json`, and that was decided rather than overlooked.** The obvious way to
+  stop the paper relation going missing at every mint is a metadata file in the repository, which
+  Zenodo reads on each release. It was investigated and **rejected**: it would duplicate metadata
+  that `CITATION.cff` already owns authoritatively, and a second file that silently wins would make
+  the working one look broken. Evidence gathered against real records, including a repository whose
+  deposit permanently carries a link pointing at the wrong tag inside an immutable record.
+
+  The reasoning is in `docs/RELEASING.md`, with the caveat stated rather than buried: the comparison
+  group's records span 2017–2021 while the control is current, and no recent counter-example could
+  be found to close that gap. Recorded here because a rejected alternative that leaves no trace gets
+  re-proposed, and the next person to notice the relation problem will reach for exactly this.
+
+- **No CI lane exercises `learner.load()`, in any configuration.** Its only callers are
+  `scripts/evaluate_synthetic.py:917` and `scripts/train.py:39`. The unit suite is weight-free; the
+  nightly `-m model` lane runs `scripts/predict.py` and `scripts/evaluate_experimental.py` through
+  `tests/test_scripts_local.py` and never invokes `evaluate_synthetic.py`; `train.py` is frozen.
+  So the fastai question above could not have been decided by waiting for a lane to go red or
+  green — a green run installing fastai 2.8.8 proves imports work and nothing more. It was decided
+  by reading the two wheels. Recorded because the same blind spot will apply to the next `fastai`
+  or `torch` decision.
 
 ## [1.3.0] - 2026-08-09
 
