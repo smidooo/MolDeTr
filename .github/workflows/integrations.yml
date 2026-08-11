@@ -24,7 +24,7 @@ on:
   release:
     # The one moment these targets DO change on a scale of minutes. Publishing a release mints a new
     # Zenodo version, and the `isSupplementTo` relation to the article does not carry over — absent
-    # on every release since v0.1.0, five for five, most recently v1.3.0. Weekly alone would leave a
+    # on every release since v0.1.0, six for six, most recently v1.4.0. Weekly alone would leave a
     # release unrelated to its own paper for up to six days, and the whole finding is that the
     # post-publish check is a missing automation rather than a checklist item somebody forgot.
     #
@@ -247,7 +247,7 @@ jobs:
         # built around would vanish for exactly the fault it exists to catch.
         #
         # The second clause reports a repair that ACTUALLY RAN outside a release. At mint time a
-        # missing relation is expected, five for five, and needs no issue. Off the release path it
+        # missing relation is expected, six for six, and needs no issue. Off the release path it
         # means something removed a relation from an already-published archival record, and
         # repairing that silently would erase the only evidence it happened.
         #

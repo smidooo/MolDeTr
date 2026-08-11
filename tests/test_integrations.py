@@ -261,9 +261,17 @@ def test_newest_release_is_the_one_published_last(monkeypatch):
 def test_latest_software_record_supplements_the_article():
     """The newest software deposit must point at the paper it accompanies.
 
-    It never does. The relation has been absent from **every release since v0.1.0 — five for
-    five** (v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0) — the last minted four days after a script was
-    written to fix the problem.
+    It never does. The relation has been absent from **every release since v0.1.0 — six for
+    six** (v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0, v1.4.0).
+
+    The sixth is the one this test observed itself, and it is worth separating from the five it
+    inherited. On 2026-08-11 this assertion failed three seconds after Zenodo minted v1.4.0, with
+    `Present relations: [('isSupplementTo', '.../tree/v1.4.0')]` — the auto-generated tree link and
+    nothing else. `scripts/zenodo_add_paper_doi.py` then repaired it unattended and the re-check
+    passed 14 seconds later. So "six for six" is five observations plus one measurement, not a run
+    of six measurements, and re-deriving it beats incrementing it: this repository has already
+    shipped an inherited "four for four" that was really five.
+
     Zenodo does not carry it forward: v1.2.0 was published without it even though v1.1.1 had
     already been hand-edited to carry it, which rules out "the previous record seeds the next one"
     and rules out diligence as the cause. Nothing in the repository could see it, and nothing

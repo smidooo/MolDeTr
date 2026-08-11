@@ -56,9 +56,15 @@ trail, so use it.
 
 **The link to the paper does not survive versioning, and this was never a checklist problem.** The
 `isSupplementTo` relation pointing at the article was present on v0.1.0 and absent from every
-release since — **five for five**: v1.0.0, v1.1.0, v1.1.1, v1.2.0 and v1.3.0. The last was minted
-on 2026-08-09, four days after a tool existed to fix it. Six Zenodo records exist under the concept
-DOI and only the first was ever born correct; the other five were restored after the fact.
+release since — **six for six**: v1.0.0, v1.1.0, v1.1.1, v1.2.0, v1.3.0 and v1.4.0. Seven Zenodo
+records exist under the concept DOI and only the first was ever born correct; the other six were
+restored after the fact — the last of them without anyone noticing, which is the point of the
+section below.
+
+The sixth was **measured**, not predicted, and that is a different claim from the five before it.
+On 2026-08-11 the release-triggered run recorded Zenodo minting v1.4.0 at 11:40:32 and the guard
+failing at 11:40:35 with `Present relations: [('isSupplementTo', '.../tree/v1.4.0')]`. Re-derive
+this count at each release rather than incrementing it.
 
 Zenodo is not carrying it forward and does not prefill it from the previous record: **v1.2.0 was
 published without the relation even though v1.1.1 had already been hand-edited to carry it.** That
