@@ -164,7 +164,9 @@ def test_every_readme_figure_is_at_least_2x_its_rendered_width():
 #: 2827cdb". That stopped being true when `example_prediction` and `example_prediction_vanillin`
 #: were re-authored as SVG in `scripts/build_diagram_svgs.py`: they have a generator again, and
 #: having left the raster floor entirely through the viewBox exemption, they are no longer rasters
-#: at all. `vanillin_spin_systems.png` is the last figure still in that state.
+#: at all. `vanillin_spin_systems` followed, so `gui.png` and `demo.gif` are now the ONLY rasters
+#: the README carries -- which is what makes the 3.0 floor below the operative one and `MIN_SCALE`
+#: a guard with no current subjects. Keep it: it still catches any future raster.
 APP_CAPTURES = ("docs/img/gui.png", "docs/img/demo.gif")
 CAPTURE_MIN_SCALE = 3.0
 
