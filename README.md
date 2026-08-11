@@ -101,8 +101,8 @@ test suite ties to the published checkpoint.</p>
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/img/vanillin_spin_systems-dark.png">
-    <img src="docs/img/vanillin_spin_systems.png" alt="Vanillin drawn from its structure with the three aromatic protons colour-coded by spin system, H2 a meta doublet, H5 an ortho doublet, H6 a doublet-of-doublets, each linked by colour to its multiplet in the 300 MHz 1H NMR spectrum" width="820">
+    <source media="(prefers-color-scheme: dark)" srcset="docs/img/vanillin_spin_systems-dark.svg">
+    <img src="docs/img/vanillin_spin_systems.svg" alt="Vanillin drawn from its structure with the three aromatic protons colour-coded by spin system, H2 a meta doublet, H5 an ortho doublet, H6 a doublet-of-doublets, each linked by colour to its multiplet in the 300 MHz 1H NMR spectrum" width="820">
   </picture>
 </p>
 <p align="center"><b>The same three protons, on the molecule.</b> Each aromatic proton is its own spin system:

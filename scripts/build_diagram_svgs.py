@@ -343,9 +343,7 @@ def _multiplets(
             # Half-width from the data: walk out until the line drops below half, and cap at the
             # gap to its neighbour so an unresolved shoulder cannot inflate it.
             j = next((k for k in range(1, 40) if amp[min(i + k, len(amp) - 1)] < amp[i] * 0.5), 6)
-            lines.append(
-                (x0 + (PPM_LEFT - ppm[i]) * span, amp[i] * height, max(j * step * span, 2.4))
-            )
+            lines.append((x0 + (left - ppm[i]) * span, amp[i] * height, max(j * step * span, 2.4)))
         out.append(lines)
     return out
 
@@ -444,8 +442,14 @@ class Canvas:
         if ground is not None:
             self.parts.append(f'<rect width="{width}" height="{height}" fill="{ground}"/>')
 
-    def rect(self, x, y, w, h, rx, fill, stroke=None, sw=1.5, dash=None) -> None:
+    def rect(self, x, y, w, h, rx, fill, stroke=None, sw=1.5, dash=None, opacity=None) -> None:
+        """`opacity` for the multiplet washes, which are the tricolor at 0.16 rather than their own
+        colours. Extracting the dark twin confirms it: 0.16 over the dark ground reproduces all
+        three measured dark hexes exactly, so a translucent fill is one token where three opaque
+        ones would be three that can drift."""
         edge = f' stroke="{stroke}" stroke-width="{sw}"' if stroke else ""
+        if opacity is not None:
+            edge += f' fill-opacity="{opacity}"'
         if dash:
             edge += f' stroke-dasharray="{dash}"'
         self.parts.append(
@@ -1433,7 +1437,9 @@ def _figure_numbers() -> dict:
     return json.loads(FIGURE_NUMBERS.read_text(encoding="utf-8"))["figures"]
 
 
-def _prediction_eyebrow(c: Canvas, t: dict[str, str], head: str, tail: tuple[str, ...]) -> None:
+def _prediction_eyebrow(
+    c: Canvas, t: dict[str, str], head: str, tail: tuple[str, ...], anchor_x: float = 1470.4
+) -> None:
     """The right-aligned mono caption, with its subscripts composed rather than written.
 
     `C₆D₆` and `DMSO-d₆` need U+2086, which no vendored subset carries -- see
@@ -1456,7 +1462,7 @@ def _prediction_eyebrow(c: Canvas, t: dict[str, str], head: str, tail: tuple[str
     # collapses TRAILING whitespace, so the pad above is silently dropped on the last run while the
     # mid-string ones survive (the C-to-D pitch measures 29 px, one cell, correctly). Padding the
     # last one unconditionally was tried first and changed nothing, which is what identified this.
-    c.runs(1470.4, 110.0, runs, anchor="end")
+    c.runs(anchor_x, 110.0, runs, anchor="end")
 
 
 def _prediction_plot(
@@ -1569,6 +1575,190 @@ def example_prediction_vanillin(t: dict[str, str]) -> str:
     )
 
 
+# --- vanillin, drawn beside its own spectrum ------------------------------------------------------
+
+#: Ring geometry, all measured. Pointy-top, so the flat sides are the ones bonds leave -- the
+#: orientation `Canvas.hexagon` already draws and the one benzene is conventionally drawn in.
+RING_C, RING_R = (333.0, 438.5), 117.8
+#: Which three edges carry the inner Kekulé bond, as (vertex angle, vertex angle) pairs.
+#: **The opposite alternation from `_banner_molecule`** -- upper-left/top, the right vertical, and
+#: lower-left/bottom, leaving the LEFT vertical bare. Both are valid Kekulé structures of benzene,
+#: but they are different drawings, and copying the banner's would silently redraw this molecule.
+KEKULE = ((210, -90), (-30, 30), (150, 90))
+SPIN_X0, SPIN_X1 = 639.0, 1565.0
+SPIN_LEFT, SPIN_RIGHT = 7.80, 6.55
+SPIN_BASE, SPIN_HEIGHT = 612.51, 350.0
+
+
+def _ring_vertex(angle: float) -> tuple[float, float]:
+    return (
+        RING_C[0] + RING_R * math.cos(math.radians(angle)),
+        RING_C[1] + RING_R * math.sin(math.radians(angle)),
+    )
+
+
+def _vanillin_molecule(c: Canvas, t: dict[str, str], rows) -> None:
+    """The ring, its substituents, and one numbered badge per aromatic proton.
+
+    Not `_banner_molecule`: that one is smaller, labels its protons `H_A/H_B/H_C`, and draws the
+    other Kekulé alternation. Same technique, different molecule drawing.
+    """
+    c.hexagon(*RING_C, RING_R, fill="none", stroke=t["ink"], sw=3.8)
+    for a, b in KEKULE:
+        (x0, y0), (x1, y1) = _ring_vertex(a), _ring_vertex(b)
+        mx, my = (x0 + x1) / 2, (y0 + y1) / 2
+        # Inset toward the ring centre, then take the middle 92 px of the edge.
+        ix, iy = RING_C[0] - mx, RING_C[1] - my
+        inorm = math.hypot(ix, iy)
+        cx, cy = mx + 22.99 * ix / inorm, my + 22.99 * iy / inorm
+        ex, ey = x1 - x0, y1 - y0
+        enorm = math.hypot(ex, ey)
+        ux, uy = 46.0 * ex / enorm, 46.0 * ey / enorm
+        c.line(
+            round(cx - ux, 2),
+            round(cy - uy, 2),
+            round(cx + ux, 2),
+            round(cy + uy, 2),
+            t["ink"],
+            3.8,
+        )
+
+    for angle, (tx, ty) in ((-90, (333.0, 271.24)), (90, (333.0, 606.76)), (-30, (484.6, 351.0))):
+        vx, vy = _ring_vertex(angle)
+        c.line(round(vx, 2), round(vy, 2), tx, ty, t["ink"], 3.8)
+    c.text(333.0, 253.0, "OH", 28.6, PLEX, 600, t["ink"])
+    c.runs(
+        496.5,
+        359.0,
+        [("OCH", PLEX, 28.6, t["ink"], 600), ("3", PLEX, 21.0, t["ink"], 600, False, 7.0)],
+    )
+    c.text(333.0, 642.0, "CHO", 28.6, PLEX, 600, t["ink"])
+
+    # Badge, its proton label, and the colour that ties both to the multiplet below. The badge
+    # numerals stay pure white in BOTH themes -- `onSolid` flips to #e2e9f4 and `card` to #1b2130,
+    # so neither token expresses this and a literal is the honest way to say "always white".
+    for row, colour, badge, label, label_x in zip(
+        rows,
+        (t["blue"], t["orange"], t["teal"]),
+        ((198.07, 520.76), (467.93, 520.76), (198.07, 357.24)),
+        ("H6", "H2", "H5"),
+        (123.5, 511.5, 123.5),
+    ):
+        c.circle(badge[0], badge[1], 20.9, colour)
+        c.text(badge[0], badge[1] + 8.0, str(row["n"]), 23.0, SG, 700, "#ffffff")
+        c.text(label_x, badge[1] + 7.24, label, 23.5, SG, 700, t["display"], "start")
+    c.text(261.5, 740.0, "Vanillin", 30.0, SG, 700, t["display"], "start")
+
+
+def _spin_system_plot(c: Canvas, t: dict[str, str], npz: Path, rows) -> None:
+    """The 7.80-6.55 ppm window, each multiplet washed in its own colour and marked."""
+    span = (SPIN_X1 - SPIN_X0) / (SPIN_LEFT - SPIN_RIGHT)
+    ppm, amp, _ = _spectrum(npz, SPIN_LEFT, SPIN_RIGHT)
+
+    # Washes first, so the trace draws over them. 0.16 of the tricolor rather than three opaque
+    # tokens -- extracting the dark twin reproduces all three measured dark hexes at that opacity.
+    # `_multiplets` orders its groups by ASCENDING ppm; `rows` run descending, as `predict.py`
+    # prints them. Zipping the two directly swaps blue and teal -- and the swap is only visible
+    # because the markers below take their colour from `rows`, so the wash and the marker for one
+    # proton end up different colours. Re-key by shift rather than trusting either order.
+    by_shift = [
+        colour
+        for _, colour in sorted(
+            zip(rows, (t["blue"], t["orange"], t["teal"])), key=lambda rc: rc[0]["shift_ppm"]
+        )
+    ]
+    for lines, colour in zip(
+        _multiplets(SPIN_X0, SPIN_X1, SPIN_HEIGHT, npz, SPIN_LEFT, SPIN_RIGHT), by_shift
+    ):
+        lo = min(cx for cx, _, _ in lines) - 10
+        hi = max(cx for cx, _, _ in lines) + 10
+        c.rect(
+            round(lo, 1),
+            185.0,
+            round(hi - lo, 1),
+            round(SPIN_BASE - 185.0, 1),
+            0,
+            colour,
+            opacity=0.16,
+        )
+
+    c.path(
+        _trace_d(SPIN_X0, SPIN_X1, SPIN_BASE, SPIN_HEIGHT, "faithful", npz, SPIN_LEFT, SPIN_RIGHT),
+        stroke=t["ink"],
+        sw=2.45,
+        ident="trace",
+    )
+    c.path(f"M {SPIN_X0} 616.25 H {SPIN_X1}", stroke=t["arrow"], sw=2.32)
+    n, tick = 0, 6.6
+    while tick <= SPIN_LEFT - 0.1:
+        x = SPIN_X0 + (SPIN_LEFT - tick) * span
+        c.path(f"M {x:.1f} 616.25 V 625.84", stroke=t["arrow"], sw=2.32)
+        c.text(round(x, 1), 651.0, f"{tick:.1f}", 21.0, PLEX, 400, t["mute"], ident=f"tick-{n}")
+        n, tick = n + 1, tick + 0.2
+    c.runs(1104.0, 697.0, [("δ [ppm]", PLEX, 24.0, t["mute"], 400, True)], anchor="middle")
+
+    # No stems on this figure's markers -- measured, the gap to each peak is pure ground.
+    for row, colour in zip(rows, (t["blue"], t["orange"], t["teal"])):
+        near = [a for p, a in zip(ppm, amp) if abs(p - row["shift_ppm"]) < 0.03]
+        apex = SPIN_BASE - max(near) * SPIN_HEIGHT
+        x = SPIN_X0 + (SPIN_LEFT - row["shift_ppm"]) * span
+        c.circle(round(x, 1), round(apex - 49.5, 1), 20.17, colour)
+
+
+def _spin_system_legend(c: Canvas, t: dict[str, str], rows) -> None:
+    """Three chips instead of a table. The couplings come from the data file, not from the artwork.
+
+    The superseded PNG printed `J 8.2` on H6 and `J 8.7` on H5 -- the same transposition its sibling
+    figure carried, from the same source. H6's `dd` is its ortho coupling to H5 (row 1's `max J`)
+    and its meta coupling to H2, which IS row 2's `max J`: one physical coupling, predicted at both
+    protons, so both numbers are derived here rather than typed.
+    """
+    ortho_h6, meta, ortho_h5 = (r["max_j_hz"] for r in rows)
+    for (x, w), row, colour, proton, coupling in zip(
+        ((621, 352), (989, 288), (1293, 290)),
+        rows,
+        (t["blue"], t["orange"], t["teal"]),
+        ("H6", "H2", "H5"),
+        (f"dd, J {ortho_h6:.1f}, {meta:.1f} Hz", f"d, J {meta:.1f} Hz", f"d, J {ortho_h5:.1f} Hz"),
+    ):
+        c.rect(x, 720, w, 50, 25, t["card"], stroke=colour, sw=2)
+        c.circle(x + 32, 745, 9, colour)
+        c.text(
+            x + 53,
+            754,
+            f"{row['n']} · {proton} — {coupling}",
+            24.0,
+            PLEX,
+            600,
+            t["display"],
+            "start",
+            ident=f"legend-{row['n']}",
+        )
+
+
+def vanillin_spin_systems(t: dict[str, str]) -> str:
+    """The molecule and its spectrum side by side, one colour per aromatic proton."""
+    spec = _figure_numbers()["example_prediction_vanillin"]
+    c = Canvas(
+        1640,
+        810,
+        "Three aromatic protons → three spin systems",
+        "Vanillin drawn from its structure with the three aromatic protons colour-coded by spin "
+        "system, H2 a meta doublet, H5 an ortho doublet, H6 a doublet-of-doublets, each linked by "
+        "colour to its multiplet in the 300 MHz 1H NMR spectrum beside it",
+        faces=("sg700", "plex400", "plex600", "mono400"),
+        ground=t["card"],
+    )
+    _masthead(c, t, "Three aromatic protons → three spin systems", 38.0, 48, 48, 104, "-0.37")
+    _prediction_eyebrow(
+        c, t, "¹H NMR · aromatic region · 300 MHz · DMSO-d", ("",), anchor_x=1587.16
+    )
+    _vanillin_molecule(c, t, spec["rows"])
+    _spin_system_plot(c, t, ROOT / spec["npz"], spec["rows"])
+    _spin_system_legend(c, t, spec["rows"])
+    return c.done()
+
+
 DIAGRAMS = {
     "banner": banner,
     "pipeline": pipeline,
@@ -1577,6 +1767,7 @@ DIAGRAMS = {
     "coupling_rule": coupling_rule,
     "benchmark": benchmark,
     "mark": mark,
+    "vanillin_spin_systems": vanillin_spin_systems,
     "example_prediction": example_prediction,
     "example_prediction_vanillin": example_prediction_vanillin,
 }
