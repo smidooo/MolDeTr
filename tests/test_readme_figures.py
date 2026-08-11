@@ -155,10 +155,16 @@ def test_every_readme_figure_is_at_least_2x_its_rendered_width():
 
 
 #: The two figures `scripts/capture_gui_media.py` owns. They are screenshots of the running app, so
-#: unlike the hand-drawn diagrams they cannot become vector -- and unlike the prediction plots, whose
-#: generators were deliberately removed in 2827cdb, they can be regenerated on demand at any scale.
-#: That makes them the only rasters for which a floor above `MIN_SCALE` is both meaningful and
-#: satisfiable, which is why the stricter bar is scoped here rather than applied globally.
+#: unlike every other figure here they cannot become vector -- and they can be regenerated on demand
+#: at any scale, which makes them the only rasters for which a floor above `MIN_SCALE` is both
+#: meaningful and satisfiable. That is why the stricter bar is scoped here rather than applied
+#: globally.
+#:
+#: This used to add "unlike the prediction plots, whose generators were deliberately removed in
+#: 2827cdb". That stopped being true when `example_prediction` and `example_prediction_vanillin`
+#: were re-authored as SVG in `scripts/build_diagram_svgs.py`: they have a generator again, and
+#: having left the raster floor entirely through the viewBox exemption, they are no longer rasters
+#: at all. `vanillin_spin_systems.png` is the last figure still in that state.
 APP_CAPTURES = ("docs/img/gui.png", "docs/img/demo.gif")
 CAPTURE_MIN_SCALE = 3.0
 
