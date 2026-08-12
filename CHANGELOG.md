@@ -7,6 +7,40 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The vendored diagram fonts are rebuilt from a checked-in script, with the character set read out
+  of the diagrams.** Closes six of the eight characters in
+  [#84](https://github.com/smidooo/MolDeTr/issues/84): `Δ` (twice), `•`, `↕`, `−` and `✓` now come
+  from an embedded face instead of falling through to whatever the reader's OS supplies.
+
+  The point is not the six. `docs/fonts/README.md` described the subsetting as prose — a manual
+  `fontTools` session with a hand-typed character list — and that list aged behind the diagrams it
+  described until five figures printed characters no face carried. Re-subsetting by hand would have
+  fixed the eight and left the mechanism. `scripts/build_diagram_fonts.py` derives the set from the
+  committed SVGs instead, unioned with what the faces already carried so coverage can only grow.
+
+  Pinned, because each one was a way to be silently wrong: the upstream `google/fonts` commit and
+  each source TTF's SHA-256 (outlines can be revised under a diff that shows only base64); and the
+  build is byte-reproducible, which took `recalcTimestamp = False` — `head.modified` is a wall-clock
+  stamp re-applied at save time, so two builds a second apart differed. That would have disarmed
+  `FONT_SHA256` by teaching a human to paste a new hash without reading it, which is how the
+  original list rotted.
+
+  `sg500.woff2` is gone — embedded by nothing, yet hash-pinned as though it mattered. `fonttools[woff]`
+  is now a declared `dev` dependency; it had been resolving only by accident, transitively through
+  matplotlib and gradio.
+
+  **The other two needed the generator, not the font**, and measuring is what showed that: `✕`
+  U+2715 is in **no** family here, and `∅` U+2205 is in **Space Grotesk only** while the run
+  printing it is Plex-Sans-only. So `coupling_rule` now prints `×` U+00D7 — covered everywhere,
+  conventional beside a checkmark, sized to the checkmark rather than to the glyph it replaced — and
+  `architecture` splits its bullet, keeping the prose in Plex Sans and emitting `∅` as a `<tspan>`
+  in the Space Grotesk stack. A deliberate single-glyph face change, in place of the browser making
+  the same substitution invisibly from whatever the reader's OS holds.
+
+  `KNOWN_UNCOVERED` is now empty and stays in the suite as an exact-set assertion, so **every
+  character every diagram prints comes from a font that diagram embeds** — and a new uncoverable one
+  fails against it. Closes [#84](https://github.com/smidooo/MolDeTr/issues/84).
+
 - **`vanillin_spin_systems` is vector, and its legend no longer transposes two couplings.** The last
   README figure at the 2.00x floor. Its legend printed `J 8.2` on H6 and `J 8.7` on H5 — the same
   transposition its sibling figure carried, from the same source. Both couplings now derive from
