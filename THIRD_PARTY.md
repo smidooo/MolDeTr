@@ -70,7 +70,7 @@ Three families, in two places, all base64-embedded rather than fetched.
 | **Copyright** | © 2020 The Space Grotesk Project Authors · © 2017 IBM Corp. |
 | **Licence** | **SIL Open Font License 1.1** for all three. OFL permits bundling and redistribution; it requires the licence to travel with the font data — and base64-embedding a subset *is* distributing font data — and forbids selling the font on its own. Neither family carries a Reserved Font Name, so subsetting under the original family name is compliant. This is not a copyleft obligation on the surrounding Apache-2.0 code. |
 | **Where — app** | `app_ui/fonts/SpaceGrotesk-latin-var.woff2` (22 KB, latin subset, weight axis intact), embedded as a `data:` URI by `app_ui/theme.py`. Licence at `app_ui/fonts/OFL.txt`; provenance at `app_ui/fonts/README.md`. |
-| **Where — diagrams** | `docs/fonts/{sg500,sg700,plex400,plex600,mono400}.woff2`, embedded into the generated SVGs by `scripts/build_diagram_svgs.py`. Licences at `docs/fonts/OFL-{SpaceGrotesk,IBMPlexSans,IBMPlexMono}.txt`; provenance at `docs/fonts/README.md`. |
+| **Where — diagrams** | `docs/fonts/{sg700,plex400,plex600,mono400}.woff2`, embedded into the generated SVGs by `scripts/build_diagram_svgs.py`. Licences at `docs/fonts/OFL-{SpaceGrotesk,IBMPlexSans,IBMPlexMono}.txt`; provenance at `docs/fonts/README.md`. |
 | **Status** | **present and distributed** in the repository; none of it is in the wheel, since neither `app_ui` nor `docs` is a packaged module |
 
 ### Why the app font is vendored rather than fetched
