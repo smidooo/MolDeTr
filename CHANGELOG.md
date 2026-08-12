@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [1.4.2] - 2026-08-12
+
 ### Changed
 - **The vendored diagram fonts are rebuilt from a checked-in script, with the character set read out
   of the diagrams.** Closes six of the eight characters in
