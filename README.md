@@ -461,7 +461,7 @@ button uses it.
 **Paper.** Open access under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) — *Analytical
 Chemistry*, published 4 August 2026, DOI
 [10.1021/acs.analchem.5c03465](https://doi.org/10.1021/acs.analchem.5c03465). The
-[Supporting Information](https://pubs.acs.org/doi/10.1021/acs.analchem.5c03465) is free to download.
+[Supporting Information](https://pubs.acs.org/doi/suppl/10.1021/acs.analchem.5c03465/suppl_file/ac5c03465_si_001.pdf) is free to download.
 
 **Code.** Apache-2.0, at <https://github.com/smidooo/MolDeTr>, archived at Zenodo
 (DOI [10.5281/zenodo.21214876](https://doi.org/10.5281/zenodo.21214876)). The trained weights are deposited
@@ -471,7 +471,7 @@ with the data (concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zen
 ground-truth spin-system annotations and metadata, is at Zenodo
 (concept DOI [10.5281/zenodo.21217101](https://doi.org/10.5281/zenodo.21217101), all versions). The metadata follow the format
 used in the Supporting Information; full curation details are in
-[Supporting Information Section 4.4](https://pubs.acs.org/doi/10.1021/acs.analchem.5c03465).
+[Supporting Information Section 4.4](https://pubs.acs.org/doi/suppl/10.1021/acs.analchem.5c03465/suppl_file/ac5c03465_si_001.pdf).
 
 ## License
 Apache License 2.0; see [`LICENSE`](LICENSE). © 2026 Nicolas Schmid and the MolDeTr authors.

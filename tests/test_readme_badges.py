@@ -35,8 +35,18 @@ import pytest
 REPO = Path(__file__).resolve().parent.parent
 README = REPO / "README.md"
 
+#: Every committed page that offers the reader a "Supporting Information" link.
+SI_LINKING_PAGES = (README, REPO / "docs" / "index.md")
+
 #: The software *concept* DOI — stable across every release, unlike the per-version DOI.
 CONCEPT_DOI = "10.5281/zenodo.21214876"
+
+#: ACS serves the SI as its own file. The article DOI resolves to the *landing page*, which is a
+#: different resource entirely — it renders the abstract, and a reader sent there to find
+#: "Section 4.4" has to go looking. `/doi/suppl/…/suppl_file/…` is the DOI-derived path to the PDF
+#: itself; the `/ancham/article-supplement/5242316/…` form works too but is keyed to an ACS-internal
+#: article id rather than the DOI, so it does not survive a site reorganisation.
+SI_PATH_MARKERS = ("/doi/suppl/", "suppl_file")
 
 #: Hosts that combine a no-cache badge response with a per-IP rate limit. Serving a README image
 #: from one of these is a slow-motion outage: it renders until GitHub's shared pool exhausts the
@@ -61,6 +71,47 @@ def test_readme_images_avoid_rate_limited_hosts():
         f"{len(offenders)} README image(s) are served from a rate-limited, no-cache host and will "
         f"intermittently render as `Invalid upstream response (429)`: {offenders}. "
         f"Use an equivalent img.shields.io badge, which is CDN-cached (max-age=432000)."
+    )
+
+
+def _si_links(markdown: str) -> list[tuple[str, str]]:
+    """`(anchor text, url)` for every Markdown link that offers the Supporting Information.
+
+    Selected on the **anchor text**, deliberately, because the URL is the thing under test: a
+    selector that matched on the URL would stop matching exactly when the URL went wrong, and the
+    guard would pass by finding nothing.
+    """
+    links = re.findall(
+        r"\[([^\]]*[Ss]upporting [Ii]nformation[^\]]*)\]\(\s*([^)\s]+)\s*\)", markdown
+    )
+    return [(text, url) for text, url in links]
+
+
+@pytest.mark.unit
+def test_supporting_information_links_point_at_the_si_not_the_article():
+    """The SI is a separate file; the article DOI resolves to the landing page.
+
+    Both are live URLs, so no link checker can tell them apart — and this repo's cannot even try:
+    `.github/workflows/integrations.yml` excludes `pubs.acs.org` from lychee because ACS answers
+    automated clients with 403, and the one DOI check hits the Handle API, which validates that a
+    DOI is *registered*, not that a link goes where its text claims. That is the gap this fills.
+    """
+    offenders: list[str] = []
+    checked = 0
+    for page in SI_LINKING_PAGES:
+        for text, url in _si_links(page.read_text(encoding="utf-8")):
+            checked += 1
+            if not all(marker in url for marker in SI_PATH_MARKERS):
+                offenders.append(f"{page.relative_to(REPO).as_posix()}: [{text}]({url})")
+
+    assert checked, (
+        "no Supporting Information link was found on any page, so this guard proved nothing. "
+        f"Expected at least one in {[p.name for p in SI_LINKING_PAGES]}."
+    )
+    assert not offenders, (
+        f"{len(offenders)} link(s) labelled 'Supporting Information' do not resolve to the SI "
+        f"file: {offenders}. The article DOI lands on the abstract page instead — which is a live "
+        f"URL, so nothing else in CI can catch this."
     )
 
 

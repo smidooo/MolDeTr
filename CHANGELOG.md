@@ -106,6 +106,25 @@ All notable changes to this project are documented here. The format is based on
   generator deleted in `2827cdb`, in a column its caption describes as a prediction.
 
 ### Fixed
+- **Three links labelled "Supporting Information" led to the article's abstract page, not the SI.**
+  `README.md` (twice) and `docs/index.md` all pointed at `pubs.acs.org/doi/10.1021/acs.analchem.5c03465`,
+  which is the landing page; the SI is a separate file. The worst of the three promised
+  "Supporting Information **Section 4.4**" and left the reader on the abstract to go looking. All
+  three now resolve to `…/doi/suppl/…/suppl_file/ac5c03465_si_001.pdf`.
+
+  **Nothing in CI could have caught this, and that is the more useful half.** Both `doi.org` and
+  `pubs.acs.org` are excluded from the link checker — correctly, because ACS answers automated
+  clients with 403 (measured: 403 in 5,691 bytes, no redirect) — and the surviving DOI check queries
+  the Handle API, which confirms a DOI is *registered*, not that a link goes where its text says.
+  A wrong-but-live URL sits exactly in that gap. `test_supporting_information_links_point_at_the_si_not_the_article`
+  closes it offline, selecting links by **anchor text** and asserting on the **URL**, so the guard
+  cannot go blind at the moment the URL is what breaks. It carries a non-vacuity assert for the same
+  reason, and was mutation-checked by reverting one link.
+
+  Prefer the DOI-derived `/doi/suppl/…` form over `/ancham/article-supplement/5242316/…`: the latter
+  is keyed to an ACS-internal article id rather than the DOI, and will not survive a site
+  reorganisation.
+
 - **The banner's `T₂` was a code point no embedded font carries**, so the README hero's assignment
   table rendered its subscript in whatever face the reader's OS supplied. Composed instead, the way
   the same generator already built the identical label forty lines below.
