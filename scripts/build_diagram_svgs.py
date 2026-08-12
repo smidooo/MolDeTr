@@ -230,9 +230,9 @@ FACES = (
 #: named second; in a `MONO` run it has nowhere to go, since `MONO` names no Plex face at all. A
 #: single union would call that safe. `tests/test_diagram_fonts.py` holds every committed SVG to it.
 GLYPHS = {
-    "Space Grotesk": "°±²³·¹Å×÷–—‘’“”…→≤≥",
-    "IBM Plex Sans": "°±²³·¹Å×÷δ–—‘’“”…→≤≥",
-    "IBM Plex Mono": "°±²³·¹Å×÷–—‘’“”…→≤≥",
+    "Space Grotesk": "°±²³·¹Å×÷Δ–—‘’“”•…→↕∅−≤≥",
+    "IBM Plex Sans": "°±²³·¹Å×÷Δδ–—‘’“”•…→↕−≤≥✓",
+    "IBM Plex Mono": "°±²³·¹Å×÷–—‘’“”•…→↕−≤≥✓",
 }
 
 
@@ -769,14 +769,26 @@ def architecture(t: dict[str, str]) -> str:
     c.rect(1074, 226, 396, 360, 22, t["page"], t["border"], sw=3)
     c.text(1272, 264, "Per-query heads", 25, SG, 700, t["display"])
     bullets = [
-        (320, "• multiplet / ∅", None),
+        # `∅` is carried by Space Grotesk ONLY, and this run is Plex-Sans-only -- so it is split
+        # across two families rather than reworded. DETR's no-object symbol is worth keeping.
+        (320, ("• multiplet / ", "∅"), None),
         (368, "• δ chemical shift", None),
         (416, "• J embedding ", "[sum,min,max,std]"),
         (464, "• proton count (class)", None),
         (512, "• line width", None),
     ]
     for y, label, mono in bullets:
-        if mono is None:
+        if isinstance(label, tuple):
+            # Prose in Plex Sans, then one symbol in the Space Grotesk stack. A deliberate,
+            # single-glyph face change beats the alternative, which is the browser making the same
+            # substitution invisibly from whatever the reader's OS happens to hold.
+            # Weight 700 stated explicitly, because it is what will paint either way: the only
+            # Space Grotesk face any diagram embeds is `sg700`. Left at the inherited 400 the
+            # markup would claim a weight that is not present, render bold regardless, and change
+            # behaviour the day a 400 face is vendored.
+            prose, symbol = label
+            c.runs(1105, y, [(prose, PLEX, 23, t["ink"]), (symbol, SG, 23, t["ink"], 700)])
+        elif mono is None:
             c.text(1105, y, label, 23, PLEX, 400, t["ink"], anchor="start")
         else:
             c.runs(1105, y, [(label, PLEX, 23, t["ink"]), (mono, MONO, 19, t["mute"])])
@@ -898,7 +910,16 @@ def coupling_rule(t: dict[str, str]) -> str:
 
     c.text(112, 220, "✓", 30, PLEX, 600, t["teal"])
     c.text(142, 220, "Complete spin system", 28.3, SG, 700, t["tealText"], anchor="start")
-    c.text(934, 220, "✕", 26, PLEX, 600, t["brick"])
+    # U+00D7, not U+2715. No vendored face carries U+2715 -- measured against all three upstream
+    # cmaps, not merely absent from the subset -- so it would resolve to the reader's system font,
+    # in the one figure whose entire semantic content is these two marks. U+00D7 is covered by all
+    # three families and is the conventional rejection marker beside a checkmark. Sized to the
+    # checkmark rather than to the glyph it replaces: at 30 the multiplication sign measured 13.2
+    # units of ink height against the checkmark's 20.7, so it read as an afterthought beside it.
+    # 47 = 30 x (20.7 / 13.2), i.e. the size at which the two marks stand the same height -- taken
+    # off the render, not guessed, because "looks about right" is what put a 1.57x mismatch on a
+    # figure whose entire content is these two marks.
+    c.text(934, 220, "×", 47, PLEX, 600, t["brick"])
     c.text(964, 220, "Partner outside → wrong", 28.3, SG, 700, t["brick"], anchor="start")
 
     # The windows. Dashed, because a region of interest is a choice the user draws, not a feature

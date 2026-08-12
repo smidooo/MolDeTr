@@ -97,6 +97,15 @@ dev = [
     # 3.11+ and this package supports 3.10, so the backport keeps that coverage on the oldest
     # supported interpreter instead of skipping it exactly where a packaging slip is likeliest.
     "tomli>=2.0; python_version < '3.11'",
+    # scripts/build_diagram_fonts.py rebuilds the vendored diagram subsets. It resolved before this
+    # line only by accident -- fontTools arrives transitively via matplotlib, brotli via gradio --
+    # so the font build worked or not depending on which extras happened to be installed.
+    # `[woff]` is what pulls brotli, without which `flavor = "woff2"` fails at save time.
+    # Note this DOES reach the test environment -- every CI job installs `.[dev,app]` and there is
+    # no separate `test` extra. That is deliberate: it lets the cmap check in
+    # tests/test_diagram_fonts.py run in CI rather than skip. The rest of that file still reads
+    # only committed bytes and pinned tables, so the per-figure guard never depends on it.
+    "fonttools[woff]>=4.40",
 ]
 # Opt-in Playwright browser e2e (tests/e2e/, run with `-m browser`; needs `playwright install chromium`).
 browser = [

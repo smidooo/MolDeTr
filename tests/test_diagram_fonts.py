@@ -42,14 +42,12 @@ _SVG_NS = "{http://www.w3.org/2000/svg}"
 #: xfail and the suite would still be green. Equality catches both directions: a character that
 #: appears and one that is repaired both fail here until this table is updated to match.
 #:
-#: Inventory and the reason it is not simply fixed: https://github.com/smidooo/MolDeTr/issues/84
-KNOWN_UNCOVERED = {
-    "architecture": {0x2022, 0x2195, 0x2205},
-    "banner": {0x0394},
-    "benchmark": {0x0394},
-    "coupling_rule": {0x2713, 0x2715},
-    "input_contract": {0x2212},
-}
+#: **Empty, and that is the assertion.** Issue #84 -- eight characters across five figures
+#: -- is closed: six by re-subsetting (`scripts/build_diagram_fonts.py`) and two by the
+#: generator, because no upstream face carries U+2715 and only Space Grotesk carries
+#: U+2205. Kept rather than deleted so a newly-introduced uncoverable character fails
+#: against `{}`. History: https://github.com/smidooo/MolDeTr/issues/84
+KNOWN_UNCOVERED: dict[str, set[int]] = {}
 
 #: SHA-256 of each vendored face, so `GLYPHS` cannot drift from the binaries it describes.
 #:
@@ -57,15 +55,17 @@ KNOWN_UNCOVERED = {
 #: below proves every printed character is covered, never that a claimed character exists. A
 #: re-subset that silently dropped `δ` would leave `GLYPHS` claiming it, `--check` green (you
 #: regenerated), and `pipeline.svg`'s "δ · J" resolving to the reader's system face. Hashing is what
-#: closes that: re-subsetting fails here until a human re-derives the table. A fontTools cmap test
-#: would be stronger still, but fontTools is not a declared dependency and would *skip* in CI --
-#: which is the failure mode this whole file exists to avoid.
+#: closes that: re-subsetting fails here until a human re-derives the table.
+#:
+#: This used to add "a fontTools cmap test would be stronger, but fontTools is not a declared
+#: dependency and would *skip* in CI". That stopped being true when `fonttools[woff]` joined
+#: the `dev` extra, which every CI job installs -- so the cmap check at the bottom of this file
+#: runs there, and it is the only thing verifying `GLYPHS`'s *content* rather than its bytes.
 FONT_SHA256 = {
-    "mono400.woff2": "2e797d1fe1a85b9b14a55fb4356c265dc3c9ecd28998a906702d8511051c432f",
-    "plex400.woff2": "58d742444dd06e2454a1581b236fa32bb9814bc8b3af13da1865880c0a434f4e",
-    "plex600.woff2": "bf4757bddfae9b8a6eb07ed4080133113a5d771ba2d277c9ca3e7abab23b92a9",
-    "sg500.woff2": "e1d61779e6ac662f78122695032e6f76cf2fd0eed06c227f6bc5ef6c1009fef0",
-    "sg700.woff2": "804f8136f100584155d8c92ebd5173691c1eeaf84f8044f13424320fa0dbfa53",
+    "mono400.woff2": "2888c1ecc1b8394052c06ba18e1b87ce16798b1b835f066b1d42fab2e9d8d668",
+    "plex400.woff2": "64871baba0f990153c90b4207339860ba93d95766b491e95241667e8854098be",
+    "plex600.woff2": "f3f2d0e77db68d03a18153bb1c922fbfa49998e9e5c789be2c078f50a8d5530d",
+    "sg700.woff2": "2b09d6676c40a739eee11bd555194e8130808ed289b9566e1d2c875a4f3e3c05",
 }
 
 
@@ -156,13 +156,19 @@ def test_printed_characters_match_the_fonts_each_figure_embeds(path: Path) -> No
             "  NEW, and a real defect: "
             + ", ".join(f"U+{c:04X} {chr(c)!r}" for c in appeared)
             + "\n    Compose it instead of writing the code point — `Canvas.sub` and the `dy` run "
-            "in `Canvas.runs` exist for this. Re-subsetting the fonts is a much larger change: it "
-            "rewrites the base64 payload of every committed SVG.\n"
+            "in `Canvas.runs` exist for this, and that is how the banner's subscript was fixed.\n"
+            "    (2) Re-subset: `python scripts/build_diagram_fonts.py --tables`, paste "
+            "GLYPHS + FONT_SHA256, then rerun `build_diagram_svgs.py`. Mind the ordering "
+            "-- the font build reads the COMMITTED SVGs, so a newly added character needs "
+            "svgs then fonts then svgs.\n"
+            "    (3) If no upstream face carries it at all, neither route works: substitute a "
+            "covered character, or emit it in a family that has one, as `U+00D7` and "
+            "`U+2205` were.\n"
             if appeared
             else ""
         )
         + (
-            "  REPAIRED, so delete it from KNOWN_UNCOVERED (and from issue #84): "
+            "  REPAIRED, so delete it from KNOWN_UNCOVERED: "
             + ", ".join(f"U+{c:04X} {chr(c)!r}" for c in repaired)
             + "\n"
             if repaired
@@ -251,3 +257,47 @@ def test_every_committed_svg_belongs_to_a_diagram_that_still_exists() -> None:
         f"  on disk but not generated (orphaned, verified by nothing): {sorted(on_disk - expected)}\n"
         f"  generated but not committed: {sorted(expected - on_disk)}"
     )
+
+
+@pytest.mark.unit
+def test_the_glyph_table_matches_what_the_vendored_binaries_actually_carry() -> None:
+    """``GLYPHS`` is hand-transcribed from ``--tables``; this checks it against the binaries.
+
+    The one remaining human link in the chain. ``FONT_SHA256`` pins *bytes*, not claims, so a
+    character added to ``GLYPHS`` that the font does not carry passes everything else here -- the
+    hash is unchanged and the per-figure check believes the table -- and ships as a silent fallback
+    in a published figure. Both directions are asserted, because they fail differently:
+    over-claiming hides a defect, under-claiming makes a correct figure look broken.
+
+    It also pins the assumption ``_uncovered`` rests on but never states. That function skips every
+    code point below 0x80 on the strength of "every subset covers printable ASCII in full
+    (measured)" -- measured once, by hand. Now measured on every run.
+
+    Needs fontTools, which reaches CI through the ``dev`` extra; see ``FONT_SHA256`` above for why
+    that is deliberate rather than incidental. It degrades to a skip elsewhere, and nothing else in
+    this file ever does.
+    """
+    ttlib = pytest.importorskip("fontTools.ttLib", reason="fontTools ships in the dev extra")
+
+    for stem, family, _weight in FACES:
+        cmap = set(ttlib.TTFont(FONT_DIR / f"{stem}.woff2").getBestCmap())
+
+        carried = {c for c in cmap if c > 0x7F}
+        claimed = {ord(ch) for ch in GLYPHS[family]}
+        assert carried == claimed, (
+            f"{stem}.woff2 disagrees with GLYPHS[{family!r}].\n"
+            "  carried but not claimed: "
+            + (", ".join(f"U+{c:04X} {chr(c)!r}" for c in sorted(carried - claimed)) or "none")
+            + "\n  claimed but not carried: "
+            + (", ".join(f"U+{c:04X} {chr(c)!r}" for c in sorted(claimed - carried)) or "none")
+            + "\nRe-derive with `python scripts/build_diagram_fonts.py --tables`; never edit "
+            "GLYPHS by hand."
+        )
+
+        ascii_gap = set(range(0x20, 0x7F)) - cmap
+        assert not ascii_gap, (
+            f"{stem}.woff2 is missing printable ASCII: "
+            + ", ".join(f"U+{c:04X} {chr(c)!r}" for c in sorted(ascii_gap))
+            + ". `_uncovered` skips every character below 0x80 assuming all of it is covered, so a "
+            "gap here is invisible to every per-figure check in this file."
+        )

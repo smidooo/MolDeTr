@@ -5,7 +5,7 @@ vendored rather than fetched so that no third-party host sits in the render path
 
 ## Why this exists separately from `docs/fonts/`
 
-`docs/fonts/` holds *diagram* subsets — static single weights (`sg500`, `sg700`), pinned with
+`docs/fonts/` holds *diagram* subsets — a static single weight (`sg700`), pinned with
 `fontTools` and cut down to the glyphs the SVGs use. Those cannot serve the app, whose UI text is
 arbitrary. This file is the full latin subset with the weight axis intact, so one 22 KB payload
 covers every weight `CUSTOM_CSS` asks for.
