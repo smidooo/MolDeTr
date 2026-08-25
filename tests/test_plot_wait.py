@@ -95,9 +95,9 @@ class TestFormatTargetDeath:
         last = HEALTHY_SAMPLE
         report = format_target_death([earlier, last], 12.3, RuntimeError("Target crashed"))
         assert '"plotlyLoaded": True' in report or "'plotlyLoaded': True" in report
-        assert (
-            "'box': '0x0'" not in report and '"box": "0x0"' not in report
-        ), "only the LAST sample belongs in the report"
+        assert "'box': '0x0'" not in report and '"box": "0x0"' not in report, (
+            "only the LAST sample belongs in the report"
+        )
 
     def test_does_not_claim_the_canvas_never_appeared(self) -> None:
         """REGRESSION: this exact false claim shipped in #78's failure message, because the
@@ -216,4 +216,3 @@ class TestSlicedWait:
 
         sliced_wait(lambda: {}, flaky_wait, clock=_TickClock(step_s=2.0))
         assert calls["n"] == 3
-
