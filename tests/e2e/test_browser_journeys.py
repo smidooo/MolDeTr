@@ -19,6 +19,8 @@ import pytest
 pytest.importorskip("playwright")
 from playwright.sync_api import Page, expect  # noqa: E402
 
+from tests.plot_wait import sliced_wait  # noqa: E402
+
 pytestmark = pytest.mark.browser
 
 DETECT = "Detect multiplets"
@@ -131,34 +133,29 @@ def test_download_buttons_deliver_the_detected_rows(page: Page, served_app_url: 
 
 
 def _expect_plotly_or_report(page: Page):
-    """Wait for the Plotly canvas, and on timeout say what the DOM actually contained.
+    """Wait for the Plotly canvas, sampling the DOM while it waits, and report honestly on failure.
 
-    `browser e2e (webkit)` has failed here twice — the #41 merge run (31247518046) and the #49 merge
-    run (31266452657) — both times as a bare "Locator expected to be visible", which cannot
-    distinguish *Plotly drew late* from *Plotly never ran*. Both retained traces answer it the same
-    way, and identically to each other: `js-plotly-plot`, `plotly` and `main-svg` appear in **none**
-    of the 15 DOM snapshots across the full 30 s, while `#md-plot` itself is present, and a
-    `ResizeObserver loop completed with undelivered notifications` pageError fires ~1.9 s in. So
-    Plotly never initialises, and a resize notification is provably dropped.
+    `browser e2e (webkit)` has failed around this wait four times, in two distinct classes:
 
-    That signature is reproducible, but its cause is not established and it does not reproduce
-    locally — chromium, firefox and webkit all pass here. Rather than guess a fix and then be unable
-    to tell whether a green lane meant anything, this puts the measurement in the failure message:
-    the next occurrence reports the container's geometry, its child count, and whether `window.Plotly`
-    even loaded — without depending on someone downloading a trace inside its 7-day retention.
+    - **Plotly never initialised** — the #41 merge run (31247518046) and the #49 merge run
+      (31266452657): the page lives out the full 30 s, `window.Plotly` never appears, and a
+      `ResizeObserver loop completed with undelivered notifications` pageError fires ~1.9 s in.
+      The diagnostic answers this truthfully after a timeout.
+    - **The browser target dies** — the #78 merge run (31483547839) and the #92 merge run
+      (31585679098): the webkit process dies seconds into the journey. Against a dead target the
+      post-hoc diagnostic could only ever raise `Target crashed` itself, so this wrapper reported
+      "the Plotly canvas never appeared within 30 s" about a page that had stopped existing at
+      ~1.9 s.
 
-    Raises `AssertionError(...) from exc` rather than calling `pytest.fail`, matching the fix this
-    repo already applied for CodeQL's `py/uninitialized-local-variable`: `pytest.fail` is not
-    recognised as `NoReturn`.
+    The mechanics live in `tests.plot_wait.sliced_wait` (unit-pinned there): short slices with a
+    probe between them, target-death classified against five driver phrasings, everything else
+    propagating unchanged, and the last playwright call log chained onto the timeout report.
     """
     plot = page.locator("#md-plot .js-plotly-plot")
-    try:
-        expect(plot).to_be_visible(timeout=30_000)
-    except AssertionError as exc:
-        state = plot_diagnostic_state(page)
-        raise AssertionError(
-            f"the Plotly canvas never appeared within 30 s. #md-plot at timeout: {state}"
-        ) from exc
+    sliced_wait(
+        lambda: plot_diagnostic_state(page),
+        lambda slice_s: expect(plot).to_be_visible(timeout=slice_s),
+    )
     return plot
 
 
