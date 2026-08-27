@@ -1,10 +1,11 @@
-"""The dependency audit must be able to produce a result at all.
+"""The dependency audit must be able to produce a result at all, and now must be able to fail.
 
-`security.yml`'s audit step is deliberately report-only -- `continue-on-error: true` -- while the
-noise floor of a torch-sized transitive tree is unknown. That is a defensible choice, and it is also
-what hid this: the lane has run **once** in the repository's history (the only non-`pull_request`
-`security.yml` run; the job is gated `if: github.event_name != 'pull_request'`), and in that run
-`pip-audit` produced **no audit at all**. Measured 2026-08-08 from the job log::
+`security.yml`'s audit step was report-only -- `continue-on-error: true` -- while the noise floor of
+a torch-sized transitive tree was unknown. That was a defensible choice, and it is also what hid
+this: at the time it was made, the lane had run **once** in the repository's history (the only
+non-`pull_request` `security.yml` run so far; the job is gated `if: github.event_name !=
+'pull_request'`), and in that run `pip-audit` produced **no audit at all**. Measured 2026-08-08 from
+the job log::
 
     Run pip-audit --strict --desc --format columns          08:04:29
     ERROR:pip_audit._cli:moldetr: Dependency not found on   08:04:30
@@ -37,6 +38,12 @@ little as before -- the very defect class it was written to catch.
 
 The invariant is therefore about ``--strict`` itself: this project always has at least one skipped
 dependency by construction, so ``--strict`` guarantees no audit output rather than a stricter audit.
+
+**Promoted to a ratchet 2026-08-27.** The noise floor was measured (four non-``pull_request`` runs,
+all reporting one stable finding -- see ``.github/pip-audit-baseline.json``), so the step no longer
+carries ``continue-on-error``; ``scripts/pip_audit_ratchet.py`` decides pass/fail against the
+baseline. ``tests/test_pip_audit_ratchet.py`` covers that comparator directly; the tests below cover
+only the workflow wiring around it.
 
 Reads only the committed workflow, so it needs no network and cannot skip itself.
 """
@@ -106,4 +113,34 @@ def test_pip_audit_skips_the_editable_self_install():
         + "\n  ".join(missing)
         + "\n`moldetr` is installed editable and can never be resolved on PyPI, so every run reports "
         "it as unauditable. Skipping it explicitly keeps the advisory output about dependencies."
+    )
+
+
+@pytest.mark.unit
+def test_pip_audit_step_no_longer_continues_on_error():
+    """A step that cannot fail is not a ratchet -- see .github/pip-audit-baseline.json."""
+    lines = SECURITY_WORKFLOW.read_text(encoding="utf-8").splitlines()
+    offenders = [line for line in lines if line.strip() == "continue-on-error: true"]
+    assert not offenders, (
+        "security.yml still has a `continue-on-error: true` step. The dependency-audit job was "
+        "promoted to a baseline ratchet 2026-08-27 (scripts/pip_audit_ratchet.py) and must be able "
+        "to fail on a genuinely new advisory; re-adding continue-on-error recreates defect #43."
+    )
+
+
+@pytest.mark.unit
+def test_pip_audit_produces_json_for_the_ratchet():
+    calls = _pip_audit_invocations(SECURITY_WORKFLOW.read_text(encoding="utf-8"))
+    assert any("--format json" in call for call in calls), (
+        "no `pip-audit ... --format json` invocation found; scripts/pip_audit_ratchet.py needs "
+        "machine-readable output to diff against .github/pip-audit-baseline.json"
+    )
+
+
+@pytest.mark.unit
+def test_ratchet_script_is_invoked():
+    text = SECURITY_WORKFLOW.read_text(encoding="utf-8")
+    assert "pip_audit_ratchet.py" in text, (
+        "security.yml no longer invokes scripts/pip_audit_ratchet.py -- the audit step can produce "
+        "JSON but nothing decides pass/fail against the baseline"
     )
