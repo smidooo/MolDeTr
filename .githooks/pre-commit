@@ -1,0 +1,52 @@
+#!/bin/sh
+# Refuse a commit that breaks the paper-median reproduction, but ONLY when the staged set touches
+# a path that guard actually covers -- most commits pay nothing.
+#
+# The pinning assertion already exists (tests/test_scripts.py::test_aggregate_reproduces_paper_medians)
+# and this hook has exactly one job: run it, and only it, when relevant. It does not reimplement the
+# check, so the assertion has one home and this hook cannot drift from it.
+#
+# Why this is safe to run without `moldetr` installed: `scripts/aggregate_experimental.py` imports
+# only argparse/json/statistics/pathlib (verified by reading the file, not assumed), and
+# `tests/conftest.py` -- loaded by pytest before collecting anything under `tests/` -- imports
+# numpy/torch only inside fixture bodies, never at module scope. Measured directly: this one test
+# node id passes in a bare venv containing nothing but `pytest`. So the only real precondition here
+# is `python` + `pytest` on PATH, not a full dev install.
+#
+# `.githooks/` is TRACKED and wired via `core.hooksPath` (scripts/install_hooks.py), unlike the
+# adjacent `.git/hooks/commit-msg`, which is untracked and silently absent on every fresh clone --
+# this file exists to not repeat that.
+
+set -e
+
+changed=$(git diff --cached --name-only --diff-filter=ACMR)
+
+relevant=$(printf '%s\n' "$changed" | grep -E '^(scripts/aggregate_experimental\.py|structured_output/experimental_matched_pairs\.json|moldetr/postprocess\.py)$' || true)
+
+if [ -z "$relevant" ]; then
+  exit 0
+fi
+
+echo "pre-commit: staged changes touch a paper-median input:"
+printf '%s\n' "$relevant" | sed 's/^/pre-commit:   /'
+echo "pre-commit: running the reproduction test..."
+
+if ! command -v pytest >/dev/null 2>&1 && ! python -m pytest --version >/dev/null 2>&1; then
+  echo "pre-commit: neither 'pytest' nor 'python -m pytest' is available in this environment."
+  echo "pre-commit: the hook cannot verify the paper-median reproduction without it. Activate your"
+  echo "pre-commit: dev environment (pytest is in the 'dev' extra), or commit with --no-verify if"
+  echo "pre-commit: you are certain this commit does not change the reproduced numbers."
+  exit 1
+fi
+
+if python -m pytest -q tests/test_scripts.py::test_aggregate_reproduces_paper_medians; then
+  echo "pre-commit: paper-median reproduction test passed."
+  exit 0
+fi
+
+echo "pre-commit: the paper-median reproduction test FAILED."
+echo "pre-commit: this commit touches a path this project's frozen-config rule ties directly to"
+echo "pre-commit: the published numbers (|dd| 0.90 Hz / |dJ| 0.20 Hz / proton-count 93.5%)."
+echo "pre-commit: fix the regression, or if this is a deliberate, reviewed re-export, update"
+echo "pre-commit: CLAUDE.md's frozen-config rule and this commit message accordingly first."
+exit 1
