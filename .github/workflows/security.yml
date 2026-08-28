@@ -175,3 +175,25 @@ jobs:
             CodeQL static analysis and the `pip-audit` dependency scan, which fails on any advisory
             not already recorded in `.github/pip-audit-baseline.json`.
           token: ${{ github.token }}
+
+  # This lane also has `schedule:` above and carries the identical 60-day silent-disable exposure
+  # `nightly.yml` and `integrations.yml` document -- it just never said so.
+  #
+  # Restricted to `schedule` and `workflow_dispatch` specifically, NOT the broader
+  # `!= 'pull_request'` that `dependency-audit` uses: this job's whole point is "the scheduled check
+  # ran", and this workflow also triggers on `push: branches: [main]`. Every merged PR would
+  # otherwise ping the switch too, resetting its timer on unrelated activity -- so a corrupted cron
+  # expression or a silently disabled schedule would hide behind the next merge's push-triggered
+  # run and never trip the alert. `workflow_dispatch` stays allowed as the documented manual
+  # escape hatch for the schedule itself, matching how a human would re-run the check by hand.
+  freshness-ping:
+    name: report success to the freshness watch
+    needs: [codeql, dependency-audit]
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/heartbeat-ping
+        with:
+          url: ${{ secrets.HEALTHCHECK_URL_SECURITY }}
+          label: "security (CodeQL + pip-audit)"

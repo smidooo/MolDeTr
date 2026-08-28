@@ -165,6 +165,21 @@ jobs:
               )
           PY
 
+      - name: Report success to the freshness watch
+        # No `if:` needed beyond the default: a step with none only runs if every prior step in
+        # this job succeeded, which is exactly "ping only on a genuinely successful nightly" --
+        # including the guard-the-guard step above. Confirmed from this repo's own run history, not
+        # just by analogy: run 33040589280 shows a `skipped` cache-miss download step followed by a
+        # `success` no-`if:` verify step, so a skip in this job does not block a later default step.
+        #
+        # No event-name restriction needed the way `security.yml`/`integrations.yml` have one: this
+        # workflow only triggers on `schedule` and `workflow_dispatch`, both legitimate "the check
+        # ran" events -- there is no `push` or `release` trigger here to filter out.
+        uses: ./.github/actions/heartbeat-ping
+        with:
+          url: ${{ secrets.HEALTHCHECK_URL_NIGHTLY }}
+          label: "nightly (real-checkpoint tests)"
+
   # See `ci.yml`'s note: a cron lane in a quiet repo that only goes red tells nobody. This one is
   # the science guard -- it runs the real-checkpoint tests, including the vanillin oracle, that no
   # other lane can run. If it breaks, the repository has stopped verifying the paper's numbers.

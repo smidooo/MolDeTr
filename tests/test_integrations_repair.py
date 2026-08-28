@@ -47,6 +47,13 @@ PAPER_TEST = "test_latest_software_record_supplements_the_article"
 #: if a trigger is ever added to `on:`, the repair stays refused until someone names it here.
 WRITE_EVENTS = {"release", "schedule", "workflow_dispatch"}
 
+#: The credential this file exists to keep scoped. Named explicitly rather than matching any
+#: `secrets.` reference: this job also carries a `HEALTHCHECK_URL_INTEGRATIONS` freshness-ping
+#: secret in its own step (see `.github/actions/heartbeat-ping`) -- a low-privilege URL with none of
+#: the blast radius `deposit:write` has, and correctly none of this file's business. A bare
+#: `"secrets." in block` check would flag that unrelated secret as if it were the write token.
+WRITE_CREDENTIAL = "secrets.ZENODO_DEPOSIT_TOKEN"
+
 
 def _steps(text: str) -> list[str]:
     """The job's `steps:` list, one raw text block per item.
@@ -194,20 +201,24 @@ def test_the_workflow_never_runs_on_a_pull_request(workflow: str) -> None:
 def test_the_credential_is_scoped_to_the_repair_step_alone(workflow: str, steps: list[str]) -> None:
     """A job-level `env:` would hand the token to lychee-action and the issue filer for free.
 
+    Scoped to `WRITE_CREDENTIAL` specifically, not "any `secrets.` reference" -- see that
+    constant's docstring for why a bare substring match would misfire on this job's unrelated
+    freshness-ping secret.
+
     Mutations: hoist the secret to job-level `env:`; add it to a second step.
     """
     before_steps = workflow.split("steps:")[0]
-    assert "secrets." not in before_steps, (
-        "a `secrets.` reference appears above the step list — at job or workflow level it is "
-        "exported into every step, including the third-party action this job runs."
+    assert WRITE_CREDENTIAL not in before_steps, (
+        f"a `{WRITE_CREDENTIAL}` reference appears above the step list — at job or workflow level "
+        "it is exported into every step, including the third-party action this job runs."
     )
 
-    carrying = [block for block in steps if "secrets." in block]
+    carrying = [block for block in steps if WRITE_CREDENTIAL in block]
     assert len(carrying) == 1, (
-        f"expected exactly one step to reference `secrets.`, found {len(carrying)}: "
+        f"expected exactly one step to reference `{WRITE_CREDENTIAL}`, found {len(carrying)}: "
         f"{[_field(block, 'name') for block in carrying]}"
     )
-    assert "secrets." in _field(carrying[0], "env"), (
+    assert WRITE_CREDENTIAL in _field(carrying[0], "env"), (
         "the secret must arrive through the repair step's own `env:` block"
     )
 
