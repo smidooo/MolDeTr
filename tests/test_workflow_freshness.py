@@ -167,7 +167,9 @@ def test_the_three_documented_secret_names_appear_in_both_the_workflows_and_the_
     secrets_in_doc = set(re.findall(r"HEALTHCHECK_URL_\w+", doc))
     secrets_in_workflows: set[str] = set()
     for path in _scheduled_workflow_paths(WORKFLOWS_DIR):
-        secrets_in_workflows |= set(re.findall(r"HEALTHCHECK_URL_\w+", path.read_text(encoding="utf-8")))
+        secrets_in_workflows |= set(
+            re.findall(r"HEALTHCHECK_URL_\w+", path.read_text(encoding="utf-8"))
+        )
     assert secrets_in_doc, "docs/MONITORING.md mentions no HEALTHCHECK_URL_* secret by name"
     assert secrets_in_workflows == secrets_in_doc, (
         f"secret names drifted between the workflows {secrets_in_workflows} and "
@@ -206,7 +208,9 @@ def test_seeded_defect_a_scheduled_workflow_without_the_ping_is_caught(tmp_path)
         text,
         flags=re.DOTALL,
     )
-    assert stripped != text, "the regex removing the heartbeat step matched nothing -- fix the regex"
+    assert stripped != text, (
+        "the regex removing the heartbeat step matched nothing -- fix the regex"
+    )
     victim.write_text(stripped, encoding="utf-8")
 
     failures = _assert_scheduled_workflows_ping_safely(scratch)
