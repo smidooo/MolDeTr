@@ -1,0 +1,75 @@
+#!/bin/sh
+# Refuse a commit that breaks the paper-median reproduction, but ONLY when the staged set touches
+# a path that guard actually covers -- most commits pay nothing.
+#
+# The pinning assertion already exists (tests/test_scripts.py::test_aggregate_reproduces_paper_medians)
+# and this hook has exactly one job: run it, and only it, when relevant. It does not reimplement the
+# check, so the assertion has one home and this hook cannot drift from it.
+#
+# Why this is safe to run without `moldetr` installed: `scripts/aggregate_experimental.py` imports
+# only argparse/json/statistics/pathlib (verified by reading the file, not assumed), and
+# `tests/conftest.py` -- loaded by pytest before collecting anything under `tests/` -- imports
+# numpy/torch only inside fixture bodies, never at module scope. Measured directly: this one test
+# node id passes in a bare venv containing nothing but `pytest`. So the only real precondition here
+# is a working `pytest` on PATH, not a full dev install.
+#
+# GUARDED PATHS are limited to what this ONE test can actually see: `aggregate_experimental.py`
+# reads a committed JSON intermediate and imports no other project module, so it cannot detect a
+# regression in, say, `moldetr/postprocess.py` -- a check narrower than its claim is worse than no
+# check, so that path is deliberately NOT listed here even though it is a plausible-looking guard
+# target. `D` is in the diff-filter (not just `ACMR`): deleting the JSON also breaks the
+# reproduction and must not slip past silently.
+#
+# `.githooks/` is TRACKED and wired via `core.hooksPath` (scripts/install_hooks.py), unlike the
+# adjacent `.git/hooks/commit-msg`, which is untracked and silently absent on every fresh clone --
+# this file exists to not repeat that.
+#
+# LIMITATION, stated rather than hidden: this runs pytest against the WORKING TREE, not the staged
+# index. A partial stage (`git add -p`, or editing further after staging) can pass here while the
+# actual commit content differs. `git stash --keep-index` would close this, but a repo-wide stash
+# inside a hook is its own hazard under concurrent writers -- not worth it for a guard this narrow.
+
+set -e
+
+changed=$(git diff --cached --name-only --diff-filter=ACDMR)
+
+relevant=$(printf '%s\n' "$changed" | grep -E '^(scripts/aggregate_experimental\.py|structured_output/experimental_matched_pairs\.json)$' || true)
+
+if [ -z "$relevant" ]; then
+  exit 0
+fi
+
+echo "pre-commit: staged changes touch a paper-median input:"
+printf '%s\n' "$relevant" | sed 's/^/pre-commit:   /'
+echo "pre-commit: running the reproduction test..."
+
+# Resolve ONE runner and use it for both the availability check and the real invocation -- checking
+# `command -v pytest` but then unconditionally running `python -m pytest` would report "available"
+# and then fail with exit 127 on a machine where `pytest` is on PATH but no bare `python` is (common
+# on macOS and distros that ship only `python3`), which reads as a paper-number regression rather
+# than a missing interpreter.
+if command -v pytest >/dev/null 2>&1; then
+  RUNNER="pytest"
+elif python -m pytest --version >/dev/null 2>&1; then
+  RUNNER="python -m pytest"
+elif python3 -m pytest --version >/dev/null 2>&1; then
+  RUNNER="python3 -m pytest"
+else
+  echo "pre-commit: no working pytest found ('pytest', 'python -m pytest', 'python3 -m pytest' all"
+  echo "pre-commit: failed). The hook cannot verify the paper-median reproduction without it."
+  echo "pre-commit: Activate your dev environment (pytest is in the 'dev' extra), or commit with"
+  echo "pre-commit: --no-verify if you are certain this commit does not change the reproduced numbers."
+  exit 1
+fi
+
+if $RUNNER -q tests/test_scripts.py::test_aggregate_reproduces_paper_medians; then
+  echo "pre-commit: paper-median reproduction test passed."
+  exit 0
+fi
+
+echo "pre-commit: the paper-median reproduction test FAILED."
+echo "pre-commit: this commit touches a path this project's frozen-config rule ties directly to"
+echo "pre-commit: the published numbers (|dd| 0.90 Hz / |dJ| 0.20 Hz / proton-count 93.5%)."
+echo "pre-commit: fix the regression, or if this is a deliberate, reviewed re-export, update"
+echo "pre-commit: CLAUDE.md's frozen-config rule and this commit message accordingly first."
+exit 1

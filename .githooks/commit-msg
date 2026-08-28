@@ -1,0 +1,11 @@
+#!/bin/sh
+# Strip any "Co-Authored-By: Claude/Anthropic" trailer from the commit message.
+# Belt-and-suspenders so that identity never re-enters this repo's public history
+# (GitHub counts co-author trailers as contributors). See the contributor-removal
+# post-mortem; the primary guard is the "no Claude trailers" line in CLAUDE.md.
+#
+# Tracked here (.githooks/, wired via core.hooksPath -- scripts/install_hooks.py) rather than
+# .git/hooks/, which git never checks out: this exact file lived only in .git/hooks/ before and was
+# silently absent on every fresh clone. Moving it is the point, not a rewrite of its logic.
+grep -viE '^[[:space:]]*co-authored-by:.*(claude|anthropic)' "$1" > "$1.tmp"
+mv "$1.tmp" "$1"

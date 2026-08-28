@@ -16,6 +16,13 @@ All notable changes to this project are documented here. The format is based on
   `docs/MONITORING.md`), every ping step reports "no healthcheck configured" rather than silently
   doing nothing; `tests/test_workflow_freshness.py` catches a future scheduled lane added without
   one. `[four-skills]`
+- **Git hooks are now tracked, in `.githooks/`, wired via `core.hooksPath`.** Run
+  `python scripts/install_hooks.py` once per clone. A new pre-commit hook runs
+  `tests/test_scripts.py::test_aggregate_reproduces_paper_medians` when a commit touches
+  `scripts/aggregate_experimental.py` or `structured_output/experimental_matched_pairs.json`,
+  refusing the commit if the paper-median reproduction breaks; ordinary commits pay nothing. The
+  existing commit-message co-author-trailer cleanup moves here too, unchanged, so it survives a
+  fresh clone (it previously lived only in the untracked `.git/hooks/commit-msg`). `[four-skills]`
 
 ### Changed
 - **`security.yml`'s `pip-audit` step is a baseline ratchet instead of permanently advisory.**
