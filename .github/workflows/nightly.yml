@@ -165,6 +165,15 @@ jobs:
               )
           PY
 
+      - name: Report success to the freshness watch
+        # No `if:` needed beyond the default: a step with none only runs if every prior step in
+        # this job succeeded, which is exactly "ping only on a genuinely successful nightly" --
+        # including the guard-the-guard step above.
+        uses: ./.github/actions/heartbeat-ping
+        with:
+          url: ${{ secrets.HEALTHCHECK_URL_NIGHTLY }}
+          label: "nightly (real-checkpoint tests)"
+
   # See `ci.yml`'s note: a cron lane in a quiet repo that only goes red tells nobody. This one is
   # the science guard -- it runs the real-checkpoint tests, including the vanillin oracle, that no
   # other lane can run. If it breaks, the repository has stopped verifying the paper's numbers.

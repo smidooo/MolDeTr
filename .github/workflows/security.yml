@@ -134,3 +134,19 @@ jobs:
           guards: >-
             CodeQL static analysis and the advisory `pip-audit` dependency scan.
           token: ${{ github.token }}
+
+  # This lane also has `schedule:` above and carries the identical 60-day silent-disable exposure
+  # `nightly.yml` and `integrations.yml` document -- it just never said so. Gated on
+  # `event_name != 'pull_request'` explicitly, matching `dependency-audit`'s own gating, rather than
+  # relying on `needs`' default skip-propagation semantics on a PR run where that job never executes.
+  freshness-ping:
+    name: report success to the freshness watch
+    needs: [codeql, dependency-audit]
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/heartbeat-ping
+        with:
+          url: ${{ secrets.HEALTHCHECK_URL_SECURITY }}
+          label: "security (CodeQL + pip-audit)"

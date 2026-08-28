@@ -1,0 +1,45 @@
+name: Ping a freshness dead-man's switch
+description: >-
+  Ping an external URL (healthchecks.io or equivalent) after a scheduled run succeeds, so a
+  workflow GitHub has silently disabled becomes visible from outside GitHub. See
+  docs/MONITORING.md for the mechanism and why nothing inside GitHub can do this job: a lane
+  watching another lane dies under the same 60-day silent-disable rule at the exact moment it
+  would matter, since GitHub disables a scheduled workflow after 60 days without a *commit*
+  (issues, PRs, releases and tags do not count).
+
+inputs:
+  url:
+    description: >-
+      The healthcheck ping URL, from a repository secret. Empty is a valid, expected state -- a
+      fork or a checkout without the secret configured must not fail on this step, only skip it
+      visibly.
+    required: false
+    default: ""
+  label:
+    description: Human name for this lane, used only in log output and the step summary.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Ping the freshness watch
+      shell: bash
+      env:
+        HEALTHCHECK_URL: ${{ inputs.url }}
+        LANE_LABEL: ${{ inputs.label }}
+      # Never allowed to fail the lane it reports on: a transient healthchecks.io outage is not
+      # this repository's problem, and letting it redden a real green run would train people to
+      # ignore red runs -- exactly the outcome a dead-man's switch exists to prevent. So every path
+      # through this step exits 0; a failed ping is logged as a warning, not propagated.
+      run: |
+        if [ -z "$HEALTHCHECK_URL" ]; then
+          echo "no healthcheck configured for $LANE_LABEL (secret unset) -- skipping ping" \
+            >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+        if curl -fsS --retry 3 --retry-delay 2 --max-time 10 "$HEALTHCHECK_URL" >/dev/null; then
+          echo "freshness ping OK for $LANE_LABEL" >> "$GITHUB_STEP_SUMMARY"
+        else
+          echo "::warning::freshness ping FAILED for $LANE_LABEL -- the external watch may not have recorded this run"
+          echo "freshness ping FAILED for $LANE_LABEL (see warning above)" >> "$GITHUB_STEP_SUMMARY"
+        fi

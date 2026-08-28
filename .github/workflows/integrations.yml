@@ -336,3 +336,14 @@ jobs:
         # Actions tab shows a green tick over a filed issue and the two disagree.
         if: steps.lychee.outcome == 'failure'
         run: exit 1
+
+      - name: Report success to the freshness watch
+        # No `if:` beyond the default: a step with none only runs if no prior step in this job has
+        # FAILED (a skipped step, like the `release`-only Zenodo wait on a cron run, does not block
+        # it -- see e.g. how "Verify the checkpoint" in nightly.yml runs regardless of whether the
+        # cache-miss download above it ran or skipped). So this fires only when the two `exit 1`
+        # guards above did not fire, i.e. a genuinely clean sweep.
+        uses: ./.github/actions/heartbeat-ping
+        with:
+          url: ${{ secrets.HEALTHCHECK_URL_INTEGRATIONS }}
+          label: "integrations (external rot watch)"
