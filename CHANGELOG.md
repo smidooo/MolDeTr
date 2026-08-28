@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **An external dead-man's switch watches the three scheduled CI lanes** (`nightly.yml`,
+  `integrations.yml`, `security.yml`). Each pings a URL from a repository secret via the new
+  `.github/actions/heartbeat-ping` action on success, on `schedule`/`workflow_dispatch` runs only.
+  GitHub silently disables a scheduled workflow after 60 days without a *commit*, and a workflow that
+  watches another workflow for staleness is subject to the identical rule, so the assertion has to
+  live outside GitHub. Until the three `HEALTHCHECK_URL_*` secrets are configured (see
+  `docs/MONITORING.md`), every ping step reports "no healthcheck configured" rather than silently
+  doing nothing; `tests/test_workflow_freshness.py` catches a future scheduled lane added without
+  one. `[four-skills]`
+
 ### Changed
 - **`security.yml`'s `pip-audit` step is a baseline ratchet instead of permanently advisory.**
   `continue-on-error: true` is gone; `scripts/pip_audit_ratchet.py` now fails the lane on any
