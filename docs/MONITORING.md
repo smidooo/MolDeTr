@@ -1,5 +1,10 @@
 # Monitoring the scheduled lanes: an external dead-man's switch
 
+**Status: not yet active.** The code below is merged and pings correctly, but no
+healthchecks.io-style service is configured yet and none of the three repository secrets exist. Every
+ping step currently reports "no healthcheck configured" in its job's step summary rather than
+silently doing nothing. See *Setting it up*, below, for what turns this on.
+
 `nightly.yml`, `integrations.yml` and `security.yml` all carry `schedule:` triggers, and all three
 carry the same exposure: **GitHub disables a scheduled workflow after 60 days without a *commit* to
 the repository** (issues, PRs, releases and tags do not count). A published paper's companion repo
@@ -21,13 +26,17 @@ Each of the three scheduled lanes ends (on success only) with a step using
 | `integrations.yml` (`external` job) | `HEALTHCHECK_URL_INTEGRATIONS` | weekly, `0 6 * * 1` |
 | `security.yml` (`freshness-ping` job) | `HEALTHCHECK_URL_SECURITY` | weekly, `0 6 * * 3` |
 
-The ping fires only when the lane's own guard steps also passed — see the comment on each
-`heartbeat-ping` step for the exact success condition, since none of the three jobs is a flat
-sequence of unconditional steps. A [healthchecks.io](https://healthchecks.io)-style service (or
-equivalent) is configured with a check per lane, each set to the period above plus a grace window,
-and alerts (email, or whatever the service supports) when a ping fails to arrive on schedule. That
-alert is the thing that survives GitHub silently turning a lane off, a lane hanging past its
-timeout, or a lane being deleted outright.
+The ping fires only when the lane's own guard steps also passed, and only on a `schedule` or
+`workflow_dispatch` run — `security.yml` also triggers on `push: branches: [main]`, and pinging
+there too would reset the freshness timer on every merge, hiding a corrupted cron expression behind
+the next PR. See the comment on each `heartbeat-ping` step for the exact condition, since none of the
+three jobs is a flat sequence of unconditional steps.
+
+Once set up (see below), a [healthchecks.io](https://healthchecks.io)-style service is to be
+configured with a check per lane, each set to the period above plus a grace window, alerting (email,
+or whatever the service supports) when a ping fails to arrive on schedule. That alert is the thing
+that survives GitHub silently turning a lane off, a lane hanging past its timeout, or a lane being
+deleted outright.
 
 `.github/actions/heartbeat-ping` never fails the lane it reports on: an empty secret (e.g. a fork
 with none configured) or a transient outage reaching the healthcheck service are both logged to the

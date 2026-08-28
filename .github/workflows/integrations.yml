@@ -338,11 +338,18 @@ jobs:
         run: exit 1
 
       - name: Report success to the freshness watch
-        # No `if:` beyond the default: a step with none only runs if no prior step in this job has
-        # FAILED (a skipped step, like the `release`-only Zenodo wait on a cron run, does not block
-        # it -- see e.g. how "Verify the checkpoint" in nightly.yml runs regardless of whether the
-        # cache-miss download above it ran or skipped). So this fires only when the two `exit 1`
-        # guards above did not fire, i.e. a genuinely clean sweep.
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        # Restricted to `schedule`/`workflow_dispatch`, same reasoning as `security.yml`'s
+        # `freshness-ping` job: this step's point is "the scheduled check ran", and `release` is a
+        # different, more frequent event this workflow also triggers on.
+        #
+        # No status-check function needed on top: a step with none only runs if no prior step in
+        # this job has FAILED (a skipped step, like the `release`-only Zenodo wait on a cron run,
+        # does not block it). Confirmed from this repo's own run history, not just by analogy: run
+        # 32696504117 (a clean `integrations.yml` pass) shows steps 11-13 (the issue-filer and both
+        # `exit 1` guards) all `skipped`, job green -- a step after them with no `if:` runs. So this
+        # fires (on a schedule/dispatch run) only when the two `exit 1` guards above did not fire,
+        # i.e. a genuinely clean sweep.
         uses: ./.github/actions/heartbeat-ping
         with:
           url: ${{ secrets.HEALTHCHECK_URL_INTEGRATIONS }}
