@@ -33,18 +33,29 @@ def _repo_root() -> Path:
     repo in a test. `git rev-parse --show-toplevel` answers "which repo is the CURRENT DIRECTORY
     actually in", which is the question that matters.
     """
-    result = subprocess.run(
-        ["git", "rev-parse", "--show-toplevel"],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except subprocess.CalledProcessError:
+        print(
+            "error: not inside a git repository (or git is not on PATH) -- "
+            "nothing to install hooks into",
+            file=sys.stderr,
+        )
+        raise SystemExit(1) from None
     return Path(result.stdout.strip())
 
 
 def _current_hooks_path(repo: Path) -> str | None:
+    # `--local`, not a bare `--get`: a global or system-scope `core.hooksPath` (husky, a company
+    # template) would otherwise make this report "already set" for a value that isn't even
+    # repo-local, and the write below is already local-only -- the read should match.
     result = subprocess.run(
-        ["git", "config", "--get", "core.hooksPath"],
+        ["git", "config", "--local", "--get", "core.hooksPath"],
         cwd=repo,
         capture_output=True,
         text=True,
@@ -74,8 +85,10 @@ def install(force: bool = False) -> int:
         if hook.is_file():
             hook.chmod(hook.stat().st_mode | 0o111)
 
-    print(f"core.hooksPath set to {TARGET!r}. Installed hooks: "
-          f"{', '.join(p.name for p in sorted(hooks_dir.iterdir()) if p.is_file())}")
+    print(
+        f"core.hooksPath set to {TARGET!r}. Installed hooks: "
+        f"{', '.join(p.name for p in sorted(hooks_dir.iterdir()) if p.is_file())}"
+    )
     return 0
 
 

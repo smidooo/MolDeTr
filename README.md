@@ -270,6 +270,10 @@ Optional for CPU inference: the model falls back to `ms_deform_attn_core_pytorch
 python scripts/quick_validation.py     # confirms imports + ROI metadata load; no weights or data needed
 ```
 
+**Contributing a change?** Run `python scripts/install_hooks.py` once per clone. It points git at the
+tracked `.githooks/` (a pre-commit guard on the paper-median reproduction, plus a commit-message
+trailer cleanup) — this is per-checkout git config, not something a `git clone` picks up on its own.
+
 ### 4. Get the weights and data (Zenodo)
 The trained weights and the spectral regions are archived on Zenodo
 (**DOI [10.5281/zenodo.21217102](https://doi.org/10.5281/zenodo.21217102)**), not in git. Fetch the

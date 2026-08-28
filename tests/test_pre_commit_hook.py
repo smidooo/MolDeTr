@@ -129,11 +129,23 @@ def test_hook_file_exists_and_is_executable_on_posix():
 @pytest.mark.unit
 def test_commit_touching_an_unrelated_file_is_not_slowed_down(scratch_repo: Path):
     """The hook must not run pytest at all for a change that doesn't touch a guarded path -- see
-    its own early-exit check."""
+    its own early-exit check.
+
+    Asserts on the hook's own output, not just the exit code: a bare `returncode == 0` would still
+    pass if the early exit were deleted and pytest ran (and passed) on every commit, which is
+    exactly the "not slowed down" claim this test is supposed to hold the hook to.
+    """
     (scratch_repo / "README.md").write_text("hello\n", encoding="utf-8")
     _run(["git", "add", "README.md"], scratch_repo)
     result = _run(["git", "commit", "-q", "-m", "unrelated"], scratch_repo)
-    assert result.returncode == 0, f"an unrelated commit was refused: {result.stdout}{result.stderr}"
+    assert result.returncode == 0, (
+        f"an unrelated commit was refused: {result.stdout}{result.stderr}"
+    )
+    combined = result.stdout + result.stderr
+    assert "pre-commit:" not in combined, (
+        f"the hook produced output for an unrelated commit, meaning it ran (or attempted to run) "
+        f"pytest instead of exiting early: {combined!r}"
+    )
 
 
 @pytest.mark.unit
@@ -161,7 +173,7 @@ def test_seeded_defect_a_broken_matched_pairs_file_is_refused(scratch_repo: Path
 
     Each `matched_pairs_total` entry is a `[pred, label]` pair (schema read from
     `scripts/aggregate_experimental.py::aggregate`, not guessed); with 215 real pairs, perturbing
-    one value would not move the MEDIAN at all, so this replaces the whole array with two pairs
+    one value would not move the MEDIAN at all, so this replaces the whole array with a single pair
     whose chemical-shift and coupling errors are nowhere near 0.90 Hz / 0.20 Hz -- guaranteed to
     change every one of the three pinned strings, not just nudge one.
     """
@@ -173,7 +185,11 @@ def test_seeded_defect_a_broken_matched_pairs_file_is_refused(scratch_repo: Path
             {
                 "matched_pairs_total": [
                     [
-                        {"chemical_shift_in_points": 0, "proton_count": 1, "coupling_constants": 0.0},
+                        {
+                            "chemical_shift_in_points": 0,
+                            "proton_count": 1,
+                            "coupling_constants": 0.0,
+                        },
                         {
                             "chemical_shift_in_points": 5000,
                             "proton_count": 2,

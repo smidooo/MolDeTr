@@ -46,6 +46,12 @@ def test_is_idempotent(scratch_repo: Path):
     second = _run([sys.executable, str(INSTALL_SCRIPT)], scratch_repo)
     assert second.returncode == 0, second.stdout + second.stderr
 
+    check = _run(["git", "config", "--get", "core.hooksPath"], scratch_repo)
+    assert check.stdout.strip() == ".githooks", (
+        "core.hooksPath drifted after a second install run -- 'idempotent' means the VALUE stays "
+        "put, not just that the second run happens to exit 0"
+    )
+
 
 @pytest.mark.unit
 def test_refuses_to_clobber_a_different_hooks_path_without_force(scratch_repo: Path):
