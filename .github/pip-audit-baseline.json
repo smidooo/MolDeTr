@@ -1,0 +1,18 @@
+{
+  "measured": "2026-08-27",
+  "note": "Measured from four non-pull_request Security runs after #49 fixed the pip-audit flags (82d39fb, 2026-08-08); the audit had never previously produced output. All four report the identical finding below. setuptools is pulled in by the CI runner's build toolchain via `pip install --upgrade pip pip-audit`, not declared as a project dependency (see pyproject.toml) -- pinning it here would not change what the runner image actually installs.",
+  "runs_observed": [
+    "https://github.com/smidooo/MolDeTr/actions/runs/32900395452",
+    "https://github.com/smidooo/MolDeTr/actions/runs/32901672474",
+    "https://github.com/smidooo/MolDeTr/actions/runs/32933744669",
+    "https://github.com/smidooo/MolDeTr/actions/runs/32936796469"
+  ],
+  "entries": [
+    {
+      "package": "setuptools",
+      "id": "PYSEC-2026-3447",
+      "fix_versions": ["83.0.0"],
+      "note": "MANIFEST.in exclude/global-exclude directives ignored under some conditions when building an sdist. The `package` job in ci.yml does run `python -m build` (sdist + wheel), but this repo has no MANIFEST.in at all, so the affected directive path is not exercised. Runner-provided setuptools, not a declared project dependency. Accepted 2026-08-27; revisit if a MANIFEST.in is added, setuptools becomes a direct dependency, or the runner image's setuptools version changes."
+    }
+  ]
+}

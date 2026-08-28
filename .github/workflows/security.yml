@@ -45,7 +45,7 @@ jobs:
           category: "/language:python"
 
   dependency-audit:
-    name: pip-audit (report-only)
+    name: pip-audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # NOT on pull_request: this reaches PyPI's advisory database, and the `network` marker convention
@@ -66,20 +66,12 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev,app,eval]"
       - name: Audit
-        # REPORT-ONLY on purpose, and this is a considered choice rather than timidity.
-        #
-        # A torch-sized transitive tree will surface advisories in packages this project neither
-        # imports nor can upgrade independently. Enforcing on day one produces a red lane nobody can
-        # fix, which is the same failure as an aspirational coverage floor: the check gets disabled,
-        # and then it is not report-only, it is absent.
-        #
-        # The intended path is to run it visibly for a few cycles, learn the actual noise floor, and
-        # then either enforce or add a reviewed `--ignore-vuln` list. Tightening this is a follow-up
-        # with evidence behind it; leaving it permanently advisory would be the cargo-cult outcome.
+        # PROMOTED TO A BASELINE RATCHET 2026-08-27 -- this step can fail the job now. It could not
+        # before: read on for why, and for why it is written the way it is.
         #
         # `--strict` WAS HERE AND AUDITED NOTHING. Measured 2026-08-08, from the one run this lane
-        # has ever had (it is gated off `pull_request`, so only a push to main or the Wednesday cron
-        # reaches it): the audit died 1.7 s in with
+        # had had up to that point (it is gated off `pull_request`, so only a push to main or the
+        # Wednesday cron reaches it): the audit died 1.7 s in with
         #     ERROR:pip_audit._cli:moldetr: Dependency not found on PyPI and could not be audited
         # No vulnerability table was printed, and `continue-on-error` turned that into a green job --
         # a guard reporting success while performing none of its work, the exact defect #43 fixed in
@@ -97,27 +89,75 @@ jobs:
         # audit". Dropping it is the fix; `--skip-editable` just keeps the output free of a warning
         # about a non-problem. Both pinned by tests/test_security_workflow.py.
         #
-        # NOISE FLOOR STILL UNMEASURED: n=0 usable runs, not n=1. Do not promote this to enforcing
-        # until a few real audits have been observed; the next natural data point is the Wednesday
-        # cron (`0 6 * * 3`).
-        continue-on-error: true
-        run: pip-audit --skip-editable --desc --format columns
+        # NOISE FLOOR MEASURED 2026-08-27: four non-`pull_request` runs since (32900395452,
+        # 32901672474, 32933744669, 32936796469) all report the identical
+        # `setuptools 79.0.1 PYSEC-2026-3447` -- a stable, single-package floor, and it is the
+        # runner's own build toolchain (`pip install --upgrade pip pip-audit` above), not anything
+        # this project declares. That measurement lives in `.github/pip-audit-baseline.json`, not
+        # here, so it can be reviewed and dated independently of this file.
+        #
+        # Plain `pip-audit` (no `--strict`) exits 1 whenever ANY vulnerability is found, known or
+        # not -- that is not an error, it is the normal signal `scripts/pip_audit_ratchet.py` below
+        # needs to see. So this step tolerates a nonzero exit, but does NOT blanket-swallow it: a
+        # `pip-audit` invocation can also exit 1 on a genuine internal failure (a `_fatal()` call, a
+        # network error reaching the advisory service), and swallowing that would recreate the exact
+        # defect this promotion exists to fix, just one layer down. The discriminator is the output,
+        # not the exit code: `--format json` always produces a JSON object with a `dependencies` key
+        # on the two real paths (clean or found-vulnerabilities) -- verified against
+        # `pip_audit/_format/json.py` 2.10.1 -- and never reaches that formatter on a fatal path. So
+        # "valid JSON with a dependencies key" is treated as "the audit ran", and anything else is a
+        # real failure of the tool, reported as such rather than silently passed through.
+        env:
+          # Passed as an env var and read via `os.environ`, not interpolated into the Python source
+          # below: embedding an arbitrary path into a string literal is exactly the kind of fragile
+          # construct this project's own conventions warn against (a backslash in the path can form
+          # an unintended escape sequence), and it costs nothing to avoid.
+          AUDIT_JSON_PATH: ${{ runner.temp }}/pip-audit.json
+        run: |
+          set +e
+          pip-audit --skip-editable --desc --format json > "$AUDIT_JSON_PATH"
+          audit_status=$?
+          set -e
+          if ! python -c "
+          import json, os, sys
+          try:
+              data = json.load(open(os.environ['AUDIT_JSON_PATH'], encoding='utf-8'))
+          except Exception:
+              sys.exit(1)
+          sys.exit(0 if 'dependencies' in data else 1)
+          "; then
+            echo "::error::pip-audit exited ${audit_status} and did not produce parseable JSON with"
+            echo "::error::a 'dependencies' key. Treating this as a real failure of the tool itself,"
+            echo "::error::not as 'vulnerabilities found'. Raw output:"
+            cat "$AUDIT_JSON_PATH" 2>/dev/null || echo "(no output file was written)"
+            exit 1
+          fi
+          echo "pip-audit exit code: ${audit_status} (0 = clean, 1 = vulnerabilities found;"
+          echo "scripts/pip_audit_ratchet.py below decides pass/fail against the baseline)"
+
+      - name: Ratchet against the known-findings baseline
+        # This is the step that can fail the job. See scripts/pip_audit_ratchet.py's docstring and
+        # .github/pip-audit-baseline.json for what "known" means and how it was measured.
+        env:
+          AUDIT_JSON_PATH: ${{ runner.temp }}/pip-audit.json
+        run: python scripts/pip_audit_ratchet.py "$AUDIT_JSON_PATH"
 
       - name: Summarise
         if: always()
-        # So the result is legible from the run summary without opening logs -- a report-only check
-        # nobody reads is decoration.
+        # So the result is legible from the run summary without opening logs.
         run: |
-          echo "### pip-audit (report-only)" >> "$GITHUB_STEP_SUMMARY"
+          echo "### pip-audit" >> "$GITHUB_STEP_SUMMARY"
           echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Advisory output is in the *Audit* step above. This step does not gate the build:" >> "$GITHUB_STEP_SUMMARY"
-          echo "see the rationale in \`.github/workflows/security.yml\`. Once the noise floor is" >> "$GITHUB_STEP_SUMMARY"
-          echo "known, either enforce it or add a reviewed ignore-list — do not leave it advisory" >> "$GITHUB_STEP_SUMMARY"
-          echo "indefinitely." >> "$GITHUB_STEP_SUMMARY"
+          echo "Per-advisory status is in the *Ratchet against the known-findings baseline* step" >> "$GITHUB_STEP_SUMMARY"
+          echo "above: BASELINE (known, accepted), STALE (was baseline, no longer found -- consider" >> "$GITHUB_STEP_SUMMARY"
+          echo "pruning), or NEW (fails the job). Add a reviewed, dated entry to" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`.github/pip-audit-baseline.json\` to accept a new finding; do not re-add" >> "$GITHUB_STEP_SUMMARY"
+          echo "\`continue-on-error\` to make it go away." >> "$GITHUB_STEP_SUMMARY"
 
   # CodeQL going red is a finding, not an inconvenience, and nobody watches the Actions tab of a
-  # paper companion between releases. `pip-audit` is report-only by design and cannot fail the
-  # build, so in practice this fires for CodeQL and for infrastructure breakage.
+  # paper companion between releases. `pip-audit` was report-only until 2026-08-27; it is now a
+  # baseline ratchet (see the `dependency-audit` job above) and can fail this lane on a genuinely
+  # new advisory, not only on infrastructure breakage.
   report-failure:
     name: announce a failed security lane
     needs: [codeql, dependency-audit]
@@ -132,5 +172,6 @@ jobs:
         with:
           title: "Security lane is failing"
           guards: >-
-            CodeQL static analysis and the advisory `pip-audit` dependency scan.
+            CodeQL static analysis and the `pip-audit` dependency scan, which fails on any advisory
+            not already recorded in `.github/pip-audit-baseline.json`.
           token: ${{ github.token }}
