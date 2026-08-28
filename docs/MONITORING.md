@@ -48,12 +48,18 @@ real green run would train people to ignore red runs, which is the opposite of t
 1. Create an account at a dead-man's-switch service (healthchecks.io's free tier covers this: three
    checks, generous grace periods). This is an external account this project does not manage —
    analogous to the Hugging Face and Zenodo accounts in `deploy/EXTERNAL_STEPS.md`.
-2. Create three checks, one per lane above, each with a period matching its cron schedule and a
-   grace window wide enough to absorb normal run duration plus a missed-then-retried dispatch
-   (a few hours is generous for the daily lane, a day or two for the weekly ones).
-3. Add the three ping URLs as repository secrets: `HEALTHCHECK_URL_NIGHTLY`,
-   `HEALTHCHECK_URL_INTEGRATIONS`, `HEALTHCHECK_URL_SECURITY` (Settings → Secrets and variables →
-   Actions).
+2. Create three checks, one per lane, with these periods and grace windows (the daily lane's
+   observed run time is ~3.5 min as of 2026-08-28, so 6 h of grace is generous rather than tight):
+
+   | Check name | Period | Grace | Secret to paste the ping URL into |
+   |---|---|---|---|
+   | `moldetr-nightly` | 1 day (`0 3 * * *`) | 6 h | `HEALTHCHECK_URL_NIGHTLY` |
+   | `moldetr-integrations` | 7 days (`0 6 * * 1`) | 2 days | `HEALTHCHECK_URL_INTEGRATIONS` |
+   | `moldetr-security` | 7 days (`0 6 * * 3`) | 2 days | `HEALTHCHECK_URL_SECURITY` |
+
+3. Add the three ping URLs as repository secrets under the exact names in the table above
+   (Settings → Secrets and variables → Actions). `gh secret list` on this repo, re-checked
+   2026-08-28, still shows only `ZENODO_DEPOSIT_TOKEN` — none of the three exist yet.
 4. Verify the switch actually fires before trusting it: pause one check in the service's UI, wait
    past its grace period, and confirm the alert arrives. A monitor nobody has seen fire is not a
    monitor — the same discipline this repo already applies to every other guard.
