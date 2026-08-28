@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **`security.yml`'s `pip-audit` step is a baseline ratchet instead of permanently advisory.**
+  `continue-on-error: true` is gone; `scripts/pip_audit_ratchet.py` now fails the lane on any
+  `(package, vuln id)` pair not already recorded in `.github/pip-audit-baseline.json`, the same
+  ratchet idiom as `ci.yml`'s `coverage (ratcheted)` job. The floor was measured over four
+  non-`pull_request` runs (all reporting the same `setuptools 79.0.1 / PYSEC-2026-3447`) rather than
+  assumed. `[four-skills]`
+
 ## [1.4.2] - 2026-08-12
 
 ### Changed
