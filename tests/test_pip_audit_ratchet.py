@@ -8,8 +8,12 @@ anything NOT already in `.github/pip-audit-baseline.json`, mirroring the `covera
 idiom in `ci.yml` rather than the all-or-nothing choice between permanently advisory and an
 allowlist nobody revisits.
 
-The seeded-defect test at the bottom is the point of this file: a comparator nobody has seen return
-non-zero is not a comparator, and this repo has shipped exactly that guard once already (#49).
+The seeded-defect tests are the point of this file: a comparator nobody has seen return non-zero is
+not a comparator, and this repo has shipped exactly that guard once already (#49). The
+dependency-count floor tests close a second instance of the same defect class found in review: the
+original discriminator asked only "is `dependencies` a key", which a broken audit that resolves
+nothing still satisfies -- and an empty result set makes every baseline entry look STALE (fixed) by
+construction, not obviously broken.
 """
 
 from __future__ import annotations
@@ -45,16 +49,19 @@ def _baseline(*entries: dict) -> dict:
     return {"entries": list(entries)}
 
 
-@pytest.mark.unit
-def test_empty_audit_against_empty_baseline_passes(capsys):
-    assert compare(_audit(), _baseline()) == 0
-    out = capsys.readouterr().out
-    assert "all 0 advisory pair(s)" in out
+def _padding(n: int = 25) -> list[dict]:
+    """Enough clean, unrelated dependencies to clear the resolved-dependency floor.
+
+    The real audited environment is torch plus `[dev,app,eval]` -- hundreds of distributions -- so
+    any test exercising ordinary pair logic (as opposed to the floor itself) needs a payload that
+    does not accidentally trip the floor check for the wrong reason.
+    """
+    return [_resolved(f"padding-pkg-{i}") for i in range(n)]
 
 
 @pytest.mark.unit
 def test_finding_covered_by_baseline_passes(capsys):
-    audit = _audit(_resolved("setuptools", "79.0.1", ("PYSEC-2026-3447",)))
+    audit = _audit(_resolved("setuptools", "79.0.1", ("PYSEC-2026-3447",)), *_padding())
     baseline = _baseline({"package": "setuptools", "id": "PYSEC-2026-3447", "note": "known"})
     assert compare(audit, baseline) == 0
     out = capsys.readouterr().out
@@ -64,7 +71,7 @@ def test_finding_covered_by_baseline_passes(capsys):
 @pytest.mark.unit
 def test_a_pair_not_in_the_baseline_fails():
     """The seeded defect: a new advisory the baseline has never seen must fail the run."""
-    audit = _audit(_resolved("setuptools", "79.0.1", ("PYSEC-2026-3447",)))
+    audit = _audit(_resolved("setuptools", "79.0.1", ("PYSEC-2026-3447",)), *_padding())
     assert compare(audit, _baseline()) == 1
 
 
@@ -73,6 +80,7 @@ def test_new_pair_is_reported_even_alongside_a_known_one(capsys):
     audit = _audit(
         _resolved("setuptools", "79.0.1", ("PYSEC-2026-3447",)),
         _resolved("urllib3", "2.0.0", ("GHSA-fake-0000",)),
+        *_padding(),
     )
     baseline = _baseline({"package": "setuptools", "id": "PYSEC-2026-3447", "note": "known"})
     assert compare(audit, baseline) == 1
@@ -82,9 +90,10 @@ def test_new_pair_is_reported_even_alongside_a_known_one(capsys):
 
 @pytest.mark.unit
 def test_stale_baseline_entry_does_not_fail_but_is_reported(capsys):
-    """A vulnerability that stopped appearing is good news, not a build break."""
+    """A vulnerability that stopped appearing is good news, not a build break -- as long as the
+    audit that no longer reports it plainly still ran against a real tree (see the floor tests)."""
     baseline = _baseline({"package": "setuptools", "id": "PYSEC-2026-3447", "note": "known"})
-    assert compare(_audit(), baseline) == 0
+    assert compare(_audit(*_padding()), baseline) == 0
     out = capsys.readouterr().out
     assert "STALE     setuptools PYSEC-2026-3447" in out
 
@@ -93,13 +102,13 @@ def test_stale_baseline_entry_does_not_fail_but_is_reported(capsys):
 def test_skipped_dependency_has_no_vulns_key_and_is_ignored():
     """`--skip-editable` entries carry no `vulns` key at all (pip-audit 2.10.1 schema, verified
     against `pip_audit/_format/json.py`) -- `.get("vulns", [])` must not KeyError on them."""
-    audit = _audit(_skipped("moldetr"))
+    audit = _audit(_skipped("moldetr"), *_padding())
     assert compare(audit, _baseline()) == 0
 
 
 @pytest.mark.unit
 def test_resolved_dependency_with_zero_vulns_is_not_a_pair():
-    audit = _audit(_resolved("requests", "2.31.0", ()))
+    audit = _audit(_resolved("requests", "2.31.0", ()), *_padding())
     assert compare(audit, _baseline()) == 0
 
 
@@ -121,3 +130,42 @@ def test_committed_baseline_covers_the_measured_setuptools_finding():
     baseline = json.loads(BASELINE_PATH.read_text(encoding="utf-8"))
     pairs = {(e["package"], e["id"]) for e in baseline["entries"]}
     assert ("setuptools", "PYSEC-2026-3447") in pairs
+
+
+@pytest.mark.unit
+def test_an_empty_dependency_list_fails_rather_than_reporting_a_clean_run():
+    """The output-shape discriminator in security.yml only checks that `dependencies` is a KEY; it
+    says nothing about whether the audit actually resolved the real tree (torch + [dev,app,eval],
+    hundreds of distributions). Without this floor, a broken install that produces
+    `{"dependencies": []}` reports every baseline entry as STALE and exits 0 -- a false green
+    indistinguishable from a genuinely fixed vulnerability. This is the exact defect class (`#43`)
+    the ratchet exists to remove; a ratchet that reintroduces it for the empty case is not a fix.
+    """
+    baseline = _baseline({"package": "setuptools", "id": "PYSEC-2026-3447", "note": "known"})
+    assert compare(_audit(), baseline) == 1
+
+
+@pytest.mark.unit
+def test_missing_dependencies_key_also_fails(capsys):
+    """`.get("dependencies", [])` must not treat an absent key the same as "nothing to report"."""
+    assert compare({"fixes": []}, _baseline()) == 1
+    assert "did not resolve" in capsys.readouterr().out
+
+
+@pytest.mark.unit
+def test_a_real_run_with_many_resolved_dependencies_is_not_penalised():
+    """The floor must not fire on a normal, healthy audit -- only on a suspiciously empty one."""
+    audit = _audit(_resolved("setuptools", "79.0.1", ("PYSEC-2026-3447",)), *_padding())
+    baseline = _baseline({"package": "setuptools", "id": "PYSEC-2026-3447", "note": "known"})
+    assert compare(audit, baseline) == 0
+
+
+@pytest.mark.unit
+def test_baseline_package_name_is_canonicalised_against_a_non_canonical_entry(capsys):
+    """pip-audit reports PEP 503 canonical names (lowercase, `-`-separated) -- verified against
+    `pip_audit/_format/json.py` 2.10.1. A human hand-editing the baseline after a red run is exactly
+    who is told to write `PyYAML` or `zope.interface` verbatim; the comparator must still match."""
+    audit = _audit(_resolved("zope.interface", "5.0", ("GHSA-fake-1111",)), *_padding())
+    baseline = _baseline({"package": "Zope.Interface", "id": "GHSA-fake-1111", "note": "known"})
+    assert compare(audit, baseline) == 0
+    assert "BASELINE" in capsys.readouterr().out

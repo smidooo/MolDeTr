@@ -116,15 +116,46 @@ def test_pip_audit_skips_the_editable_self_install():
     )
 
 
+def _job_block(workflow: str, job_id: str) -> str:
+    """The text of one top-level job, from its `  <job_id>:` line to the next top-level job key.
+
+    Line-based rather than a YAML parse: this project has no `pyyaml` dependency declared (only
+    available here transitively), and `tests/test_integrations_isolation.py` exists precisely
+    because a lane can install `pytest` alone -- adding a real parser to a `unit`-marked test would
+    be a new, undeclared risk of the same kind. A two-space-indented top-level key is enough to find
+    a job's boundary in a workflow this project already writes by convention (see every job name
+    in `security.yml`, `ci.yml`, `nightly.yml`).
+    """
+    lines = workflow.splitlines()
+    start = next(i for i, line in enumerate(lines) if line.startswith(f"  {job_id}:"))
+    end = next(
+        (i for i in range(start + 1, len(lines)) if re.match(r"^  \S", lines[i])),
+        len(lines),
+    )
+    return "\n".join(lines[start:end])
+
+
 @pytest.mark.unit
 def test_pip_audit_step_no_longer_continues_on_error():
-    """A step that cannot fail is not a ratchet -- see .github/pip-audit-baseline.json."""
-    lines = SECURITY_WORKFLOW.read_text(encoding="utf-8").splitlines()
-    offenders = [line for line in lines if line.strip() == "continue-on-error: true"]
+    """A step that cannot fail is not a ratchet -- see .github/pip-audit-baseline.json.
+
+    Scoped to the `dependency-audit` job specifically, not the whole file: `continue-on-error`
+    could legitimately appear in a different job later (e.g. an optional lychee-style check), and a
+    file-wide ban would misdirect whoever reads this test's failure message toward the wrong job.
+    Case- and quote-insensitive on the value, since YAML accepts `True`, `'true'` and `${{ true }}`
+    as equivalent to bare `true`, and a checker narrower than the claim it makes is a false green
+    waiting to happen.
+    """
+    block = _job_block(SECURITY_WORKFLOW.read_text(encoding="utf-8"), "dependency-audit")
+    offenders = [
+        line
+        for line in block.splitlines()
+        if re.match(r"^\s*continue-on-error\s*:\s*['\"]?true['\"]?\s*$", line, re.IGNORECASE)
+    ]
     assert not offenders, (
-        "security.yml still has a `continue-on-error: true` step. The dependency-audit job was "
-        "promoted to a baseline ratchet 2026-08-27 (scripts/pip_audit_ratchet.py) and must be able "
-        "to fail on a genuinely new advisory; re-adding continue-on-error recreates defect #43."
+        "the dependency-audit job in security.yml still has a `continue-on-error: true` step. It "
+        "was promoted to a baseline ratchet 2026-08-27 (scripts/pip_audit_ratchet.py) and must be "
+        "able to fail on a genuinely new advisory; re-adding continue-on-error recreates defect #43."
     )
 
 

@@ -28,10 +28,31 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
 Pair = tuple[str, str]
+
+#: The audited environment is torch plus `[dev,app,eval]` -- hundreds of distributions. Below this
+#: many resolved entries, the audit did not run against the real tree (a broken install, a
+#: resolver that silently found nothing), and reporting "0 findings" for that as a clean pass would
+#: recreate defect #43 one layer down: a guard reporting green while performing none of its work.
+#: Picked well under the real count so it never fires on a healthy run; not tied to an exact
+#: dependency count because that count drifts with every new pinned dependency.
+MIN_EXPECTED_DEPENDENCIES = 20
+
+
+def _canonical(name: str) -> str:
+    """PEP 503 canonicalisation: lowercase, runs of `-`/`_`/`.` collapsed to a single `-`.
+
+    pip-audit reports dependency names this way -- verified against `pip_audit/_format/json.py`
+    2.10.1, `_format_dep` writes `dep.canonical_name`. Applying it to the baseline side too means a
+    human hand-adding an entry after a red run (told to write the name pip-audit printed) does not
+    silently fail to match because they wrote `PyYAML` or `zope.interface` instead of the
+    canonical form.
+    """
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 def _pairs_from_audit(audit: dict) -> set[Pair]:
@@ -45,12 +66,12 @@ def _pairs_from_audit(audit: dict) -> set[Pair]:
     pairs: set[Pair] = set()
     for dep in audit.get("dependencies", []):
         for vuln in dep.get("vulns", []):
-            pairs.add((dep["name"], vuln["id"]))
+            pairs.add((_canonical(dep["name"]), vuln["id"]))
     return pairs
 
 
 def _pairs_from_baseline(baseline: dict) -> set[Pair]:
-    return {(entry["package"], entry["id"]) for entry in baseline.get("entries", [])}
+    return {(_canonical(entry["package"]), entry["id"]) for entry in baseline.get("entries", [])}
 
 
 def compare(audit: dict, baseline: dict) -> int:
@@ -59,6 +80,16 @@ def compare(audit: dict, baseline: dict) -> int:
     Per-pair printing, not one aggregate line: a single "N covered / M new" summary would hide
     exactly which advisory is new, which is the number that matters when this fails.
     """
+    resolved = audit.get("dependencies", [])
+    if len(resolved) < MIN_EXPECTED_DEPENDENCIES:
+        print(
+            f"the audit did not resolve a real dependency tree: only {len(resolved)} "
+            f"distribution(s) reported, expected at least {MIN_EXPECTED_DEPENDENCIES}. Treating "
+            "this as a broken audit, not a clean one -- see MIN_EXPECTED_DEPENDENCIES in "
+            "scripts/pip_audit_ratchet.py."
+        )
+        return 1
+
     found = _pairs_from_audit(audit)
     known = _pairs_from_baseline(baseline)
 
