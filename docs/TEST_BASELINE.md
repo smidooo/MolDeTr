@@ -96,7 +96,11 @@ unaffected (its selector loops support subprocesses). The browser lane now passe
   present locally for L10. CI still installs chromium only (`ci.yml:70`).
 - `pytest-cov` is installed but absent from the `dev` extra in `pyproject.toml` — declare it.
 - Only **2 of 8** CI legs are required on `main` (`ubuntu-latest / py3.10`, `py3.11`); `e2e` and
-  `browser-e2e` are advisory, contradicting `docs/requirements/REQUIREMENTS.md:64`.
+  `browser-e2e` are advisory, contradicting `docs/requirements/REQUIREMENTS.md:64`. This was correct
+  when captured 2026-07-25; the whole `e2e` tier was promoted to required at some point since, and
+  **seven** checks gate merge as of 2026-08-29 (re-measured live against the branch-protection API —
+  see `CLAUDE.md`'s External API dependencies section for the current set and its own measurement
+  date). This section is a dated snapshot, per the file's header; treat this bullet the same way.
 
 ---
 
