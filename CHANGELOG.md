@@ -32,6 +32,28 @@ All notable changes to this project are documented here. The format is based on
   non-`pull_request` runs (all reporting the same `setuptools 79.0.1 / PYSEC-2026-3447`) rather than
   assumed. `[four-skills]`
 
+### Fixed
+- **Closed five guard gaps a read-only audit found, all instances of this repo's own recurring
+  defect class: a check that could report green while performing none of its work.**
+  `browser-e2e` now runs the same axe-import probe `gradio-floor` already had, closing the gap
+  named in `ci.yml`'s own comment (a broken `axe_playwright_python` import silently skips every
+  accessibility assertion behind the bare token `7 skipped`) on the three engines that are actually
+  required checks. `ci.yml`'s `announce a red trunk` and `nightly.yml`'s `announce a failed nightly`
+  now fire on `cancelled()` as well as `failure()`, matching the idiom `integrations.yml` already
+  used — `failure()` alone is false when a needed job is cancelled (a `timeout-minutes` overrun or a
+  lost runner), so a hung lane previously notified nobody. `tests/test_workflow_freshness.py` now
+  requires a `needs:` on any job whose only real step is heartbeat-ping, closing the one heartbeat
+  step (`security.yml`'s `freshness-ping`) whose success-gating lived entirely in job-level `needs:`
+  rather than a step-level `if:`, invisible to every existing check. `tests/test_integrations_isolation.py`
+  gained a structural cross-check that would catch a `test_integrations.py` pytest invocation
+  rewritten as a `run: |` block scalar dropping out of the single-line parser it already had.
+  `docs/MONITORING.md` now says plainly that the heartbeat switch's real verification is
+  observational (a dispatched run's step summary, and the paused-check drill), not anything a green
+  test run can stand in for. One audit finding — that lychee's `continue-on-error` plus a stale
+  glob could pass having checked zero links — turned out to already be closed by
+  `lycheeverse/lychee-action`'s own `failIfEmpty: true` default, which this repo does not override;
+  `tests/test_integrations_repair.py` now pins that nobody disables it. `[four-skills]`
+
 ## [1.4.2] - 2026-08-12
 
 ### Changed

@@ -20,6 +20,24 @@ not just its presence. And the seeded-defect test exercises the REAL discovery +
 end to end against scratch copies of the three actual workflows, not a synthetic string handed
 straight to a helper -- a test that only proves a helper behaves on input it was written to accept
 is not evidence the check would catch a real regression.
+
+A third thing, added after a guard audit: `nightly.yml` and `integrations.yml` put their
+heartbeat-ping step *inside* the same job that does the real work (`model`, `external`), where
+step order alone means a step-level `if:` is all that gates it. `security.yml` is different -- its
+`freshness-ping` is a *separate job* whose gating on `codeql`/`dependency-audit` succeeding lives
+entirely in that job's `needs:`, which the step-level check above cannot see at all. Drop that
+`needs:` and the ping fires unconditionally on every scheduled/dispatched run, whether or not the
+lane it reports on passed, with every check above still green. `_heartbeat_job_needs_problems`
+below closes that gap by requiring any job whose only real step is heartbeat-ping to declare a
+non-empty `needs:`.
+
+One denylist entry was re-examined rather than assumed correct: `OVERRIDING_FUNCTIONS` flags a step
+`if:` containing `always(`/`cancelled(`/`failure(` as a substring. GitHub's own semantics already
+prepend an implicit `success()` to any `if:` that contains NONE of `success()`/`failure()`/
+`cancelled()`/`always()` -- so `if: true` or `if: steps.x.conclusion == 'success'` are safe by
+GitHub's own rule, not because this file's regex happens to miss them, and `if: ${{ !cancelled() }}`
+IS caught (the substring `cancelled(` is present). No live bypass of the step-level denylist was
+found; the real gap was job-level, not step-level, which is what the new check targets.
 """
 
 from __future__ import annotations
@@ -94,6 +112,55 @@ def _heartbeat_step_blocks(workflow_text: str) -> list[str]:
     return blocks
 
 
+def _job_blocks(workflow_text: str) -> list[tuple[str, str]]:
+    """`(job_name, block_text)` for every top-level job in a workflow, keyed off the two-space
+    indented `jobname:` line under `jobs:`. Line-based, matching this module's existing convention
+    (see `_scheduled_workflow_paths`'s docstring for why a real YAML parser is deliberately not
+    used here)."""
+    lines = workflow_text.splitlines()
+    job_line_re = re.compile(r"^  ([\w-]+):\s*$")
+    starts = [(i, m.group(1)) for i, line in enumerate(lines) if (m := job_line_re.match(line))]
+    blocks = []
+    for idx, (start, name) in enumerate(starts):
+        end = starts[idx + 1][0] if idx + 1 < len(starts) else len(lines)
+        blocks.append((name, "\n".join(lines[start:end])))
+    return blocks
+
+
+def _heartbeat_job_needs_problems(workflow_text: str) -> list[str]:
+    """Problems with the `needs:` of any job whose only real step is heartbeat-ping.
+
+    `nightly.yml` and `integrations.yml` put the heartbeat-ping step at the end of the job doing
+    the real work, where step order is the gate. `security.yml` gives it a job of its own
+    (`freshness-ping`), and that job's gating on the jobs it reports for lives entirely in its
+    `needs:` -- invisible to `_heartbeat_steps_are_success_only`, which only reads the step's own
+    `if:`. A job counts as "heartbeat-only" when its steps are just checkout plus heartbeat-ping;
+    such a job must declare a non-empty `needs:`, or nothing gates it against the run it claims to
+    report on.
+    """
+    problems = []
+    for name, block in _job_blocks(workflow_text):
+        if HEARTBEAT_ACTION not in block:
+            continue
+        step_lines = [
+            line
+            for line in block.splitlines()
+            if line.lstrip(" ").startswith("- uses:") or line.lstrip(" ").startswith("- name:")
+        ]
+        heartbeat_only = all(
+            HEARTBEAT_ACTION in line or "actions/checkout" in line for line in step_lines
+        )
+        if not heartbeat_only:
+            continue
+        needs_match = re.search(r"^\s+needs:\s*(\S.*)?$", block, re.MULTILINE)
+        if not needs_match or not needs_match.group(1) or needs_match.group(1).strip() == "[]":
+            problems.append(
+                f"job `{name}` runs heartbeat-ping as its only real step but declares no "
+                "`needs:` -- nothing gates it against the run it claims to report on"
+            )
+    return problems
+
+
 def _heartbeat_steps_are_success_only(workflow_text: str) -> list[str]:
     """Problems found with this workflow's heartbeat-ping step condition(s); empty if none.
 
@@ -113,6 +180,7 @@ def _heartbeat_steps_are_success_only(workflow_text: str) -> list[str]:
                         f"a heartbeat-ping step's `if:` contains `{fn}`, which can make it fire on "
                         f"a failed or cancelled run and defeats the switch: {if_line.strip()!r}"
                     )
+    problems.extend(_heartbeat_job_needs_problems(workflow_text))
     return problems
 
 
@@ -174,6 +242,40 @@ def test_the_three_documented_secret_names_appear_in_both_the_workflows_and_the_
     assert secrets_in_workflows == secrets_in_doc, (
         f"secret names drifted between the workflows {secrets_in_workflows} and "
         f"docs/MONITORING.md {secrets_in_doc}"
+    )
+
+
+@pytest.mark.unit
+def test_seeded_defect_a_heartbeat_only_job_missing_needs_is_caught(tmp_path):
+    """`security.yml`'s `freshness-ping` is the one heartbeat step that lives in its OWN job rather
+    than as the last step of the job doing the real work -- its gating on `codeql`/`dependency-audit`
+    succeeding is entirely in that job's `needs:`, invisible to a check that only reads step-level
+    `if:`. Strip that `needs:` from a scratch copy and confirm the real discovery + assertion
+    functions catch it -- not a synthetic string handed to a helper."""
+    scratch = tmp_path / "workflows"
+    scratch.mkdir()
+    for path in WORKFLOWS_DIR.glob("*.yml"):
+        shutil.copy(path, scratch / path.name)
+
+    baseline_failures = _assert_scheduled_workflows_ping_safely(scratch)
+    assert not baseline_failures, (
+        f"the unmodified scratch copies already fail: {baseline_failures} -- fix the real "
+        "workflows or this test's expectations before trusting the seeded defect below"
+    )
+
+    victim = scratch / "security.yml"
+    text = victim.read_text(encoding="utf-8")
+    stripped = text.replace(
+        "  freshness-ping:\n    name: report success to the freshness watch\n"
+        "    needs: [codeql, dependency-audit]\n",
+        "  freshness-ping:\n    name: report success to the freshness watch\n",
+    )
+    assert stripped != text, "the `needs:` line to strip was not found -- fix the literal above"
+    victim.write_text(stripped, encoding="utf-8")
+
+    failures = _assert_scheduled_workflows_ping_safely(scratch)
+    assert set(failures) == {"security.yml"}, (
+        f"expected only the seeded victim to fail with its `needs:` stripped, got {failures}"
     )
 
 

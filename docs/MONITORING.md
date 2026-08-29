@@ -68,6 +68,19 @@ Until the secrets are set, every ping step visibly reports "no healthcheck confi
 step summary rather than silently doing nothing — check there if a lane's freshness state is in
 doubt.
 
+## How this switch is actually verified
+
+`tests/test_workflow_freshness.py` asserts only that the mechanism is wired correctly (a scheduled
+lane pings on success and only on success, the secret names agree between the workflows and this
+doc, and — after a guard audit — that a heartbeat step living in its own job declares a `needs:`
+gating it, since GitHub does not implicitly gate a standalone job the way it gates a later step in
+the same job). None of that is evidence a ping was ever *delivered*: that verification is
+observational, not automated, and has two parts. Read a dispatched run's step summary and confirm it
+says `freshness ping OK for <lane>` rather than `no healthcheck configured` (a green run proves
+nothing on its own — `heartbeat-ping` exits 0 on every path by design, see *Mechanism* above). And,
+per step 4 below, pause a check in the service's UI and confirm the alert fires past its grace
+period. A green `test_workflow_freshness` run is not a substitute for either.
+
 ## What this does not cover
 
 - It reports that a scheduled run **happened and its own guard steps passed**, not that the checks

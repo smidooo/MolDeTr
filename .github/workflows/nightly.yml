@@ -186,7 +186,10 @@ jobs:
   report-failure:
     name: announce a failed nightly
     needs: [model]
-    if: failure()
+    # `always() && (failure() || cancelled())`, not a bare `failure()`: `failure()` is false when
+    # `model` is CANCELLED (a `timeout-minutes` overrun or a lost runner), and a hung nightly is as
+    # silent as a failed one. Same idiom as `integrations.yml`'s failure-reporting step.
+    if: always() && (failure() || cancelled())
     runs-on: ubuntu-latest
     permissions:
       contents: read
