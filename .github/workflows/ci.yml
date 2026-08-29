@@ -439,6 +439,11 @@ jobs:
     # needed job is CANCELLED, which is exactly what GitHub does on a `timeout-minutes` overrun or a
     # lost runner -- so a trunk that hangs rather than fails notifies nobody. Same idiom as
     # `integrations.yml`'s `File an issue if anything rotted` step, which fixed this first.
+    #
+    # No `concurrency:` group exists on this workflow, so `cancelled()` also fires on a human
+    # clicking Cancel on a push-to-main run -- a deliberate side effect, not a bug: a maintainer who
+    # cancels a run in-flight almost always intends to redo it, and one extra deduplicated-by-title
+    # issue is cheaper than the alternative of narrowing this back to the two unattended cases.
     if: >-
       always() && (failure() || cancelled()) &&
       github.event_name == 'push' && github.ref == 'refs/heads/main'

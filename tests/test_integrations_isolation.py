@@ -212,26 +212,30 @@ def _step_blocks(workflow_text: str) -> list[str]:
 
 
 def _steps_invoking_integrations_pytest(workflow_text: str) -> int:
-    """Count of *steps* whose `run:` invokes pytest against `test_integrations.py`, matched
-    structurally — a step counts if `pytest` and `test_integrations.py` both appear inside a `run:`
-    it carries, whether that `run:` is the single-line form `_workflow_pytest_argvs` parses or a
+    """Count of *steps* whose `run:` invokes pytest against `test_integrations`, matched
+    structurally — a step counts if `pytest` and `test_integrations` both appear inside a `run:` it
+    carries, whether that `run:` is the single-line form `_workflow_pytest_argvs` parses or a
     `run: |`/`run: >-` block scalar it cannot see. This is deliberately a looser, independent match
     on the same fact, so the two can be cross-checked against each other rather than one silently
     drifting from what the workflow actually runs.
+
+    Matched on `test_integrations`, not `test_integrations.py` — review caught that the latter would
+    disagree with `_workflow_pytest_argvs`'s own `"test_integrations" in line` filter the moment a
+    step named `tests/test_integrations_isolation.py` (this file) or `tests/test_integrations_repair.py`
+    existed, producing a false cross-check mismatch between two counters that are each individually
+    correct. Matching the identical substring both parsers use is what keeps the cross-check honest.
     """
     count = 0
     for block in _step_blocks(workflow_text):
-        # Comments talk about pytest and test_integrations.py freely (this very module's steps do)
+        # Comments talk about pytest and test_integrations freely (this very module's steps do)
         # without the step actually running either — strip them before matching, or a step like
         # "Install (no torch needed)", whose comment explains why it installs pytest thinly, counts
         # as an invocation it never makes.
-        code_lines = [
-            line for line in block.splitlines() if not line.lstrip(" ").startswith("#")
-        ]
+        code_lines = [line for line in block.splitlines() if not line.lstrip(" ").startswith("#")]
         code = "\n".join(code_lines)
         if "run:" not in code:
             continue
-        if "pytest" in code and "test_integrations.py" in code:
+        if "pytest" in code and "test_integrations" in code:
             count += 1
     return count
 
@@ -343,7 +347,7 @@ def test_workflow_pytest_argv_count_matches_the_workflow_structurally(tmp_path: 
     cross-check.
     """
     real_text = WORKFLOW.read_text(encoding="utf-8")
-    real_argv_count = len(_workflow_pytest_argvs(REPO / ".github" / "workflows" / "integrations.yml"))
+    real_argv_count = len(_workflow_pytest_argvs(WORKFLOW))
     assert real_argv_count == _steps_invoking_integrations_pytest(real_text), (
         "the real workflow already disagrees between the single-line parser and the structural "
         "count -- fix the real workflow or one of the two counters before trusting the seeded "
@@ -361,7 +365,9 @@ def test_workflow_pytest_argv_count_matches_the_workflow_structurally(tmp_path: 
         "      - name: Repair the paper relation",
         1,
     )
-    assert victim != real_text, "the literal to convert to a block scalar was not found in the workflow"
+    assert victim != real_text, (
+        "the literal to convert to a block scalar was not found in the workflow"
+    )
     scratch.write_text(victim, encoding="utf-8")
 
     seeded_argv_count = len(_workflow_pytest_argvs(scratch))

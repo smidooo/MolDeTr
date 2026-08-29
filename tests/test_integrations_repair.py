@@ -489,12 +489,18 @@ def test_lychee_fails_when_it_checks_zero_links(steps: list[str]) -> None:
     `steps.lychee.outcome == 'failure'`) would never fire.
 
     That gap does not need a new counter: `lycheeverse/lychee-action`'s own `failIfEmpty` input
-    defaults to `true` and is NOT set here, so it is active. Verified against the action's
-    `entrypoint.sh` (v2, pinned lychee v0.24.2): it greps its own markdown summary for
-    `Total | 0` and exits 1 regardless of the `fail:` input when it matches -- which is exactly
-    "checked zero links, fail". `continue-on-error: true` changes the step's `conclusion`, not its
-    `outcome`, so `steps.lychee.outcome == 'failure'` still fires on that exit and the downstream
-    `exit 1` step still runs. This test pins that the workflow does not disable it.
+    defaults to `true` and is NOT set here, so it is active. Verified 2026-08-29 against the `@v2`
+    tag's `action.yml` (`failIfEmpty`, default `true`) and `entrypoint.sh`: it greps its own markdown
+    summary for `Total | 0` and exits 1 regardless of the `fail:` input when it matches -- which is
+    exactly "checked zero links, fail". `continue-on-error: true` changes the step's `conclusion`,
+    not its `outcome`, so `steps.lychee.outcome == 'failure'` still fires on that exit and the
+    downstream `exit 1` step still runs. This test pins that the workflow does not disable it.
+
+    That upstream behavior is unpinned by version and this test cannot see it: `@v2` is a floating
+    tag, so what it resolves to (and whether `failIfEmpty` keeps defaulting to `true`) can drift
+    without this repository changing anything. This test is a guard against THIS repository
+    disabling the default, not a guarantee the default's meaning stays fixed -- if a future upstream
+    release changes it, nothing here would notice until the zero-links case actually occurs.
 
     Mutation: add `failIfEmpty: false` (or `failIfEmpty: "false"`) to the lychee step's `with:`
     block -- the assertion below must go red.
@@ -503,7 +509,9 @@ def test_lychee_fails_when_it_checks_zero_links(steps: list[str]) -> None:
     assert lychee is not None, "no step uses lycheeverse/lychee-action -- has it been renamed?"
 
     with_block = _field(lychee, "with")
-    assert "failIfEmpty" not in with_block or "false" not in with_block.split("failIfEmpty")[1][:20], (
+    assert (
+        "failIfEmpty" not in with_block or "false" not in with_block.split("failIfEmpty")[1][:20]
+    ), (
         "the lychee step sets `failIfEmpty: false` (or similar), which disables the action's own "
         "guard against silently checking zero links. Remove the override -- the default `true` is "
         "what makes a broken glob or a lychee arg-parsing change fail loudly instead of passing."
