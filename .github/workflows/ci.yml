@@ -290,6 +290,16 @@ jobs:
           pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
           pip install -e ".[dev,app,browser]"
           python -m playwright install --with-deps ${{ matrix.browser }}
+      - name: Confirm the axe import actually resolves
+        # `-rs` alone is not enough: `axe-playwright-python` is pinned open against a fast-moving
+        # `playwright`, and test_browser_a11y.py:21 is the only module guarding it (via
+        # importorskip) and the only one holding axe assertions. A broken import skips all of them
+        # while the rest of this matrix carries the step to exit 0 -- the axe half of the job's
+        # stated purpose lost to the bare token `7 skipped` in a green log. Same probe as
+        # `gradio-floor`'s "Confirm the floor actually resolved" step (below); kept identical
+        # rather than reimplemented so the two do not drift.
+        run: |
+          python -c "from axe_playwright_python.sync_playwright import Axe; from playwright.sync_api import Page; print('axe + playwright import OK')"
       - name: Browser e2e
         env:
           MPLBACKEND: Agg
@@ -297,7 +307,8 @@ jobs:
         # DOM failure you cannot reproduce locally.
         # `-rs` because test_browser_a11y.py guards `axe_playwright_python` with importorskip and
         # is the only module holding axe assertions: without it, losing all of them to a broken
-        # import shows up as the bare token `7 skipped` in a green step.
+        # import shows up as the bare token `7 skipped` in a green step. The probe above is what
+        # actually catches a broken import; `-rs` only makes a skip visible after the fact.
         run: >-
           pytest tests/e2e -m browser -q -rs
           --browser ${{ matrix.browser }}
@@ -424,7 +435,18 @@ jobs:
     name: announce a red trunk
     needs:
       [test, coverage, package, onboarding, environment-file, e2e, browser-e2e, gradio-floor]
-    if: failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    # `always() && (failure() || cancelled())`, not a bare `failure()`: `failure()` is false when a
+    # needed job is CANCELLED, which is exactly what GitHub does on a `timeout-minutes` overrun or a
+    # lost runner -- so a trunk that hangs rather than fails notifies nobody. Same idiom as
+    # `integrations.yml`'s `File an issue if anything rotted` step, which fixed this first.
+    #
+    # No `concurrency:` group exists on this workflow, so `cancelled()` also fires on a human
+    # clicking Cancel on a push-to-main run -- a deliberate side effect, not a bug: a maintainer who
+    # cancels a run in-flight almost always intends to redo it, and one extra deduplicated-by-title
+    # issue is cheaper than the alternative of narrowing this back to the two unattended cases.
+    if: >-
+      always() && (failure() || cancelled()) &&
+      github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read

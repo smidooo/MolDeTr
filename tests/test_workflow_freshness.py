@@ -20,6 +20,24 @@ not just its presence. And the seeded-defect test exercises the REAL discovery +
 end to end against scratch copies of the three actual workflows, not a synthetic string handed
 straight to a helper -- a test that only proves a helper behaves on input it was written to accept
 is not evidence the check would catch a real regression.
+
+A third thing, added after a guard audit: `nightly.yml` and `integrations.yml` put their
+heartbeat-ping step *inside* the same job that does the real work (`model`, `external`), where
+step order alone means a step-level `if:` is all that gates it. `security.yml` is different -- its
+`freshness-ping` is a *separate job* whose gating on `codeql`/`dependency-audit` succeeding lives
+entirely in that job's `needs:`, which the step-level check above cannot see at all. Drop that
+`needs:` and the ping fires unconditionally on every scheduled/dispatched run, whether or not the
+lane it reports on passed, with every check above still green. `_heartbeat_job_needs_problems`
+below closes that gap by requiring any job whose only real step is heartbeat-ping to declare a
+non-empty `needs:`.
+
+One denylist entry was re-examined rather than assumed correct: `OVERRIDING_FUNCTIONS` flags a step
+`if:` containing `always(`/`cancelled(`/`failure(` as a substring. GitHub's own semantics already
+prepend an implicit `success()` to any `if:` that contains NONE of `success()`/`failure()`/
+`cancelled()`/`always()` -- so `if: true` or `if: steps.x.conclusion == 'success'` are safe by
+GitHub's own rule, not because this file's regex happens to miss them, and `if: ${{ !cancelled() }}`
+IS caught (the substring `cancelled(` is present). No live bypass of the step-level denylist was
+found; the real gap was job-level, not step-level, which is what the new check targets.
 """
 
 from __future__ import annotations
@@ -94,6 +112,69 @@ def _heartbeat_step_blocks(workflow_text: str) -> list[str]:
     return blocks
 
 
+def _job_blocks(workflow_text: str) -> list[tuple[str, str]]:
+    """`(job_name, block_text)` for every top-level job in a workflow, keyed off the two-space
+    indented `jobname:` line under `jobs:`. Line-based, matching this module's existing convention
+    (see `_scheduled_workflow_paths`'s docstring for why a real YAML parser is deliberately not
+    used here)."""
+    lines = workflow_text.splitlines()
+    job_line_re = re.compile(r"^  ([\w-]+):\s*$")
+    starts = [(i, m.group(1)) for i, line in enumerate(lines) if (m := job_line_re.match(line))]
+    blocks = []
+    for idx, (start, name) in enumerate(starts):
+        end = starts[idx + 1][0] if idx + 1 < len(starts) else len(lines)
+        blocks.append((name, "\n".join(lines[start:end])))
+    return blocks
+
+
+def _heartbeat_job_needs_problems(workflow_text: str) -> list[str]:
+    """Problems with the `needs:` of any job where nothing in the job itself gates the heartbeat.
+
+    `nightly.yml` and `integrations.yml` put the heartbeat-ping step at the end of the job doing
+    the real work, where step order is the gate -- an earlier step failing stops the job before the
+    ping runs. `security.yml` gives it a job of its own (`freshness-ping`), and that job's gating on
+    the jobs it reports for lives entirely in its `needs:` -- invisible to
+    `_heartbeat_steps_are_success_only`, which only reads the step's own `if:`.
+
+    **Deliberately keyed on step ORDER, not step COUNT.** A first version required `needs:` only
+    when heartbeat-ping was the job's *only* real step (checkout aside) -- caught by review: adding
+    one unrelated step anywhere in that job, even one that runs after the ping and gates nothing,
+    flipped the job out of "heartbeat-only" and silenced the check entirely, including on the
+    original defect it was written for. Measured: stripping `security.yml`'s `needs:` from a
+    scratch copy was caught, stripping it AND adding one harmless extra step was not. The actual
+    invariant is "does anything in this job's own step order stand between the trigger and the
+    ping" -- so this checks whether any non-`actions/checkout` step precedes heartbeat-ping in
+    document order, not whether one exists anywhere in the job.
+    """
+    problems = []
+    for name, block in _job_blocks(workflow_text):
+        if HEARTBEAT_ACTION not in block:
+            continue
+        step_lines = [
+            line
+            for line in block.splitlines()
+            if line.lstrip(" ").startswith("- uses:") or line.lstrip(" ").startswith("- name:")
+        ]
+        heartbeat_index = next(
+            (i for i, line in enumerate(step_lines) if HEARTBEAT_ACTION in line), None
+        )
+        if heartbeat_index is None:
+            continue
+        preceding_gate_exists = any(
+            "actions/checkout" not in line for line in step_lines[:heartbeat_index]
+        )
+        if preceding_gate_exists:
+            continue
+        needs_match = re.search(r"^\s+needs:\s*(\S.*)?$", block, re.MULTILINE)
+        if not needs_match or not needs_match.group(1) or needs_match.group(1).strip() == "[]":
+            problems.append(
+                f"job `{name}` runs heartbeat-ping with no step (other than checkout) preceding "
+                "it in the same job, and declares no `needs:` -- nothing gates it against the run "
+                "it claims to report on"
+            )
+    return problems
+
+
 def _heartbeat_steps_are_success_only(workflow_text: str) -> list[str]:
     """Problems found with this workflow's heartbeat-ping step condition(s); empty if none.
 
@@ -113,6 +194,7 @@ def _heartbeat_steps_are_success_only(workflow_text: str) -> list[str]:
                         f"a heartbeat-ping step's `if:` contains `{fn}`, which can make it fire on "
                         f"a failed or cancelled run and defeats the switch: {if_line.strip()!r}"
                     )
+    problems.extend(_heartbeat_job_needs_problems(workflow_text))
     return problems
 
 
@@ -174,6 +256,82 @@ def test_the_three_documented_secret_names_appear_in_both_the_workflows_and_the_
     assert secrets_in_workflows == secrets_in_doc, (
         f"secret names drifted between the workflows {secrets_in_workflows} and "
         f"docs/MONITORING.md {secrets_in_doc}"
+    )
+
+
+@pytest.mark.unit
+def test_seeded_defect_a_heartbeat_only_job_missing_needs_is_caught(tmp_path):
+    """`security.yml`'s `freshness-ping` is the one heartbeat step that lives in its OWN job rather
+    than as the last step of the job doing the real work -- its gating on `codeql`/`dependency-audit`
+    succeeding is entirely in that job's `needs:`, invisible to a check that only reads step-level
+    `if:`. Strip that `needs:` from a scratch copy and confirm the real discovery + assertion
+    functions catch it -- not a synthetic string handed to a helper."""
+    scratch = tmp_path / "workflows"
+    scratch.mkdir()
+    for path in WORKFLOWS_DIR.glob("*.yml"):
+        shutil.copy(path, scratch / path.name)
+
+    baseline_failures = _assert_scheduled_workflows_ping_safely(scratch)
+    assert not baseline_failures, (
+        f"the unmodified scratch copies already fail: {baseline_failures} -- fix the real "
+        "workflows or this test's expectations before trusting the seeded defect below"
+    )
+
+    victim = scratch / "security.yml"
+    text = victim.read_text(encoding="utf-8")
+    stripped = text.replace(
+        "  freshness-ping:\n    name: report success to the freshness watch\n"
+        "    needs: [codeql, dependency-audit]\n",
+        "  freshness-ping:\n    name: report success to the freshness watch\n",
+    )
+    assert stripped != text, "the `needs:` line to strip was not found -- fix the literal above"
+    victim.write_text(stripped, encoding="utf-8")
+
+    failures = _assert_scheduled_workflows_ping_safely(scratch)
+    assert set(failures) == {"security.yml"}, (
+        f"expected only the seeded victim to fail with its `needs:` stripped, got {failures}"
+    )
+
+
+@pytest.mark.unit
+def test_seeded_defect_needs_stripped_plus_a_trailing_step_is_still_caught(tmp_path):
+    """A first version of `_heartbeat_job_needs_problems` inferred "heartbeat-only job" from step
+    COUNT (checkout + heartbeat-ping and nothing else) rather than step ORDER. Review caught it: on
+    that version, stripping `needs:` from `security.yml`'s `freshness-ping` was caught, but the same
+    strip PLUS one harmless extra step ANYWHERE IN THE SAME JOB silenced the check entirely — the
+    exact failure class this guard exists to close, one level up. This seeds both mutations
+    together, with the extra step placed AFTER heartbeat-ping (where it gates nothing, since it runs
+    only once the ping already has), and confirms the check still fires — proving the order-based
+    fix actually closes the gap rather than merely passing the narrower single-mutation case above.
+    """
+    scratch = tmp_path / "workflows"
+    scratch.mkdir()
+    for path in WORKFLOWS_DIR.glob("*.yml"):
+        shutil.copy(path, scratch / path.name)
+
+    victim = scratch / "security.yml"
+    text = victim.read_text(encoding="utf-8")
+    mutated = text.replace(
+        "  freshness-ping:\n    name: report success to the freshness watch\n"
+        "    needs: [codeql, dependency-audit]\n",
+        "  freshness-ping:\n    name: report success to the freshness watch\n",
+    )
+    assert mutated != text, "the `needs:` line to strip was not found -- fix the literal above"
+    mutated = mutated.replace(
+        '          label: "security (CodeQL + pip-audit)"\n',
+        '          label: "security (CodeQL + pip-audit)"\n'
+        "      - name: an unrelated step that runs after the ping, gating nothing\n"
+        "        run: echo unrelated\n",
+    )
+    assert mutated != text, (
+        "the trailing-step insertion point was not found -- fix the literal above"
+    )
+    victim.write_text(mutated, encoding="utf-8")
+
+    failures = _assert_scheduled_workflows_ping_safely(scratch)
+    assert set(failures) == {"security.yml"}, (
+        f"expected the victim to still fail once `needs:` is stripped, even with an unrelated step "
+        f"added after heartbeat-ping in the same job, got {failures}"
     )
 
 

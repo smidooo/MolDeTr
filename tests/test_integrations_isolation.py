@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -168,7 +169,7 @@ def _shim_source() -> str:
     )
 
 
-def _workflow_pytest_argvs() -> list[list[str]]:
+def _workflow_pytest_argvs(path: Path = WORKFLOW) -> list[list[str]]:
     """Every pytest invocation the integrations job makes, read from the workflow, not restated.
 
     **All of them, not the first.** This returned a single argv while the job made a single call.
@@ -176,18 +177,67 @@ def _workflow_pytest_argvs() -> list[list[str]]:
     after the repair, and the broad sweep that `--deselect`s what those two own. Returning the
     first would have left this guard green while two thirds of the lane went uncovered, which is
     precisely the defect class this module documents about itself in the header.
+
+    **Sees only the single-line `run: pytest ...` form.** A step rewritten as a `run: |` block
+    scalar with the identical command drops out of this list silently — the same shape of gap one
+    step further along. `test_workflow_pytest_argv_count_matches_the_workflow_structurally` is the
+    cross-check for that; `path` is a parameter (rather than always reading the module-level
+    `WORKFLOW`) so that test can point this function at a scratch copy with a seeded defect.
     """
     argvs = [
         shlex.split(line.removeprefix("run: "))
-        for line in (raw.strip() for raw in WORKFLOW.read_text(encoding="utf-8").splitlines())
+        for line in (raw.strip() for raw in path.read_text(encoding="utf-8").splitlines())
         if line.startswith("run: pytest ") and "test_integrations" in line
     ]
     assert argvs, (
-        f"no `run: pytest ... test_integrations ...` step found in {WORKFLOW.name}. The guard can "
+        f"no `run: pytest ... test_integrations ...` step found in {path.name}. The guard can "
         "no longer tell what the job runs, so it fails rather than silently checking a stale "
         "invocation — re-point it at whatever the step became."
     )
     return argvs
+
+
+def _step_blocks(workflow_text: str) -> list[str]:
+    """Text of each step under a job's `steps:`, split at the `- name:`/`- uses:` list-item
+    boundary (6-space indent in this repo's single-job workflows). Line-based, matching this
+    module's and `tests/test_workflow_freshness.py`'s existing convention of not adding a real YAML
+    parser to a `unit`-marked test."""
+    lines = workflow_text.splitlines()
+    starts = [i for i, line in enumerate(lines) if re.match(r"^      - (name|uses):", line)]
+    blocks = []
+    for idx, start in enumerate(starts):
+        end = starts[idx + 1] if idx + 1 < len(starts) else len(lines)
+        blocks.append("\n".join(lines[start:end]))
+    return blocks
+
+
+def _steps_invoking_integrations_pytest(workflow_text: str) -> int:
+    """Count of *steps* whose `run:` invokes pytest against `test_integrations`, matched
+    structurally — a step counts if `pytest` and `test_integrations` both appear inside a `run:` it
+    carries, whether that `run:` is the single-line form `_workflow_pytest_argvs` parses or a
+    `run: |`/`run: >-` block scalar it cannot see. This is deliberately a looser, independent match
+    on the same fact, so the two can be cross-checked against each other rather than one silently
+    drifting from what the workflow actually runs.
+
+    Matched on `test_integrations`, not `test_integrations.py` — review caught that the latter would
+    disagree with `_workflow_pytest_argvs`'s own `"test_integrations" in line` filter the moment a
+    step named `tests/test_integrations_isolation.py` (this file) or `tests/test_integrations_repair.py`
+    existed, producing a false cross-check mismatch between two counters that are each individually
+    correct. Matching the identical substring both parsers use is what keeps the cross-check honest.
+    """
+    count = 0
+    for block in _step_blocks(workflow_text):
+        # Comments talk about pytest and test_integrations freely (this very module's steps do)
+        # without the step actually running either — strip them before matching, or a step like
+        # "Install (no torch needed)", whose comment explains why it installs pytest thinly, counts
+        # as an invocation it never makes.
+        code_lines = [line for line in block.splitlines() if not line.lstrip(" ").startswith("#")]
+        code = "\n".join(code_lines)
+        if "run:" not in code:
+            continue
+        if "pytest" in code and "test_integrations" in code:
+            count += 1
+    return count
 
 
 def _run(
@@ -283,6 +333,50 @@ def block_shim(tmp_path: Path) -> Path:
         f"all and any result built on it would be vacuous:\n{combined}"
     )
     return shim
+
+
+@pytest.mark.unit
+def test_workflow_pytest_argv_count_matches_the_workflow_structurally(tmp_path: Path) -> None:
+    """Cross-check `_workflow_pytest_argvs`'s single-line `run: pytest ...` parsing against a
+    structural count of steps that mention pytest and `test_integrations.py` in their `run:` block,
+    however that block is written. `_workflow_pytest_argvs` returned only the FIRST invocation
+    until the automatic paper-relation repair was wired to three -- the module's own docstring
+    calls that "a green guard covering a third of the lane". Converting one of the three single-line
+    steps to a `run: |` block scalar (same command, different YAML form) is the same shape of gap
+    one step further along: the guard would silently go back to counting two, or one, without this
+    cross-check.
+    """
+    real_text = WORKFLOW.read_text(encoding="utf-8")
+    real_argv_count = len(_workflow_pytest_argvs(WORKFLOW))
+    assert real_argv_count == _steps_invoking_integrations_pytest(real_text), (
+        "the real workflow already disagrees between the single-line parser and the structural "
+        "count -- fix the real workflow or one of the two counters before trusting the seeded "
+        "defect below"
+    )
+
+    scratch = tmp_path / "integrations.yml"
+    victim = real_text.replace(
+        "run: pytest tests/test_integrations.py::"
+        "test_latest_software_record_supplements_the_article -q -p no:cacheprovider\n\n"
+        "      - name: Repair the paper relation",
+        "run: |\n"
+        "          pytest tests/test_integrations.py::"
+        "test_latest_software_record_supplements_the_article -q -p no:cacheprovider\n\n"
+        "      - name: Repair the paper relation",
+        1,
+    )
+    assert victim != real_text, (
+        "the literal to convert to a block scalar was not found in the workflow"
+    )
+    scratch.write_text(victim, encoding="utf-8")
+
+    seeded_argv_count = len(_workflow_pytest_argvs(scratch))
+    seeded_structural_count = _steps_invoking_integrations_pytest(victim)
+    assert seeded_argv_count != seeded_structural_count, (
+        f"expected the single-line parser ({seeded_argv_count}) to fall out of step with the "
+        f"structural count ({seeded_structural_count}) once one step became a block scalar -- if "
+        "they still agree, the seeded defect did not exercise the gap this test targets"
+    )
 
 
 @pytest.mark.unit
