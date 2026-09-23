@@ -1,4 +1,4 @@
-<!-- DESIGN_VERSION: v2 -->
+<!-- DESIGN_VERSION: v3 -->
 # MolDeTr brand — single source of truth
 
 Every artifact in this repo (README figures, the GUI theme, docs diagrams, the social
@@ -94,17 +94,21 @@ tricolor being CVD-robust never implied the greys were legible.
 The **tricolor dash triple** (`▬▬▬` in blue/orange/teal) is the recurring mark — header,
 figures, banner. Reuse it; don't invent new logos.
 
-## Canonical wording — the two decode paths (use verbatim)
+## Canonical wording — the two decode paths
 
-> **Short (captions, footnotes, tooltips):**
-> "**max J** = the largest coupling per multiplet (the live decode path — `predict.py`, the GUI).
-> The committed `structured_output` path recovers the full coupling set."
+> **GUI (captions, footnotes, tooltips): never name `structured_output`.** The folder holds the
+> paper's benchmark, the app does not write to it, and a caption that points there raises a question
+> the user cannot act on. State what the live decode returns and stop:
+> "**max J** = the largest coupling per multiplet. The live decode returns no further couplings."
 
-> **Long (README, SCOPE):**
-> "The live tools reproduce the paper's predictions — δ, proton count, and the largest coupling
-> **max J**. Deviations come from out-of-distribution acquisition or processing, not from spectral
-> resolution. `max J` is only the largest coupling per multiplet; the committed `structured_output`
-> / `aggregate_experimental` path recovers the full set (the paper's exact E⁻¹, 0.20 Hz median)."
+> **Docs (README, SCOPE, USAGE_NOTES): a claim that the full coupling set is available must name it
+> as the paper's committed benchmark.** It is recovered by `structured_output/` together with
+> `aggregate_experimental.py`, and no live path produces it for a new spectrum.
+> "The live tools reproduce the paper's predictions (δ, proton count, and the largest coupling
+> **max J**). Deviations come from out-of-distribution acquisition or processing, not from spectral
+> resolution. The full coupling set exists only for the paper's committed 13-ROI benchmark, where
+> `structured_output/` together with `aggregate_experimental.py` inverts the embedding exactly (0.20
+> Hz median). No live path returns it."
 
 ## The δ ≠ Δ rule
 
@@ -114,6 +118,14 @@ lowercase δ (`δ [PPM]`).
 
 ## Changelog
 
+- **v3** — the `structured_output` promise corrected at the source. The Short wording's second
+  sentence ("The committed `structured_output` path recovers the full coupling set.") had been copied
+  into five surfaces without its first, and read alone it promised app output from a folder of
+  committed paper data. A reader duly went looking for couplings the live decode never produces: the
+  decode emits only the `max` component of the `[sum, min, max, std]` embedding, and the full set
+  exists only for the paper's committed benchmark. The GUI wordings now never name the folder, and a
+  doc claim that the full set is recoverable must carry the benchmark qualifier. Both rules are
+  enforced by `tests/test_brand_contract.py`.
 - **v2** — scope framing corrected at the source. The "Research prototype" header chip is removed
   (orange no longer serves it), the GUI accordion is **Scope & limits**, and the canonical Long
   wording drops "On well-resolved spectra" — deviations come from out-of-distribution acquisition

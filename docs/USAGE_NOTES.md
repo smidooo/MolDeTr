@@ -14,7 +14,7 @@ to avoid each one.
 |---|---|---|
 | **δ (chemical shift)** | multiplet centre, in ppm (if calibrated) or Hz | **Most reliable.** Median error 0.90 Hz. |
 | **proton count** | number of equivalent protons for the multiplet | Reliable for 1H/2H/3H (97 / 88.75 / 75 %, see [`SCOPE.md`](SCOPE.md)). 4H/6H untested on real data. |
-| **max J** | the **largest** coupling constant, in Hz | Reports the **dominant** coupling per multiplet; the full set is in `structured_output` (see [`SCOPE.md`](SCOPE.md#about-the-coupling-constants)). Can deviate for inputs outside the trained regime. |
+| **max J** | the **largest** coupling constant, in Hz | Reports the **dominant** coupling per multiplet; the full set is not available from the live tools (see [`SCOPE.md`](SCOPE.md#about-the-coupling-constants)). Can deviate for inputs outside the trained regime. |
 | **line width** | peak width, in Hz (∝ 1/T₂) | Indicative; sensitive to shim and processing. |
 
 > [!NOTE]
@@ -30,7 +30,7 @@ to avoid each one.
 | "Spectrum is complex; using its real part" | you passed a complex spectrum | Pass the **real (absorption)** spectrum. The model uses the real part. |
 | A peak at the window edge is wrong | its **coupling partner is outside** the window | Widen or re-centre the region so the whole spin system (≤ 1200 Hz) is inside it. |
 | A big water/solvent peak throws it off | **out of scope**: no water suppression | Remove/suppress solvent and water first, or exclude that region. |
-| Reported J looks too large / there's "only one" | the live demo reports only **max J**, the largest coupling per multiplet | This is by design (the model outputs a coupling *embedding*, not each J). For the full coupling set use the `structured_output` path. |
+| Reported J looks too large / there's "only one" | the live demo reports only **max J**, the largest coupling per multiplet | This is by design (the model outputs a coupling *embedding*, not each J). The full set is recovered only for the paper's committed benchmark, via `structured_output/` with `aggregate_experimental.py`; no live path returns it. |
 | Predictions look generally off | baseline/phase distortion beyond the trained range, or an unusual sample | Phase and baseline-correct first (see the TopSpin recipe in `INPUT_FORMAT.md`); check the input is in the ranges in `SCOPE.md`. |
 | A 4H or 6H prediction on real data | those classes were **not** in the experimental test set | Treat with extra caution; verify against the structure. |
 
