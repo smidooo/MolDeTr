@@ -61,7 +61,7 @@ evaluation entry points, the Hydra configuration, and the ground-truth ROI annot
 > field-agnostic: it works in Hz, so it was tested across 80–600 MHz (and simulated down to ~5 MHz).
 > Predictions can deviate for inputs outside its trained regime: unusual distortions, non-standard pulse
 > sequences or processing, mixtures/impurities, or regions wider than the 1200 Hz window. `max J` is the
-> dominant coupling per multiplet (the full set is in the committed `structured_output` path). Read
+> dominant coupling per multiplet; the live tools return no further couplings. Read
 > **[Scope &amp; limitations](docs/SCOPE.md)** and **[Usage notes](docs/USAGE_NOTES.md)**, and
 > sanity-check predictions against your own chemistry.
 
@@ -362,9 +362,10 @@ queries. Two decode paths exist, and this matters for J. The committed path (`st
 paper's numbers. The live tools (`predict.py`, the GUI, `evaluate_experimental.py`) instead report a
 single **largest coupling, max(J)**, per multiplet (the coupling head emits a permutation-invariant
 embedding `[sum, min, max, std]`, and the demo surfaces only its max component). The live path
-**reproduces the paper's proton counts, shifts, and largest coupling `max J`**; the committed path
-additionally recovers the *full* coupling set per multiplet (the exact E⁻¹). That is the only
-difference. Predictions can deviate for inputs outside the trained regime. (The live tools also inject the same calibrated input noise the
+**reproduces the paper's proton counts, shifts, and largest coupling `max J`**. The committed path
+additionally recovers the *full* coupling set per multiplet (the exact E⁻¹), but only for the paper's
+committed 13-ROI benchmark: no live path produces it for a new spectrum.
+Predictions can deviate for inputs outside the trained regime. (The live tools also inject the same calibrated input noise the
 model was trained and evaluated with; see [Scope](docs/SCOPE.md).)
 
 > **Synthetic numbers.** The synthetic set on Zenodo is a small representative subset of the full test set
@@ -433,8 +434,9 @@ on real spectra.
 **How accurate is the coupling (J)?** The live `predict.py`/GUI reproduce the
 paper's largest coupling `max J` closely — for vanillin's ABX all three land within **0.7 Hz** of a
 ground truth of 8.1 / 2.0 / 8.1 Hz (measured values in `docs/figure_predictions.json`). `max J`
-is only the *largest* coupling per multiplet; the committed `structured_output` path recovers the full set
-(the paper's per-coupling 0.20 Hz median). Predictions can deviate for inputs outside the trained regime;
+is only the *largest* coupling per multiplet. The full set is recovered only for the paper's committed
+13-ROI benchmark, by `structured_output/` with `aggregate_experimental.py` (the paper's per-coupling
+0.20 Hz median). Predictions can deviate for inputs outside the trained regime;
 see [Scope → coupling constants](docs/SCOPE.md#about-the-coupling-constants).
 
 ## How to cite

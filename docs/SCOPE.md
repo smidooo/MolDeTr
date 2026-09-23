@@ -9,7 +9,7 @@
 > field-agnostic: it works in Hz, so it was tested across 80–600 MHz (and simulated down to ~5 MHz).
 > Predictions can deviate for inputs outside its trained regime: unusual distortions, non-standard pulse
 > sequences or processing, mixtures/impurities, or regions wider than the 1200 Hz window. `max J` is the
-> dominant coupling per multiplet (the full set is in `structured_output/`). Sanity-check against your
+> dominant coupling per multiplet; the live tools return no further couplings. Sanity-check against your
 > chemistry.
 
 This page states what MolDeTr can and cannot do. The claims are conservative and cited to the paper.
@@ -91,7 +91,8 @@ There are two ways this repo turns that into numbers:
   component of the embedding): the dominant coupling per multiplet, not the full set. They reproduce the
   paper's proton counts, chemical shifts, and `max J` — for vanillin's ABX all three land within
   **0.7 Hz** of a ground truth of 8.1 / 2.0 / 8.1 Hz. Predictions can deviate for inputs outside the
-  trained regime (the ranges above). For the full coupling set, use the exact `structured_output/` path.
+  trained regime (the ranges above). The full set is recovered only for the paper's committed benchmark,
+  by the exact `structured_output/` path with `aggregate_experimental.py`; no live path returns it.
 
   The measured values live in `docs/figure_predictions.json`, tied to the published checkpoint by
   `tests/test_scripts_local.py`, rather than as a triple typed into prose here. The triple that used
@@ -100,7 +101,8 @@ There are two ways this repo turns that into numbers:
   can check.
 
 Coupling recovery is reliable for **≤ 3 distinct** couplings per multiplet; the paper's evaluation
-centres on the largest coupling, `max J`, for this reason (the full sets stay in `structured_output/`).
+centres on the largest coupling, `max J`, for this reason (the full sets are recovered only for the
+paper's committed benchmark, not by the live tools).
 
 ## A note on input noise (why the live tools inject it)
 

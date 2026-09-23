@@ -20,8 +20,8 @@ MolDeTr is research code accompanying the paper: it handles congested, strongly-
 spectra and is largely field-agnostic — it works in Hz, so it was tested across 80–600 MHz (and
 simulated down to ~5 MHz). Results can deviate for inputs outside its trained regime — unusual
 distortions, non-standard pulse sequences or processing, mixtures, or windows wider than 1200 Hz.
-``max J`` is the dominant coupling per multiplet; the full set comes from the committed
-``structured_output`` path. See docs/SCOPE.md.
+``max J`` is the dominant coupling per multiplet; the live decode returns no further couplings, and
+the full set exists only for the paper's committed benchmark. See docs/SCOPE.md.
 """
 
 from __future__ import annotations
@@ -1075,18 +1075,19 @@ SCOPE_NOTE = (
     "MolDeTr handles congested, strongly-coupled ¹H NMR spectra and is largely field-agnostic "
     "(it works in Hz; tested on 80–600 MHz). Predictions can deviate for inputs outside its trained "
     "regime: unusual distortions, non-standard pulse sequences or processing, mixtures, or windows "
-    "wider than 1200 Hz. **max J** is the dominant coupling per multiplet (the full set is in the "
-    "committed `structured_output` path). Sanity-check predictions against your own chemistry."
+    "wider than 1200 Hz. **max J** is the dominant coupling per multiplet; the full set is not "
+    "available from the live tools. Sanity-check predictions against your own chemistry."
 )
 
 FOOTNOTE = (  # NEW
-    "max J = largest coupling per multiplet; the full coupling set comes from the committed "
-    "`structured_output` path. Sanity-check predictions against your own chemistry."
+    "max J = largest coupling per multiplet; the full set is not available from the live decode. "
+    "Sanity-check predictions against your own chemistry."
 )
 
 OUTPUT_CAPTION = (
     "Numbered markers on the plot correspond to the table rows. **max J** is the largest coupling "
-    "per multiplet; the full set is in the committed `structured_output` path."
+    "per multiplet; the live decode returns no further couplings. The CSV and JSON downloads "
+    "carry this table."
 )
 
 

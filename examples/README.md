@@ -8,8 +8,8 @@ Three small illustrative spectra (the **full** datasets live on Zenodo, DOI
 - `roi_S8_example.npz`: **vanillin** aromatic ABX (300 MHz), same keys. The live predictions recover
   the pattern — one proton per multiplet, both ortho couplings near 8 Hz against a ground truth of
   8.1, and the meta one near 2.0. Exact values are in `docs/figure_predictions.json`, measured from
-  the published checkpoint and tied to it by `tests/test_scripts_local.py`; the full coupling set per
-  multiplet is in the committed `structured_output` path.
+  the published checkpoint and tied to it by `tests/test_scripts_local.py`; the live tools report only
+  `max J`, and the full set is not available from them.
 
   Numbers used to be quoted here and in the main README as a fixed triple. They are not any more, on
   purpose: the pair that was published did not reproduce from the shipped checkpoint, and nothing in

@@ -53,6 +53,17 @@ All notable changes to this project are documented here. The format is based on
   glob could pass having checked zero links — turned out to already be closed by
   `lycheeverse/lychee-action`'s own `failIfEmpty: true` default, which this repo does not override;
   `tests/test_integrations_repair.py` now pins that nobody disables it. `[four-skills]`
+- **The promise that the full coupling set lives in `structured_output/` is gone from every
+  user-facing surface, and the test that enforced it now enforces the opposite.** `docs/BRAND.md`'s
+  canonical Short wording is two sentences; the second ("The committed `structured_output` path
+  recovers the full coupling set.") was copied into five surfaces without the first, and read alone
+  it promises app output from a folder of committed paper data. A reader followed it and asked where
+  his couplings were, and the honest answer was nowhere: the app never writes to that folder, and the
+  live decode emits only the `max` component of the `[sum, min, max, std]` embedding. The defect was
+  not merely unnoticed but *enforced*: `tests/test_brand_contract.py` asserted the literal token
+  `structured_output` in all three GUI captions. The captions now name no folder, every doc claim
+  that the full set is recoverable carries the paper's-benchmark qualifier, and a new invariant test
+  fails any unqualified mention or denial-free promise. `DESIGN_VERSION` is v3. `[four-skills]`
 
 ## [1.4.2] - 2026-08-12
 

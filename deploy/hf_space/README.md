@@ -21,7 +21,7 @@ off each multiplet's chemical shift (δ), largest coupling (max J), and proton c
 > field-agnostic — it works in Hz, so it was tested across 80–600 MHz (and simulated down to ~5 MHz).
 > Predictions can deviate for inputs outside its trained regime: unusual distortions, non-standard pulse
 > sequences or processing, mixtures/impurities, or regions wider than the 1200 Hz window. `max J` is the
-> dominant coupling per multiplet (the full set is in the repo's `structured_output/` path). See the
+> dominant coupling per multiplet; the live tools return no further couplings. See the
 > [main repository](https://github.com/smidooo/MolDeTr) and its
 > [`docs/SCOPE.md`](https://github.com/smidooo/MolDeTr/blob/main/docs/SCOPE.md) for what the model can and
 > cannot do.
