@@ -20,7 +20,11 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "scripts"))
 
 import app as gui  # noqa: E402
-from evaluate_experimental import load_ground_truth, match_and_score  # noqa: E402
+from evaluate_experimental import (  # noqa: E402
+    coupling_errors,
+    load_ground_truth,
+    match_and_score,
+)
 from moldetr.inference import build_model, load_checkpoint, run  # noqa: E402
 from moldetr.postprocess import decode_predictions, load_extrema  # noqa: E402
 from moldetr.reproducibility import set_seed  # noqa: E402
@@ -237,11 +241,62 @@ def variant_preds(variant: str, path: str, npz, seed: int) -> list[dict]:
 
 VARIANTS = (
     "V0_live",
-    "V5_paper_input_public_decode",
     "V6_live_group0_paperdecode",
     "V7_paper_input_group0_paperdecode",
-    "V8_live_group0_publicdecode",
 )
+
+
+def paper_match(preds: list[dict], gts: list[dict], pph: float = 5.12) -> dict:
+    """Transcribed from multiplet_detection_detr/matching_4_experimental_evaluation.py:100-190:
+    Hungarian on cost = (proton mismatch ? 1 : 0) + |dshift Hz| / 80, pairs > 20 Hz excluded."""
+    from scipy.optimize import linear_sum_assignment
+
+    out = {"dshift": [], "dj": [], "correct": 0, "n": len(gts), "n_matched": 0}
+    if not preds or not gts:
+        return out
+    cost = np.full((len(preds), len(gts)), np.inf)
+    for i, p in enumerate(preds):
+        for j, g in enumerate(gts):
+            d = abs(p["chemical_shift_in_points"] - g["chemical_shift_in_points"]) / pph
+            if d <= 20.0:
+                cost[i, j] = float(p["proton_count"] != g["proton_count"]) + d / 80.0
+    if np.isinf(cost).all():
+        return out
+    finite = np.where(np.isinf(cost), 1e9, cost)  # scipy rejects infeasible inf matrices
+    for i, j in zip(*linear_sum_assignment(finite)):
+        if np.isinf(cost[i, j]):
+            continue
+        p, g = preds[i], gts[j]
+        out["n_matched"] += 1
+        out["dshift"].append(abs(p["chemical_shift_in_points"] - g["chemical_shift_in_points"]) / pph)
+        out["correct"] += int(p["proton_count"] == g["proton_count"])
+        out["dj"].extend(coupling_errors(p["coupling_constants_hz"], g.get("coupling_constants", [])))
+    return out
+
+
+def ablation_paper_matcher(seeds=range(5)) -> dict:
+    res: dict = {}
+    files = sorted(ROI_DIR.glob("roi_S*.npz"))
+    for variant in VARIANTS:
+        rows, per_roi = [], {}
+        for p in files:
+            npz = np.load(p, allow_pickle=True)  # project's own Zenodo ROI arrays, as above
+            gts = load_ground_truth(npz)
+            ok = n = nm = 0
+            for seed in seeds:
+                sc = paper_match(variant_preds(variant, str(p), npz, seed), gts)
+                sc["n_pred"] = 0
+                rows.append(sc)
+                ok, n, nm = ok + sc["correct"], n + sc["n"], nm + sc["n_matched"]
+            per_roi[p.stem] = {"H_ok": ok, "n": n, "n_matched": nm}
+        pooled = summarize(rows)
+        nmatch = sum(r["n_matched"] for r in rows)
+        pooled["n_matched"] = nmatch
+        pooled["proton_acc_matched_pct"] = 100 * sum(r["correct"] for r in rows) / nmatch
+        res[variant] = {"pooled": pooled, "per_roi": per_roi}
+        print("PAPERMATCH", variant, json.dumps(pooled), flush=True)
+        print("PMPERROI", variant, json.dumps(per_roi), flush=True)
+    return res
 
 
 def ablation(seeds=range(5)) -> dict:
@@ -267,6 +322,6 @@ def ablation(seeds=range(5)) -> dict:
 
 
 if __name__ == "__main__":
-    result = {"ablation": ablation()}
+    result = {"paper_matcher": ablation_paper_matcher()}
     OUT.write_text(json.dumps(result, indent=1, default=float), encoding="utf-8")
     print("wrote", OUT)
