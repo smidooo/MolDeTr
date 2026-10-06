@@ -103,7 +103,7 @@ def test_per_class_accuracy_counts_unmatched_labels_as_miss():
 
 
 def test_regression_stats_mae_and_r2():
-    """MAE and R² (Table 4) on a hand-checkable case: exact shifts, a known coupling error."""
+    """MAE and R² (Table 1(d)) on a hand-checkable case: exact shifts, a known coupling error."""
     from scripts.aggregate_experimental import regression_stats
 
     pairs = [

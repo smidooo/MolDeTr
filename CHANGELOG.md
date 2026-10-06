@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **`moldetr.roi`: a loader and the article's matcher for the experimental ROIs.** `load_roi` reads a
+  Zenodo `roi_S*.npz` in the frame its labels use (real part of `spectrum_padded`) and refuses to fall
+  back to `spectrum_raw`, which sits `padding_before` (1000-2000) points into that frame on 7 of 13
+  ROIs. `match_hungarian` is the matcher the article's Table 1(d) was produced with (proton mismatch
+  + |Δδ|/80 Hz, 20 Hz gate). Measured on the real checkpoint: building the input from `spectrum_raw`
+  drops matched labels from 204/220 to 110/220 and raises false positives from 17 to 116.
+  `[four-skills]`
+- **`tests/test_gui_experimental_rois.py`: the GUI's Detect path on all 13 experimental ROIs**, 5 noise
+  seeds, scored with the article's matcher (measured: 204/220 matched, median |Δδ| 0.92 Hz, proton
+  accuracy 93.6 % of matched pairs vs the article's 92.1 %). The nightly guard now requires it, and
+  four other key model tests, to PASS by name rather than counting passes. `[four-skills]`
 - **An external dead-man's switch watches the three scheduled CI lanes** (`nightly.yml`,
   `integrations.yml`, `security.yml`). Each pings a URL from a repository secret via the new
   `.github/actions/heartbeat-ping` action on success, on `schedule`/`workflow_dispatch` runs only.
@@ -25,6 +36,14 @@ All notable changes to this project are documented here. The format is based on
   fresh clone (it previously lived only in the untracked `.git/hooks/commit-msg`). `[four-skills]`
 
 ### Changed
+- **`scripts/evaluate_experimental.py` now reports the article's metric.** It scored with a
+  nearest-shift matcher and printed the result next to the article's figures, which came from a
+  proton-aware Hungarian matcher, so its proton accuracy read ~81 % against ~94 % for the same
+  predictions. It now pools 5 noise seeds, uses `match_hungarian`, prints false positives and misses,
+  and compares each figure with the article's value in the same denominator. The nearest-shift score
+  remains as a labelled secondary line.
+- **The nightly heartbeat pings only from `main`**, so a manual dispatch on a branch cannot reset the
+  scheduled lane's dead-man's switch.
 - **`security.yml`'s `pip-audit` step is a baseline ratchet instead of permanently advisory.**
   `continue-on-error: true` is gone; `scripts/pip_audit_ratchet.py` now fails the lane on any
   `(package, vuln id)` pair not already recorded in `.github/pip-audit-baseline.json`, the same
@@ -38,6 +57,12 @@ All notable changes to this project are documented here. The format is based on
   passed 33 of 33 browser tests on 6.28.0. The specifier is `gradio>=6.21,<6.29` in both
   `pyproject.toml` and `deploy/requirements-demo.txt`. WebKit is Safari, so the cause is being
   investigated rather than the test relaxed.
+- **Paper references:** the article has no "Table 4". The experimental metrics are Table 1(d)
+  (README, `aggregate_experimental.py`, two test docstrings). README's "0.89 vs 0.90 is rounding" was
+  wrong: the article's text gives 0.885 Hz and the committed pairs give 0.8986 Hz, a 0.014 Hz gap of
+  unidentified cause. `CITATION.cff` now carries volume 98, issue 32, pages 23399-23412 (Crossref).
+- **`docs/DATA_SCHEMA.md`** omitted `spectrum_raw` and listed `metadata` keys the files do not have.
+  It now names the frame trap, the true keys, and the ppm-referencing offset on the 80 MHz ROIs.
 - **Closed five guard gaps a read-only audit found, all instances of this repo's own recurring
   defect class: a check that could report green while performing none of its work.**
   `browser-e2e` now runs the same axe-import probe `gradio-floor` already had, closing the gap

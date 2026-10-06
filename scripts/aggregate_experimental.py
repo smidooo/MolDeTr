@@ -77,7 +77,7 @@ def per_class_accuracy(matched_pairs: list, unmatched_labels: list | None = None
 
 
 def regression_stats(matched_pairs: list) -> dict:
-    """MAE (Hz) and R² for chemical shift and coupling from the matched pairs — the paper's Table 4.
+    """MAE (Hz) and R² for chemical shift and coupling from the matched pairs — the paper's Table 1(d).
     R² is scale-invariant, so shift is evaluated in Hz (points / POINTS_PER_HZ)."""
     ds_p: list[float] = []
     ds_l: list[float] = []

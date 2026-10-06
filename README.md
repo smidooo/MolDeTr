@@ -349,7 +349,7 @@ contributes two regions, S5 and S5_R2), spanning 10 compounds at 80–600 MHz.
 
 | Command | What it does | Needs |
 |---|---|---|
-| `python scripts/aggregate_experimental.py` | reproduce Table 4 (medians, per-class accuracy, MAE, R²) from committed match data | nothing (CPU, in-repo) |
+| `python scripts/aggregate_experimental.py` | reproduce Table 1(d) (medians, per-class accuracy, MAE, R²) from committed match data | nothing (CPU, in-repo) |
 | `python scripts/evaluate_experimental.py`  | regenerate predictions from the weights | checkpoint + ROI npz (Zenodo) |
 | `python scripts/evaluate_synthetic.py`     | synthetic test-set metrics | checkpoint + synthetic npz (Zenodo), `.[eval]` |
 
@@ -417,8 +417,10 @@ New to one side of this? These are the terms that matter.
 **Do I need a GPU?** No. Inference, the tests, and `predict.py` run on CPU via the pure-PyTorch fallback.
 A GPU only speeds up training and large batches.
 
-**Why 0.89 in the paper but 0.90 here?** Rounding of the same median; `aggregate_experimental.py` prints
-0.90. Both refer to the identical matched pairs.
+**Why 0.89 in the paper but 0.90 here?** Not rounding. The article's text gives the unrounded median
+as 0.885 Hz; the committed matched pairs give 0.8986 Hz over all 215 pairs (0.8980 Hz over the 198
+correctly classified ones), so the two differ by 0.014 Hz. The coupling median agrees (0.199 Hz) and
+the per-class accuracies agree exactly. The cause of the shift gap has not been identified.
 
 **A multiplet came out wrong at the edge of my window.** Its coupling partner is probably outside the
 window. Widen or re-centre the region so the whole spin system is inside it (≤ 1200 Hz).
