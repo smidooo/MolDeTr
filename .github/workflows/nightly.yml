@@ -121,6 +121,24 @@ jobs:
         # failures" -- which is the precise failure mode this whole effort exists to remove.
         run: pytest -q -rs -m model --junitxml=/tmp/model-results.xml
 
+      - name: TEMPORARY GUI reproduction audit (branch runs only)
+        if: github.ref != 'refs/heads/main'
+        env:
+          MPLBACKEND: Agg
+          MOLDETR_CHECKPOINT: /home/runner/.cache/moldetr/model_spin_system_ABCDEFG_exp2.pth
+          MOLDETR_ROI_NPZ_DIR: /home/runner/.cache/moldetr/rois
+        run: |
+          python scripts/aggregate_experimental.py
+          python scripts/_audit_gui_rois.py /tmp/gui-audit.json
+
+      - name: Upload the audit numbers
+        if: always() && github.ref != 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: gui-audit
+          path: /tmp/gui-audit.json
+          if-no-files-found: warn
+
       - name: Fail if the lane did not actually run the tests
         if: always()
         # The guard for the guard, ROUND TWO. The first version counted tests COLLECTED, which is
@@ -175,6 +193,9 @@ jobs:
         # No event-name restriction needed the way `security.yml`/`integrations.yml` have one: this
         # workflow only triggers on `schedule` and `workflow_dispatch`, both legitimate "the check
         # ran" events -- there is no `push` or `release` trigger here to filter out.
+        # Guarded to `main`: a manual dispatch on a branch is a real run of the lane but not the
+        # nightly, and its success must not reset the dead-man's switch for the scheduled one.
+        if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/heartbeat-ping
         with:
           url: ${{ secrets.HEALTHCHECK_URL_NIGHTLY }}
