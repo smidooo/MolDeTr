@@ -7,12 +7,16 @@ produced with. Regenerates predictions from the weights (unlike ``aggregate_expe
 which reads committed predictions and reproduces the article exactly).
 
 Why several seeds: the article pooled ~5 noisy repeats of the 13 ROIs (215 matched pairs over 220
-labels); one run is 44 labels, and its medians move by up to ~0.5 Hz between noise draws.
+labels). One run is 44 labels, and its medians move by up to ~0.5 Hz between noise draws.
 
-What still differs from the article, by design (measured 2026-10-06, docs/audits/):
-- coupling: this decode reports the largest J per multiplet only; the article scored every J.
-- decode: all 8 query groups pooled and merged within 20 points; the article read group 0 only,
-  which matches 219/220 labels against 204/220 here (closely overlapped multiplets, S2/S7).
+How this compares with the article (measured 2026-10-06, see docs/DATA_SCHEMA.md):
+- coupling: comparable. Every label carries at most one J, and the article scored it against the
+  largest predicted J, which is the one J this decode reports.
+- decode: all 8 query groups pooled and merged within 20 points. The article read group 0 only,
+  which matches more of the closely overlapped multiplets (S2, S7).
+- matcher: the primary lines reproduce the article's matcher, including its quirk of discarding
+  every match in a spectrum with both an unmatchable prediction and an unmatchable label. A
+  second line gives the lenient result that keeps those valid pairs.
 
 Requires the weights and the ROI npz from Zenodo (10.5281/zenodo.21217102).
 """
@@ -40,8 +44,9 @@ PAPER_PROTON_PER_LABEL = 90.0  # 198/220 labels
 def match_and_score(preds: list[dict], gts: list[dict], points_per_hz: float) -> dict:
     """Nearest-shift greedy matching. NOT the article's metric; kept as a labelled secondary.
 
-    It pairs co-located labels (one shared point, different proton counts) arbitrarily, so its
-    proton accuracy reads ~81 % where the article's matcher reads ~94 % on the same predictions.
+    It pairs co-located labels (one shared point, different proton counts) arbitrarily and has no
+    distance gate. On the same predictions it reads ~81 % of labels where the article's matcher
+    reads 86.8 % of labels (93.6 % of matched pairs, the denominator Table 1(d) uses).
     """
     dshift: list[float] = []
     dj: list[float] = []
@@ -66,23 +71,6 @@ def match_and_score(preds: list[dict], gts: list[dict], points_per_hz: float) ->
     return {"dshift": dshift, "dj": dj, "correct": correct, "n": len(gts)}
 
 
-def load_ground_truth(npz) -> list[dict]:
-    gt = npz["ground_truth"]
-    items = gt.tolist() if hasattr(gt, "tolist") else list(gt)
-    out = []
-    for it in items:
-        if isinstance(it, dict):
-            cc = it.get("coupling_constants", [])
-            out.append(
-                {
-                    "proton_count": it.get("proton_count"),
-                    "chemical_shift_in_points": it.get("chemical_shift_in_points"),
-                    "coupling_constants": cc if isinstance(cc, (list, tuple)) else [cc],
-                }
-            )
-    return out
-
-
 def _parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="Evaluate on the experimental ROI test set (npz).")
     ap.add_argument("--structured-output", type=Path, default=ROOT / "structured_output")
@@ -96,11 +84,17 @@ def _parse_args() -> argparse.Namespace:
     ap.add_argument(
         "--seeds", type=int, default=5, help="noise draws per ROI (run()'s noise_seed 0..N-1)"
     )
-    return ap.parse_args()
+    args = ap.parse_args()
+    if args.seeds < 1:
+        ap.error("--seeds must be at least 1")
+    return args
 
 
-def _score_roi(model, extrema, path: str, args) -> tuple[list[MatchResult], int]:
-    """Hungarian results for one ROI over all noise seeds, and the nearest-shift correct count."""
+Scores = dict[str, list[MatchResult]]
+
+
+def _score_roi(model, extrema, path: str, args) -> tuple[Scores, int]:
+    """Faithful + lenient Hungarian results for one ROI over all seeds, plus nearest-shift hits."""
     roi = load_roi(path)
     labels_as_dicts = [
         {
@@ -110,28 +104,34 @@ def _score_roi(model, extrema, path: str, args) -> tuple[list[MatchResult], int]
         }
         for lab in roi.labels
     ]
-    results, greedy_correct = [], 0
+    scores: Scores = {"faithful": [], "lenient": []}
+    greedy_correct = 0
     for noise_seed in range(args.seeds):
         out = run(model, roi.spectrum, noise_seed=noise_seed)
         preds = decode_predictions(out, extrema, roi.points_per_hz, threshold=args.threshold)
-        results.append(match_hungarian(preds, roi.labels, roi.points_per_hz))
+        for mode in scores:
+            scores[mode].append(
+                match_hungarian(
+                    preds, roi.labels, roi.points_per_hz, article_faithful=mode == "faithful"
+                )
+            )
         greedy_correct += match_and_score(preds, labels_as_dicts, roi.points_per_hz)["correct"]
-    s = summarize(results)
+    s = summarize(scores["faithful"])
     print(
         f"  {roi.name}: {len(roi.labels)} spin systems x {args.seeds} seeds -> "
         f"{s.n_matched} matched, {s.n_correct} proton-count correct, "
         f"{s.false_positives} false positives, {s.false_negatives} missed"
     )
-    return results, greedy_correct
+    return scores, greedy_correct
 
 
-def _report(results: list[MatchResult], greedy_correct: int, n_seeds: int) -> None:
-    s = summarize(results)
+def _report(scores: Scores, greedy_correct: int, n_seeds: int) -> None:
+    s = summarize(scores["faithful"])
     print(f"\nOverall ({s.n_labels} labels = spin systems x {n_seeds} noise seeds), paper matcher:")
     print(f"  median |dd| = {s.median_dshift_hz:.2f} Hz   (paper {PAPER_MEDIAN_DSHIFT_HZ} Hz)")
     print(
-        f"  median |dJ| = {s.median_dj_hz:.2f} Hz   (paper {PAPER_MEDIAN_DJ_HZ} Hz over every J; "
-        "this decode scores the largest J only)"
+        f"  median |dJ| = {s.median_dj_hz:.2f} Hz   (paper {PAPER_MEDIAN_DJ_HZ} Hz; "
+        "largest predicted J vs the label J, as the article scored it)"
     )
     print(
         f"  proton-count accuracy = {100 * s.proton_acc_per_match:.1f} % of matched pairs "
@@ -141,6 +141,13 @@ def _report(results: list[MatchResult], greedy_correct: int, n_seeds: int) -> No
     print(
         f"  matched {s.n_matched}/{s.n_labels}, false positives {s.false_positives}, "
         f"missed {s.false_negatives}"
+    )
+    lenient = summarize(scores["lenient"])
+    print(
+        "  [lenient matcher: keeps valid pairs in spectra the article's code zeroes] matched "
+        f"{lenient.n_matched}/{lenient.n_labels}, false positives {lenient.false_positives}, "
+        f"proton-count accuracy {100 * lenient.proton_acc_per_match:.1f} % of matched pairs, "
+        f"median |dd| {lenient.median_dshift_hz:.2f} Hz"
     )
     print(
         f"  [secondary, NOT the paper's metric] nearest-shift matcher proton-count accuracy = "
@@ -164,13 +171,14 @@ def main() -> None:
         )
     extrema = load_extrema(args.extrema)
     model = load_checkpoint(build_model(), args.checkpoint)
-    results: list[MatchResult] = []
+    scores: Scores = {"faithful": [], "lenient": []}
     greedy_correct = 0
     for path in npz_files:
-        roi_results, roi_greedy = _score_roi(model, extrema, path, args)
-        results += roi_results
+        roi_scores, roi_greedy = _score_roi(model, extrema, path, args)
+        for mode in scores:
+            scores[mode] += roi_scores[mode]
         greedy_correct += roi_greedy
-    _report(results, greedy_correct, args.seeds)
+    _report(scores, greedy_correct, args.seeds)
 
 
 if __name__ == "__main__":

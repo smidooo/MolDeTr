@@ -179,7 +179,8 @@ jobs:
           PY
 
       - name: Report success to the freshness watch
-        # No `if:` needed beyond the default: a step with none only runs if every prior step in
+        # Its `if:` names no status function, so GitHub still prepends the implicit `success()`:
+        # it runs only if every prior step in
         # this job succeeded, which is exactly "ping only on a genuinely successful nightly" --
         # including the guard-the-guard step above. Confirmed from this repo's own run history, not
         # just by analogy: run 33040589280 shows a `skipped` cache-miss download step followed by a

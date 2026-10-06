@@ -1,9 +1,9 @@
 """The GUI's Detect decode, on all 13 Zenodo experimental ROIs, against the article's numbers.
 
-Every ROI goes in the way an upload does (``app._load`` with ``trusted=False``, so no pickle), through
-``validate_spectrum`` -> ``run`` -> ``decode_predictions`` with the file's ppm bounds, under noise seeds
-0-4 (the article pooled ~5 noisy repeats: 215 matched pairs over 220 labels). Scored with the article's
-own matcher, ``moldetr.roi.match_hungarian``.
+Every ROI goes in the way an upload does (``app._load`` with ``trusted=False``, so no pickle),
+through ``validate_spectrum`` -> ``run`` -> ``decode_predictions`` with the file's ppm bounds,
+under noise seeds 0-4 (the article pooled ~5 noisy repeats: 215 matched pairs over 220 labels).
+Scored with the article's own matcher, ``moldetr.roi.match_hungarian``.
 
 Measured 2026-10-06 on CI (real checkpoint, this exact path), and the bounds asserted below:
 
@@ -29,6 +29,7 @@ Not asserted: |dJ|. This decode reports the largest J per multiplet; the article
 from __future__ import annotations
 
 import os
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -82,7 +83,7 @@ def gui_runs():
 
 
 def test_the_gui_reads_an_upload_in_the_frame_the_labels_use():
-    """``app._load`` must hand back ``spectrum_padded`` (the labels' frame), never ``spectrum_raw``."""
+    """``app._load`` must return ``spectrum_padded`` (the labels' frame), not ``spectrum_raw``."""
     _require_rois()
     import app
     from moldetr.roi import load_roi
@@ -95,12 +96,22 @@ def test_the_gui_reads_an_upload_in_the_frame_the_labels_use():
 def test_gui_detect_reproduces_the_article_on_all_rois(gui_runs):
     from moldetr.roi import match_hungarian, summarize
 
-    s = summarize([match_hungarian(p, lab) for p, lab in gui_runs.values()])
-    report = (
-        f"labels={s.n_labels} matched={s.n_matched} FP={s.false_positives} "
-        f"FN={s.false_negatives} median|dd|={s.median_dshift_hz:.3f} Hz "
-        f"H/match={s.proton_acc_per_match:.3f} H/label={s.proton_acc_per_label:.3f}"
-    )
+    def scored(faithful: bool):
+        runs = gui_runs.values()
+        return summarize([match_hungarian(p, lab, article_faithful=faithful) for p, lab in runs])
+
+    def describe(tag: str, x) -> str:
+        return (
+            f"{tag}: labels={x.n_labels} matched={x.n_matched} FP={x.false_positives} "
+            f"FN={x.false_negatives} median|dd|={x.median_dshift_hz:.3f} Hz "
+            f"median|dJ|={x.median_dj_hz:.3f} Hz H/match={x.proton_acc_per_match:.3f} "
+            f"H/label={x.proton_acc_per_label:.3f}"
+        )
+
+    s, faithful = scored(False), scored(True)
+    report = describe("lenient", s) + " | " + describe("faithful", faithful)
+    # Shown in the nightly log on every run, pass or fail: the measured numbers, not a verdict.
+    warnings.warn(report, stacklevel=1)
     assert s.n_labels == N_SPIN_SYSTEMS * len(SEEDS), report
     assert s.n_matched >= 195, report
     assert s.false_positives <= 30, report
@@ -113,7 +124,13 @@ def test_app_predict_table_is_the_decode_this_test_scores(gui_runs):
     """Ties the replicated path to ``app.predict`` itself: seed 0 is what the Detect button runs."""
     import app
 
+    n_rows = 0
     for path in ROI_FILES:
         table, _fig, msg = app.predict(str(path), THRESHOLD, app.AUTO, None, None, 5.12)
         preds, _labels = gui_runs[(path.stem, 0)]
-        assert table is not None and len(table) == len(preds), f"{path.name}: {msg}"
+        assert table is not None, f"{path.name}: {msg}"
+        shown = list(zip(table["PROTONS"], table["δ (PPM)"]))
+        scored = [(f"{p['proton_count']} H", f"{p['chemical_shift_ppm']:.3f}") for p in preds]
+        assert shown == scored, f"{path.name}: the table is not the decode this file scores"
+        n_rows += len(shown)
+    assert n_rows >= 40, "every ROI came back empty; the comparison above proved nothing"

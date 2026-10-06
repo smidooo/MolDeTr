@@ -4,18 +4,19 @@
 copies of the spectrum, and the labels fit only one of them:
 
 - ``spectrum_padded`` -- 6144 points, the model's input frame. ``ground_truth`` is indexed here.
-- ``spectrum_raw`` -- the ROI before padding, 500-4190 points for nine of the thirteen ROIs, and for
+- ``spectrum_raw`` -- the ROI before padding, 500-4190 points for eight of the thirteen ROIs, and for
   seven of them it starts ``metadata["padding_before"]`` (1000-2000) points into the padded frame.
 
 Building the input from ``spectrum_raw`` and padding it at the end shifts every peak 195-390 Hz off
 its label. Measured 2026-10-06 on the real checkpoint (13 ROIs x 5 noise seeds, scored with
-:func:`match_hungarian`): 110/220 labels matched with 116 false positives, against 204/220 and 17 for
-``spectrum_padded``. Taking the magnitude instead of the real part costs 105 false positives.
+:func:`match_hungarian`): 110/220 labels matched with 116 false positives, against 204/220 and 17
+for ``spectrum_padded``. Taking the magnitude instead of the real part costs 105 false positives.
 
 ``match_hungarian`` is the matcher the article's numbers were produced with (transcribed from the
 private training repo, ``multiplet_detection_detr/matching_4_experimental_evaluation.py:100-190``).
-A nearest-shift matcher on the same predictions reports ~81 % proton accuracy instead of ~94 %,
-because it pairs co-located labels (S2, S7) arbitrarily: the two are different metrics.
+A nearest-shift matcher on the same predictions reports ~81 % of labels with the right proton
+count, against 86.8 % for this one (93.6 % of matched pairs, Table 1(d)'s denominator), because
+it pairs co-located labels (S2, S7) arbitrarily: the two are different metrics.
 
 numpy + scipy only, so scoring never needs the torch extra.
 """
@@ -57,27 +58,40 @@ class RoiData:
 def load_roi(path: str | Path) -> RoiData:
     """Load a Zenodo benchmark ROI as the model must see it: the real part of ``spectrum_padded``.
 
-    Unpickles ``metadata`` and ``ground_truth`` (object arrays), so this is for the trusted benchmark
-    files from Zenodo 10.5281/zenodo.21217102 only -- never for user uploads; the GUI does not call it.
-    Raises ``ValueError`` rather than falling back to ``spectrum_raw``, because that fallback IS the trap.
+    Unpickles ``metadata`` and ``ground_truth`` (object arrays), so this is for the trusted
+    benchmark files from Zenodo 10.5281/zenodo.21217102 only, never for user uploads. The GUI
+    does not call it. Raises ``ValueError`` rather than falling back to ``spectrum_raw``, because
+    that fallback IS the trap.
     """
     p = Path(path)
     with np.load(p, allow_pickle=True) as npz:
         if "spectrum_padded" not in npz.files:
             raise ValueError(
                 f"{p.name}: no 'spectrum_padded'. The labels are indexed in the padded 6144-point "
-                "frame; 'spectrum_raw' is offset by metadata['padding_before'] and must not be used."
+                "frame; 'spectrum_raw' is offset by metadata['padding_before'] and must not "
+                "be used."
             )
         spectrum = np.real(np.asarray(npz["spectrum_padded"])).astype(np.float64)
         if spectrum.shape != (N_POINTS,):
-            raise ValueError(f"{p.name}: spectrum_padded has shape {spectrum.shape}, expected (6144,)")
-        md: dict[str, Any] = npz["metadata"].item() if "metadata" in npz.files else {}
-        gt = npz["ground_truth"].tolist() if "ground_truth" in npz.files else []
-        axis = np.asarray(npz["ppm_axis_padded"], dtype=np.float64) if "ppm_axis_padded" in npz.files else None
+            raise ValueError(
+                f"{p.name}: spectrum_padded has shape {spectrum.shape}, expected (6144,)"
+            )
+        for key in ("metadata", "ground_truth"):
+            if key not in npz.files:
+                raise ValueError(f"{p.name}: no '{key}'; not a benchmark ROI file")
+        md: dict[str, Any] = npz["metadata"].item()
+        gt = list(npz["ground_truth"].tolist())
+        axis = (
+            np.asarray(npz["ppm_axis_padded"], dtype=np.float64)
+            if "ppm_axis_padded" in npz.files
+            else None
+        )
+    if not gt or not all(isinstance(g, dict) for g in gt):
+        raise ValueError(f"{p.name}: 'ground_truth' must be a non-empty list of label dicts")
     return RoiData(
         name=p.stem,
         spectrum=spectrum,
-        labels=[from_experimental(g) for g in gt if isinstance(g, dict)],
+        labels=[from_experimental(g) for g in gt],
         points_per_hz=float(md.get("points_per_hz", POINTS_PER_HZ)),
         padding_before=int(md.get("padding_before", 0)),
         padding_after=int(md.get("padding_after", 0)),
@@ -87,10 +101,16 @@ def load_roi(path: str | Path) -> RoiData:
 
 
 def coupling_errors(pred_cc: list[float], label_cc: list[float]) -> list[float]:
-    """|ΔJ| per label coupling: both sides sorted by magnitude, zero labels ignored (Hz)."""
+    """|ΔJ| per non-zero label coupling, both sides sorted by magnitude (Hz).
+
+    A label coupling with no predicted partner scores against 0: ``decode_predictions`` reports no
+    J when its largest is <= 0.5 Hz, while the article's predictions always carried J slots, so
+    dropping the pair would bias |ΔJ| low. Every label carries at most one J (123 of 215 committed
+    pairs have one), and the article scored it against the largest predicted J, as this does.
+    """
     true = sorted((abs(c) for c in label_cc if c not in (0, 0.0)), reverse=True)
-    pred = sorted((abs(c) for c in pred_cc), reverse=True)[: len(true)]
-    return [abs(t - p) for t, p in zip(true, pred)]
+    pred = sorted((abs(c) for c in pred_cc), reverse=True)
+    return [abs(t - (pred[i] if i < len(pred) else 0.0)) for i, t in enumerate(true)]
 
 
 @dataclass
@@ -130,37 +150,56 @@ def _cost_matrix(
     return cost
 
 
+def _assign(cost: NDArray[np.float64], article_faithful: bool) -> list[tuple[int, int]]:
+    """Index pairs inside the gate.
+
+    scipy raises "cost matrix is infeasible" whenever no complete finite assignment exists, i.e.
+    whenever a spectrum has an unmatchable prediction AND an unmatchable label. The article's code
+    (``matching_4_experimental_evaluation.py:167-171``) catches that and keeps NO match for the
+    spectrum. ``article_faithful=False`` instead solves with a large finite stand-in (1e9, far above
+    the largest in-gate cost of 1 + 20/80) and keeps the valid pairs.
+    """
+    if not cost.size or np.isinf(cost).all():
+        return []
+    if article_faithful:
+        try:
+            rows, cols = linear_sum_assignment(cost)
+        except ValueError:
+            return []
+    else:
+        rows, cols = linear_sum_assignment(np.where(np.isinf(cost), 1e9, cost))
+    return [(int(i), int(j)) for i, j in zip(rows, cols) if not np.isinf(cost[i, j])]
+
+
 def match_hungarian(
     preds: list[dict],
     labels: list[Multiplet],
     points_per_hz: float = POINTS_PER_HZ,
     gate_hz: float = GATE_HZ,
+    article_faithful: bool = True,
 ) -> MatchResult:
     """The article's matcher: Hungarian assignment on proton mismatch + |Δδ| / 80 Hz, 20 Hz gate.
 
     ``preds`` are ``decode_predictions`` dicts. Inside the gate a correct proton count always wins
-    over a closer shift, which is what lets co-located labels (one shared point, different H) pair up.
+    over a closer shift, which is what lets co-located labels (one shared point, different H)
+    pair up. By default it also reproduces the article's quirk of discarding every match in a
+    spectrum that has both an unmatchable prediction and an unmatchable label (see ``_assign``).
     """
     res = MatchResult()
     cost = _cost_matrix(preds, labels, points_per_hz, gate_hz)
     used_p: set[int] = set()
     used_l: set[int] = set()
-    if cost.size and not np.isinf(cost).all():
-        # scipy refuses an infeasible all-inf row/col, so gate with a large finite cost instead.
-        rows, cols = linear_sum_assignment(np.where(np.isinf(cost), 1e9, cost))
-        for i, j in zip(rows, cols):
-            if np.isinf(cost[i, j]):
-                continue
-            p, lab = preds[i], labels[j]
-            used_p.add(int(i))
-            used_l.add(int(j))
-            res.pairs.append((p, lab))
-            shift = abs(float(p["chemical_shift_in_points"]) - lab.center_in_points)
-            res.dshift_hz.append(shift / points_per_hz)
-            res.n_correct += int(int(p["proton_count"]) == lab.proton_count)
-            res.dj_hz.extend(
-                coupling_errors(list(p.get("coupling_constants_hz", [])), lab.coupling_constants_hz)
-            )
+    for i, j in _assign(cost, article_faithful):
+        p, lab = preds[i], labels[j]
+        used_p.add(int(i))
+        used_l.add(int(j))
+        res.pairs.append((p, lab))
+        shift = abs(float(p["chemical_shift_in_points"]) - lab.center_in_points)
+        res.dshift_hz.append(shift / points_per_hz)
+        res.n_correct += int(int(p["proton_count"]) == lab.proton_count)
+        res.dj_hz.extend(
+            coupling_errors(list(p["coupling_constants_hz"]), lab.coupling_constants_hz)
+        )
     res.unmatched_predictions = [p for k, p in enumerate(preds) if k not in used_p]
     res.unmatched_labels = [lab for k, lab in enumerate(labels) if k not in used_l]
     return res

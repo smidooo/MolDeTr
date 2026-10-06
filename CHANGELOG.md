@@ -38,8 +38,8 @@ All notable changes to this project are documented here. The format is based on
 ### Changed
 - **`scripts/evaluate_experimental.py` now reports the article's metric.** It scored with a
   nearest-shift matcher and printed the result next to the article's figures, which came from a
-  proton-aware Hungarian matcher, so its proton accuracy read ~81 % against ~94 % for the same
-  predictions. It now pools 5 noise seeds, uses `match_hungarian`, prints false positives and misses,
+  proton-aware Hungarian matcher: on the same predictions it read ~81 % of labels against 86.8 %
+  (93.6 % of matched pairs, the article's denominator). It now pools 5 noise seeds, uses `match_hungarian`, prints false positives and misses,
   and compares each figure with the article's value in the same denominator. The nearest-shift score
   remains as a labelled secondary line.
 - **The nightly heartbeat pings only from `main`**, so a manual dispatch on a branch cannot reset the

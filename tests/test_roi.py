@@ -2,7 +2,8 @@
 
 Both exist because of a measured failure, not a hypothetical one (CI, 2026-10-06, real checkpoint,
 13 Zenodo ROIs x 5 noise seeds, paper matcher): a downloader who builds the model input from
-``spectrum_raw`` instead of ``spectrum_padded`` gets 110/220 labels matched with 116 false positives,
+``spectrum_raw`` instead of ``spectrum_padded`` gets 110/220 labels matched with 116 false
+positives,
 against 204/220 and 17 for the frame the labels live in. Seven ROIs start ``spectrum_raw`` at a
 non-zero ``metadata.padding_before``, so the wrong array shifts every peak 195-390 Hz off its label.
 
@@ -29,7 +30,8 @@ PEAK_PADDED = PAD_BEFORE + PEAK_IN_RAW  # where the label lives
 
 def _write_roi(path: Path, *, with_padded: bool = True, padded_len: int = N) -> Path:
     x = np.arange(RAW_LEN)
-    # Complex, as in the deposit: the real part is the absorption line, the imaginary part dispersive.
+    # Complex, as in the deposit: the real part is the absorption line, the imaginary part
+    # dispersive.
     raw = np.exp(-0.5 * ((x - PEAK_IN_RAW) / 3.0) ** 2) * (1 + 0.5j) * 1e9
     padded = np.zeros(padded_len, dtype=complex)
     padded[PAD_BEFORE : PAD_BEFORE + RAW_LEN] = raw
@@ -95,6 +97,26 @@ def test_load_roi_refuses_a_file_without_the_padded_frame(tmp_path: Path) -> Non
         load_roi(_write_roi(tmp_path / "roi_SX.npz", with_padded=False))
 
 
+def test_load_roi_refuses_a_file_without_ground_truth(tmp_path: Path) -> None:
+    """A missing key used to load as zero labels, so every prediction read as a false positive."""
+    path = tmp_path / "roi_SX.npz"
+    np.savez(path, spectrum_padded=np.zeros(N), metadata=np.array({}, dtype=object))
+    with pytest.raises(ValueError, match="ground_truth"):
+        load_roi(path)
+
+
+def test_load_roi_refuses_labels_that_are_not_dicts(tmp_path: Path) -> None:
+    path = tmp_path / "roi_SX.npz"
+    np.savez(
+        path,
+        spectrum_padded=np.zeros(N),
+        metadata=np.array({}, dtype=object),
+        ground_truth=np.array([[1, 2, 3]], dtype=object),
+    )
+    with pytest.raises(ValueError, match="label dicts"):
+        load_roi(path)
+
+
 def test_load_roi_refuses_a_wrong_length_padded_spectrum(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="6144"):
         load_roi(_write_roi(tmp_path / "roi_SX.npz", padded_len=N - 1))
@@ -109,13 +131,16 @@ def _pred(points: float, protons: int, j: float = 7.0) -> dict:
 
 
 def _label(points: float, protons: int, j: list[float] | None = None) -> Multiplet:
-    return Multiplet(proton_count=protons, center_in_points=float(points), coupling_constants_hz=j or [])
+    return Multiplet(
+        proton_count=protons, center_in_points=float(points), coupling_constants_hz=j or []
+    )
 
 
 def test_hungarian_assigns_co_located_labels_by_proton_count() -> None:
     """The S2/S7 shape: three labels at one identical point (H = 2, 2, 1).
 
-    Shift alone cannot tell them apart, so the paper's cost lets proton agreement decide. A shift-only
+    Shift alone cannot tell them apart, so the paper's cost lets proton agreement decide. A
+    shift-only
     matcher would pair them in list order and score this case 1/3 (labels 2,2,1 vs preds 1,2,2).
     """
     labels = [_label(1086, 2), _label(1086, 2), _label(1086, 1)]
@@ -156,13 +181,31 @@ def test_hungarian_reports_shift_in_hz_and_largest_coupling_error() -> None:
     assert res.dj_hz == [pytest.approx(0.5)]
 
 
+def test_a_coupled_label_matched_to_a_prediction_without_j_scores_the_whole_j() -> None:
+    """decode_predictions reports no J when its largest is <= 0.5 Hz. The article's predictions
+    always carried J slots, so such a pair scored |0 - J|; dropping it would bias |dJ| low."""
+    labels = [_label(2000, 2, j=[8.2])]
+    pred = _pred(2000, 2)
+    pred["coupling_constants_hz"] = []
+    res = match_hungarian([pred], labels)
+    assert res.dj_hz == [pytest.approx(8.2)]
+
+
+def test_an_uncoupled_label_contributes_no_coupling_error() -> None:
+    res = match_hungarian([_pred(2000, 1, j=7.0)], [_label(2000, 1, j=[])])
+    assert res.dj_hz == []
+
+
 def test_summarize_pools_counts_and_uses_both_accuracy_denominators() -> None:
     """Paper Table 1(d) quotes proton accuracy over matched pairs (92.1 %); per label (198/220) is
     the other honest denominator. Both must come out, from the same pooled counts."""
     from moldetr.roi import summarize
 
-    a = match_hungarian([_pred(1000, 2), _pred(3000, 1)], [_label(1000, 2), _label(2000, 1)])
-    b = match_hungarian([_pred(1000 + 5.12, 1)], [_label(1000, 2)])
+    # Lenient mode on purpose: `a` is the shape the article's matcher zeroes (see the tests below),
+    # and this test is about the pooling arithmetic, not that quirk.
+    preds_a = [_pred(1000, 2), _pred(3000, 1)]
+    a = match_hungarian(preds_a, [_label(1000, 2), _label(2000, 1)], article_faithful=False)
+    b = match_hungarian([_pred(1000 + 5.12, 1)], [_label(1000, 2)], article_faithful=False)
     s = summarize([a, b])
     assert (s.n_labels, s.n_matched, s.false_positives, s.false_negatives) == (3, 2, 1, 1)
     assert s.n_correct == 1
@@ -183,3 +226,28 @@ def test_summarize_of_nothing_matched_reports_nan_not_a_crash() -> None:
 def test_hungarian_with_no_predictions_counts_every_label_missed() -> None:
     res = match_hungarian([], [_label(1000, 1), _label(2000, 2)])
     assert (res.n_matched, res.false_positives, res.false_negatives) == (0, 0, 2)
+
+
+# The article's quirk (matching_4_experimental_evaluation.py:167-171, verified with scipy 1.18) ----
+# scipy raises "cost matrix is infeasible" when no complete finite assignment exists, which happens
+# whenever a spectrum has an unmatchable prediction AND an unmatchable label. The article's code
+# catches that and returns NO matches for the spectrum, discarding the valid pairs as well.
+
+
+def _one_valid_plus_one_unmatchable_each() -> tuple[list[dict], list[Multiplet]]:
+    preds = [_pred(1000, 2), _pred(3000, 1)]  # 3000 is 195 Hz from any label: outside the gate
+    labels = [_label(1000, 2), _label(2000, 1)]  # 2000 is 195 Hz from any prediction
+    return preds, labels
+
+
+def test_faithful_mode_zeroes_the_spectrum_like_the_article() -> None:
+    preds, labels = _one_valid_plus_one_unmatchable_each()
+    res = match_hungarian(preds, labels)  # article_faithful is the default
+    assert (res.n_matched, res.false_positives, res.false_negatives) == (0, 2, 2)
+
+
+def test_lenient_mode_keeps_the_valid_pair() -> None:
+    preds, labels = _one_valid_plus_one_unmatchable_each()
+    res = match_hungarian(preds, labels, article_faithful=False)
+    assert (res.n_matched, res.false_positives, res.false_negatives) == (1, 1, 1)
+    assert res.n_correct == 1
