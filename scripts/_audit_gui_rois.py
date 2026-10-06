@@ -37,12 +37,16 @@ def med(xs: list[float]) -> float:
     return statistics.median(xs) if xs else float("nan")
 
 
-def gui_preds(path: str, pph: float) -> list[dict]:
-    """The app.predict decode, but returning raw predictions so match_and_score can use them."""
+def gui_preds(path: str, pph: float, noise_seed: int = 0) -> list[dict]:
+    """The app.predict decode, but returning raw predictions so match_and_score can use them.
+
+    ``noise_seed`` is run()'s own argument (default 0, which is what the GUI always uses): the
+    in-model noise floor is seeded there, NOT by the global set_seed.
+    """
     raw, cal = gui._load(path, trusted=True)
     amps = gui.validate_spectrum(raw, points_per_hz=pph)
     return decode_predictions(
-        run(model, amps),
+        run(model, amps, noise_seed=noise_seed),
         extrema,
         pph,
         ppm_left=cal.get("ppm_left"),
@@ -155,7 +159,33 @@ def synthetic() -> dict:
     return out
 
 
+def replicates(n_seeds: int = 10) -> dict:
+    """GUI decode with run()'s noise_seed varied. The paper pooled ~5 stochastic repeats per ROI
+    (215 matched pairs over 41 distinct labels in the committed JSON), the GUI uses one (seed 0)."""
+    per_seed: dict[int, list[dict]] = {}
+    for seed in range(n_seeds):
+        rows = []
+        for p in sorted(ROI_DIR.glob("roi_S*.npz")):
+            npz = np.load(p, allow_pickle=True)  # project's own Zenodo ROI arrays, as above
+            gts = load_ground_truth(npz)
+            sc = match_and_score(gui_preds(str(p), 5.12, seed), gts, 5.12)
+            sc["n_pred"] = len(gui_preds(str(p), 5.12, seed))
+            rows.append(sc)
+        per_seed[seed] = rows
+        s = summarize(rows)
+        print(f"SEED {seed} {json.dumps(s)}", flush=True)
+    pooled = {}
+    for label, seeds in (("pooled_0-4", range(5)), ("pooled_0-9", range(n_seeds))):
+        pooled[label] = summarize([r for s in seeds for r in per_seed[s]])
+        print("POOLED", label, json.dumps(pooled[label]), flush=True)
+    return {"per_seed": {s: summarize(r) for s, r in per_seed.items()}, "pooled": pooled}
+
+
 if __name__ == "__main__":
-    result = {"experimental": experimental(), "synthetic": synthetic()}
+    result = {
+        "experimental": experimental(),
+        "replicates": replicates(),
+        "synthetic": synthetic(),
+    }
     OUT.write_text(json.dumps(result, indent=1, default=float), encoding="utf-8")
     print("wrote", OUT)
