@@ -181,11 +181,86 @@ def replicates(n_seeds: int = 10) -> dict:
     return {"per_seed": {s: summarize(r) for s, r in per_seed.items()}, "pooled": pooled}
 
 
+PAPER_THRESH = float(1 / (1 + np.exp(0.5)))  # paper: any(logit > -0.5) == max sigmoid > 0.378
+
+
+def paper_input(npz, noise_seed: int) -> np.ndarray:
+    """multiplet_detection_detr/evaluate_experimental.py:1403-1466 on the Zenodo raw ROI:
+    sigma-2 Gaussian broadening and 0.5 % noise on the ROI chunk only, divide-by-max, zero pad."""
+    from moldetr.dataloader.data_augmentation import add_line_broadening
+
+    md = npz["metadata"].item()
+    pb, pa = int(md.get("padding_before", 0)), int(md.get("padding_after", 0))
+    full = np.asarray(npz["spectrum_padded"])
+    chunk = full[pb : full.size - pa]
+    chunk = np.real(add_line_broadening(chunk, custom_sigma=2.0, use_custom_values=True))
+    rng = np.random.RandomState(noise_seed)
+    chunk = chunk + rng.normal(0, 0.005 * chunk.max(), chunk.shape)
+    chunk = chunk / (chunk.max() + 1e-6)
+    return np.pad(chunk, (pb, pa), "constant", constant_values=0).astype(np.float32)
+
+
+def forward_raw(arr: np.ndarray):
+    import torch
+
+    with torch.no_grad():
+        out = model(torch.from_numpy(arr).float()[None, None, :])
+    return out[0].reshape(-1, out.shape[-1])
+
+
+def live_input(path: str, broaden: bool):
+    raw, _cal = gui._load(path, trusted=True)
+    if broaden:
+        from moldetr.dataloader.data_augmentation import add_line_broadening
+
+        raw = add_line_broadening(np.asarray(raw), custom_sigma=2.0, use_custom_values=True)
+    return gui.validate_spectrum(raw, points_per_hz=5.12)
+
+
+def variant_preds(variant: str, path: str, npz, seed: int) -> list[dict]:
+    if variant in ("V4_paper_faithful", "V5_paper_input_public_decode"):
+        out = forward_raw(paper_input(npz, seed))
+    else:
+        out = run(model, live_input(path, broaden=variant == "V3_live_broaden"), noise_seed=seed)
+    faithful_decode = variant == "V4_paper_faithful"
+    thresh = PAPER_THRESH if variant in ("V2_live_thr0378", "V4_paper_faithful") else THRESH
+    merge = 0.0 if variant in ("V1_live_nomerge",) or faithful_decode else 20.0
+    return decode_predictions(out, extrema, 5.12, threshold=thresh, merge_tol_points=merge)
+
+
+VARIANTS = (
+    "V0_live",
+    "V1_live_nomerge",
+    "V2_live_thr0378",
+    "V3_live_broaden",
+    "V4_paper_faithful",
+    "V5_paper_input_public_decode",
+)
+
+
+def ablation(seeds=range(5)) -> dict:
+    res: dict = {}
+    files = sorted(ROI_DIR.glob("roi_S*.npz"))
+    for variant in VARIANTS:
+        rows, per_roi = [], {}
+        for p in files:
+            npz = np.load(p, allow_pickle=True)  # project's own Zenodo ROI arrays, as above
+            gts = load_ground_truth(npz)
+            ok = n = npred = 0
+            for seed in seeds:
+                preds = variant_preds(variant, str(p), npz, seed)
+                sc = match_and_score(preds, gts, 5.12)
+                sc["n_pred"] = len(preds)
+                rows.append(sc)
+                ok, n, npred = ok + sc["correct"], n + sc["n"], npred + len(preds)
+            per_roi[p.stem] = {"H_ok": ok, "n": n, "n_pred": npred}
+        res[variant] = {"pooled": summarize(rows), "per_roi": per_roi}
+        print("ABLATION", variant, json.dumps(res[variant]["pooled"]), flush=True)
+        print("PERROI", variant, json.dumps(per_roi), flush=True)
+    return res
+
+
 if __name__ == "__main__":
-    result = {
-        "experimental": experimental(),
-        "replicates": replicates(),
-        "synthetic": synthetic(),
-    }
+    result = {"ablation": ablation()}
     OUT.write_text(json.dumps(result, indent=1, default=float), encoding="utf-8")
     print("wrote", OUT)
