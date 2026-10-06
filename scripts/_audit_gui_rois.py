@@ -217,24 +217,30 @@ def live_input(path: str, broaden: bool):
     return gui.validate_spectrum(raw, points_per_hz=5.12)
 
 
+GROUP0 = 10  # out[0] is (n_groups=8, num_queries=10, C) reshaped row-major: rows 0-9 = group 0
+
+
 def variant_preds(variant: str, path: str, npz, seed: int) -> list[dict]:
-    if variant in ("V4_paper_faithful", "V5_paper_input_public_decode"):
+    """The paper read group 0 only (evaluate_experimental.py:247, ``[0, 0, ...]``)."""
+    paper_in = variant in ("V5_paper_input_public_decode", "V7_paper_input_group0_paperdecode")
+    if paper_in:
         out = forward_raw(paper_input(npz, seed))
     else:
-        out = run(model, live_input(path, broaden=variant == "V3_live_broaden"), noise_seed=seed)
-    faithful_decode = variant == "V4_paper_faithful"
-    thresh = PAPER_THRESH if variant in ("V2_live_thr0378", "V4_paper_faithful") else THRESH
-    merge = 0.0 if variant in ("V1_live_nomerge",) or faithful_decode else 20.0
+        out = run(model, live_input(path, broaden=False), noise_seed=seed)
+    if variant.startswith(("V6", "V7", "V8")):
+        out = out[:GROUP0]
+    paper_decode = variant in ("V6_live_group0_paperdecode", "V7_paper_input_group0_paperdecode")
+    thresh = PAPER_THRESH if paper_decode else THRESH
+    merge = 0.0 if paper_decode else 20.0
     return decode_predictions(out, extrema, 5.12, threshold=thresh, merge_tol_points=merge)
 
 
 VARIANTS = (
     "V0_live",
-    "V1_live_nomerge",
-    "V2_live_thr0378",
-    "V3_live_broaden",
-    "V4_paper_faithful",
     "V5_paper_input_public_decode",
+    "V6_live_group0_paperdecode",
+    "V7_paper_input_group0_paperdecode",
+    "V8_live_group0_publicdecode",
 )
 
 
