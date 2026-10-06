@@ -1,0 +1,119 @@
+"""The GUI's Detect decode, on all 13 Zenodo experimental ROIs, against the article's numbers.
+
+Every ROI goes in the way an upload does (``app._load`` with ``trusted=False``, so no pickle), through
+``validate_spectrum`` -> ``run`` -> ``decode_predictions`` with the file's ppm bounds, under noise seeds
+0-4 (the article pooled ~5 noisy repeats: 215 matched pairs over 220 labels). Scored with the article's
+own matcher, ``moldetr.roi.match_hungarian``.
+
+Measured 2026-10-06 on CI (real checkpoint, this exact path), and the bounds asserted below:
+
+=====================  ========  ======================  ====================
+quantity               measured  bound                   article (Table 1(d))
+=====================  ========  ======================  ====================
+labels                 220       == 220                  220
+matched (<= 20 Hz)     204       >= 195                  215
+false positives        17        <= 30                   20
+median |dd| (Hz)       0.919     0.60 - 1.20             0.89
+H acc, matched pairs   93.6 %    >= 88 %                 92.1 %
+H acc, all labels      86.8 %    >= 80 %                 90.0 % (198/220)
+=====================  ========  ======================  ====================
+
+What the bounds exclude, measured the same day on the same 220 labels: building the input from
+``spectrum_raw`` padded at the end (110 matched, 116 false positives, 49.5 %) or from the magnitude
+(105 false positives, 68.6 %). Seed 3 alone gives a 1.35 Hz median, which is why one seed is not
+enough and why the band is on the 5-seed pool.
+
+Not asserted: |dJ|. This decode reports the largest J per multiplet; the article scored every J.
+"""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+import numpy as np
+import pytest
+
+pytestmark = pytest.mark.model
+
+REPO = Path(__file__).resolve().parent.parent
+ROI_DIR = Path(os.environ.get("MOLDETR_ROI_NPZ_DIR", str(REPO / "structured_output")))
+ROI_FILES = sorted(ROI_DIR.glob("roi_S*.npz"))
+SEEDS = range(5)
+THRESHOLD = 0.3
+N_SPIN_SYSTEMS = 44  # in the 13 ROIs (structured_output/README.md)
+
+
+def _require_rois() -> None:
+    if len(ROI_FILES) < 13:
+        pytest.skip(f"expected 13 Zenodo roi_S*.npz in {ROI_DIR}, found {len(ROI_FILES)}")
+
+
+@pytest.fixture(scope="module")
+def gui_runs():
+    """(roi, seed) -> (predictions, labels) for every ROI and noise seed, via the GUI's path."""
+    ckpt = os.environ.get("MOLDETR_CHECKPOINT")
+    if not ckpt or not Path(ckpt).exists():
+        pytest.skip("real checkpoint absent (set MOLDETR_CHECKPOINT)")
+    _require_rois()
+    import app
+    from moldetr.inference import build_model, load_checkpoint, run
+    from moldetr.postprocess import decode_predictions, load_extrema
+    from moldetr.roi import load_roi
+
+    model = load_checkpoint(build_model(), ckpt)
+    extrema = load_extrema(app.EXTREMA)
+    runs = {}
+    for path in ROI_FILES:
+        raw, cal = app._load(str(path), trusted=False)  # exactly how an upload is read
+        amps = app.validate_spectrum(raw, points_per_hz=5.12)
+        labels = load_roi(path).labels
+        for seed in SEEDS:
+            preds = decode_predictions(
+                run(model, amps, noise_seed=seed),
+                extrema,
+                5.12,
+                ppm_left=cal.get("ppm_left"),
+                ppm_right=cal.get("ppm_right"),
+                threshold=THRESHOLD,
+            )
+            runs[(path.stem, seed)] = (preds, labels)
+    return runs
+
+
+def test_the_gui_reads_an_upload_in_the_frame_the_labels_use():
+    """``app._load`` must hand back ``spectrum_padded`` (the labels' frame), never ``spectrum_raw``."""
+    _require_rois()
+    import app
+    from moldetr.roi import load_roi
+
+    for path in ROI_FILES:
+        raw, _cal = app._load(str(path), trusted=False)
+        assert np.array_equal(np.real(raw), load_roi(path).spectrum), path.name
+
+
+def test_gui_detect_reproduces_the_article_on_all_rois(gui_runs):
+    from moldetr.roi import match_hungarian, summarize
+
+    s = summarize([match_hungarian(p, lab) for p, lab in gui_runs.values()])
+    report = (
+        f"labels={s.n_labels} matched={s.n_matched} FP={s.false_positives} "
+        f"FN={s.false_negatives} median|dd|={s.median_dshift_hz:.3f} Hz "
+        f"H/match={s.proton_acc_per_match:.3f} H/label={s.proton_acc_per_label:.3f}"
+    )
+    assert s.n_labels == N_SPIN_SYSTEMS * len(SEEDS), report
+    assert s.n_matched >= 195, report
+    assert s.false_positives <= 30, report
+    assert 0.60 <= s.median_dshift_hz <= 1.20, report
+    assert s.proton_acc_per_match >= 0.88, report
+    assert s.proton_acc_per_label >= 0.80, report
+
+
+def test_app_predict_table_is_the_decode_this_test_scores(gui_runs):
+    """Ties the replicated path to ``app.predict`` itself: seed 0 is what the Detect button runs."""
+    import app
+
+    for path in ROI_FILES:
+        table, _fig, msg = app.predict(str(path), THRESHOLD, app.AUTO, None, None, 5.12)
+        preds, _labels = gui_runs[(path.stem, 0)]
+        assert table is not None and len(table) == len(preds), f"{path.name}: {msg}"

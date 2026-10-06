@@ -121,24 +121,6 @@ jobs:
         # failures" -- which is the precise failure mode this whole effort exists to remove.
         run: pytest -q -rs -m model --junitxml=/tmp/model-results.xml
 
-      - name: TEMPORARY GUI reproduction audit (branch runs only)
-        if: github.ref != 'refs/heads/main'
-        env:
-          MPLBACKEND: Agg
-          MOLDETR_CHECKPOINT: /home/runner/.cache/moldetr/model_spin_system_ABCDEFG_exp2.pth
-          MOLDETR_ROI_NPZ_DIR: /home/runner/.cache/moldetr/rois
-        run: |
-          python scripts/aggregate_experimental.py
-          python scripts/_audit_gui_rois.py /tmp/gui-audit.json
-
-      - name: Upload the audit numbers
-        if: always() && github.ref != 'refs/heads/main'
-        uses: actions/upload-artifact@v4
-        with:
-          name: gui-audit
-          path: /tmp/gui-audit.json
-          if-no-files-found: warn
-
       - name: Fail if the lane did not actually run the tests
         if: always()
         # The guard for the guard, ROUND TWO. The first version counted tests COLLECTED, which is
@@ -171,6 +153,19 @@ jobs:
           print(f"model-marked tests passed: {len(passed)}   skipped: {len(skipped)}")
           for name in skipped:
               print(f"  SKIPPED {name}")
+
+          # Named, not counted: the lane already passes more tests than the floor below, so a NEW
+          # test that silently skipped would still clear it. These must each have PASSED.
+          required = (
+              "test_gui_detect_reproduces_the_article_on_all_rois",
+              "test_the_gui_reads_an_upload_in_the_frame_the_labels_use",
+              "test_app_predict_table_is_the_decode_this_test_scores",
+              "test_evaluate_experimental_reproduces_paper_median",
+              "test_vanillin_oracle_reproduces_the_published_numbers",
+          )
+          missing = [r for r in required if not any(n.endswith("::" + r) for n in passed)]
+          if missing:
+              sys.exit(f"required model tests did not pass (failed or skipped): {missing}")
 
           # 13 measured 2026-08-07. A floor, not equality: widening RECOVERY_PHENOTYPES raises it
           # legitimately. Skips are not tolerated at all here -- every skip in this lane means an
