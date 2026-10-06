@@ -274,6 +274,54 @@ def paper_match(preds: list[dict], gts: list[dict], pph: float = 5.12) -> dict:
     return out
 
 
+USER_LOADERS = ("U0_shipped_padded", "U1_raw_endpadded", "U2_raw_stretched", "U3_abs_padded")
+
+
+def user_input(loader: str, npz) -> np.ndarray:
+    """How a Zenodo downloader might build the 6144-point model input from the npz."""
+    raw, pad = np.asarray(npz["spectrum_raw"]), np.asarray(npz["spectrum_padded"])
+    if loader == "U0_shipped_padded":
+        return np.real(pad)
+    if loader == "U1_raw_endpadded":  # pads at the end, unaware of metadata.padding_before
+        return np.pad(np.real(raw), (0, 6144 - raw.size), "constant")
+    if loader == "U2_raw_stretched":  # resamples the ROI to fill the window
+        x = np.linspace(0, raw.size - 1, 6144)
+        return np.interp(x, np.arange(raw.size), np.real(raw))
+    return np.abs(pad)  # U3: magnitude instead of the absorption (real) part
+
+
+def user_loader_study(seeds=range(5)) -> dict:
+    res: dict = {}
+    for loader in USER_LOADERS:
+        rows, per_roi = [], {}
+        for p in sorted(ROI_DIR.glob("roi_S*.npz")):
+            npz = np.load(p, allow_pickle=True)  # project's own Zenodo ROI arrays, as above
+            gts = load_ground_truth(npz)
+            fp = fn = ok = 0
+            for seed in seeds:
+                preds = decode_predictions(
+                    run(model, user_input(loader, npz), noise_seed=seed), extrema, 5.12
+                )
+                sc = paper_match(preds, gts)
+                sc["n_pred"] = len(preds)
+                rows.append(sc)
+                fp += len(preds) - sc["n_matched"]
+                fn += sc["n"] - sc["n_matched"]
+                ok += sc["correct"]
+            per_roi[p.stem] = {"FP": fp, "FN": fn, "H_ok": ok}
+        pooled = summarize(rows)
+        nm = sum(r["n_matched"] for r in rows)
+        pooled.update(
+            n_matched=nm,
+            FP=sum(r["n_pred"] for r in rows) - nm,
+            FN=sum(r["n"] for r in rows) - nm,
+        )
+        res[loader] = {"pooled": pooled, "per_roi": per_roi}
+        print("USERLOAD", loader, json.dumps(pooled), flush=True)
+        print("ULPERROI", loader, json.dumps(per_roi), flush=True)
+    return res
+
+
 def ablation_paper_matcher(seeds=range(5)) -> dict:
     res: dict = {}
     files = sorted(ROI_DIR.glob("roi_S*.npz"))
@@ -322,6 +370,6 @@ def ablation(seeds=range(5)) -> dict:
 
 
 if __name__ == "__main__":
-    result = {"paper_matcher": ablation_paper_matcher()}
+    result = {"user_loaders": user_loader_study()}
     OUT.write_text(json.dumps(result, indent=1, default=float), encoding="utf-8")
     print("wrote", OUT)
