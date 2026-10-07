@@ -38,7 +38,7 @@ label dict: `proton_count`, `chemical_shift_in_points`, `coupling_constants` (**
 
 > [!WARNING]
 > **Load these files with `moldetr.roi.load_roi`, not by hand.** Measured 2026-10-06 on the real
-> checkpoint (13 ROIs x 5 noise seeds, scored with the article's matcher `moldetr.roi.match_hungarian`):
+> checkpoint (13 ROIs x 5 noise seeds, scored with `moldetr.roi.match_hungarian` in lenient mode):
 >
 > | model input built from | labels matched | false positives | proton accuracy |
 > |---|---|---|---|

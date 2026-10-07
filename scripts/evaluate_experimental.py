@@ -46,7 +46,7 @@ def match_and_score(preds: list[dict], gts: list[dict], points_per_hz: float) ->
 
     It pairs co-located labels (one shared point, different proton counts) arbitrarily and has no
     distance gate. On the same predictions it reads ~81 % of labels where the article's matcher
-    reads 86.8 % of labels (93.6 % of matched pairs, the denominator Table 1(d) uses).
+    reads 85.0 % of labels (93.5 % of matched pairs, the denominator Table 1(d) uses).
     """
     dshift: list[float] = []
     dj: list[float] = []

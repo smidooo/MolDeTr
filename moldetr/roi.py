@@ -4,18 +4,20 @@
 copies of the spectrum, and the labels fit only one of them:
 
 - ``spectrum_padded`` -- 6144 points, the model's input frame. ``ground_truth`` is indexed here.
-- ``spectrum_raw`` -- the ROI before padding, 500-4190 points for eight of the thirteen ROIs, and for
-  seven of them it starts ``metadata["padding_before"]`` (1000-2000) points into the padded frame.
+- ``spectrum_raw`` -- the ROI before padding, 500-4190 points for eight of the thirteen ROIs, and
+  for seven of them it starts ``metadata["padding_before"]`` (1000-2000) points into the padded
+  frame.
 
 Building the input from ``spectrum_raw`` and padding it at the end shifts every peak 195-390 Hz off
 its label. Measured 2026-10-06 on the real checkpoint (13 ROIs x 5 noise seeds, scored with
-:func:`match_hungarian`): 110/220 labels matched with 116 false positives, against 204/220 and 17
-for ``spectrum_padded``. Taking the magnitude instead of the real part costs 105 false positives.
+:func:`match_hungarian` in lenient mode): 110/220 labels matched with 116 false positives, against
+204/220 and 17 for ``spectrum_padded``. Taking the magnitude instead of the real part costs 105
+false positives.
 
 ``match_hungarian`` is the matcher the article's numbers were produced with (transcribed from the
 private training repo, ``multiplet_detection_detr/matching_4_experimental_evaluation.py:100-190``).
 A nearest-shift matcher on the same predictions reports ~81 % of labels with the right proton
-count, against 86.8 % for this one (93.6 % of matched pairs, Table 1(d)'s denominator), because
+count, against 85.0 % for this one (93.5 % of matched pairs, Table 1(d)'s denominator), because
 it pairs co-located labels (S2, S7) arbitrarily: the two are different metrics.
 
 numpy + scipy only, so scoring never needs the torch extra.

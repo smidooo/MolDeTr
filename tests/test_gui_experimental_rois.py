@@ -5,25 +5,30 @@ through ``validate_spectrum`` -> ``run`` -> ``decode_predictions`` with the file
 under noise seeds 0-4 (the article pooled ~5 noisy repeats: 215 matched pairs over 220 labels).
 Scored with the article's own matcher, ``moldetr.roi.match_hungarian``.
 
-Measured 2026-10-06 on CI (real checkpoint, this exact path), and the bounds asserted below:
+Measured 2026-10-06 on CI (run 37518511396, real checkpoint, this exact path). The bounds are
+asserted on the article-faithful matcher; the lenient one (keeps valid pairs in spectra the
+article's code zeroes) gave 204 matched, 17 FP, 86.8 % of labels:
 
 =====================  ========  ======================  ====================
 quantity               measured  bound                   article (Table 1(d))
 =====================  ========  ======================  ====================
 labels                 220       == 220                  220
-matched (<= 20 Hz)     204       >= 195                  215
-false positives        17        <= 30                   20
-median |dd| (Hz)       0.919     0.60 - 1.20             0.89
-H acc, matched pairs   93.6 %    >= 88 %                 92.1 %
-H acc, all labels      86.8 %    >= 80 %                 90.0 % (198/220)
+matched (<= 20 Hz)     200       >= 190                  215
+false positives        21        <= 32                   20
+median |dd| (Hz)       0.917     0.60 - 1.20             0.885
+median |dJ| (Hz)       0.174     <= 0.30                 0.199
+H acc, matched pairs   93.5 %    >= 88 %                 92.1 %
+H acc, all labels      85.0 %    >= 78 %                 90.0 % (198/220)
 =====================  ========  ======================  ====================
 
-What the bounds exclude, measured the same day on the same 220 labels: building the input from
-``spectrum_raw`` padded at the end (110 matched, 116 false positives, 49.5 %) or from the magnitude
-(105 false positives, 68.6 %). Seed 3 alone gives a 1.35 Hz median, which is why one seed is not
-enough and why the band is on the 5-seed pool.
+|dJ| is like-for-like: every label carries at most one J, and the article scored it against the
+largest predicted J, the one J this decode reports. The labels gap (200 vs 215) is the decode
+merging closely overlapped multiplets (S2, S7), see scripts/evaluate_experimental.py.
 
-Not asserted: |dJ|. This decode reports the largest J per multiplet; the article scored every J.
+What the bounds exclude, measured the same day on the same 220 labels (lenient matcher): building
+the input from ``spectrum_raw`` padded at the end (110 matched, 116 false positives, 49.5 %) or
+from the magnitude (105 false positives, 68.6 %). Seed 3 alone gives a 1.35 Hz median, which is
+why one seed is not enough and why the band is on the 5-seed pool.
 """
 
 from __future__ import annotations
@@ -112,12 +117,15 @@ def test_gui_detect_reproduces_the_article_on_all_rois(gui_runs):
     report = describe("lenient", s) + " | " + describe("faithful", faithful)
     # Shown in the nightly log on every run, pass or fail: the measured numbers, not a verdict.
     warnings.warn(report, stacklevel=1)
-    assert s.n_labels == N_SPIN_SYSTEMS * len(SEEDS), report
-    assert s.n_matched >= 195, report
-    assert s.false_positives <= 30, report
-    assert 0.60 <= s.median_dshift_hz <= 1.20, report
-    assert s.proton_acc_per_match >= 0.88, report
-    assert s.proton_acc_per_label >= 0.80, report
+    assert faithful.n_labels == N_SPIN_SYSTEMS * len(SEEDS), report
+    assert faithful.n_matched >= 190, report
+    assert faithful.false_positives <= 32, report
+    assert 0.60 <= faithful.median_dshift_hz <= 1.20, report
+    assert faithful.median_dj_hz <= 0.30, report
+    assert faithful.proton_acc_per_match >= 0.88, report
+    assert faithful.proton_acc_per_label >= 0.78, report
+    # The lenient matcher only ever keeps pairs the faithful one drops, never fewer.
+    assert s.n_matched >= faithful.n_matched, report
 
 
 def test_app_predict_table_is_the_decode_this_test_scores(gui_runs):

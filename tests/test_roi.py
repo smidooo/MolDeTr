@@ -1,11 +1,11 @@
 """Weight-free tests for ``moldetr.roi``: the benchmark-ROI loader and the paper's matcher.
 
 Both exist because of a measured failure, not a hypothetical one (CI, 2026-10-06, real checkpoint,
-13 Zenodo ROIs x 5 noise seeds, paper matcher): a downloader who builds the model input from
+13 Zenodo ROIs x 5 noise seeds, lenient matcher): a downloader who builds the model input from
 ``spectrum_raw`` instead of ``spectrum_padded`` gets 110/220 labels matched with 116 false
-positives,
-against 204/220 and 17 for the frame the labels live in. Seven ROIs start ``spectrum_raw`` at a
-non-zero ``metadata.padding_before``, so the wrong array shifts every peak 195-390 Hz off its label.
+positives, against 204/220 and 17 for the frame the labels live in. Seven ROIs start
+``spectrum_raw`` at a non-zero ``metadata.padding_before``, so the wrong array shifts every peak
+195-390 Hz off its label.
 
 The fixtures below rebuild that layout in miniature: a short raw ROI embedded at an offset inside a
 6144-point padded spectrum, labels indexed in the padded frame.
