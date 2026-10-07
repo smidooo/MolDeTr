@@ -33,6 +33,11 @@ All notable changes to this project are documented here. The format is based on
   assumed. `[four-skills]`
 
 ### Fixed
+- **`gradio` capped below 6.29.** Gradio 6.29.1 broke the WebKit zoom-reset journey
+  (`test_spectrum_plot_zooms_and_resets[webkit]`): 3 of 3 runs failed on it, while unchanged `main`
+  passed 33 of 33 browser tests on 6.28.0. The specifier is `gradio>=6.21,<6.29` in both
+  `pyproject.toml` and `deploy/requirements-demo.txt`. WebKit is Safari, so the cause is being
+  investigated rather than the test relaxed.
 - **Closed five guard gaps a read-only audit found, all instances of this repo's own recurring
   defect class: a check that could report green while performing none of its work.**
   `browser-e2e` now runs the same axe-import probe `gradio-floor` already had, closing the gap

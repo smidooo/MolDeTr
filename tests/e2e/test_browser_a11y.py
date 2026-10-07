@@ -227,7 +227,7 @@ def test_button_name_settle_is_not_vacuous(page: Page, served_app_url: str) -> N
 # Gradio mounts its tab-overflow control only when the tabs cannot fit, and ships it as an
 # icon-only <button>. Until gradio-app/gradio#13639 (released in 6.21.0) that button carried no
 # accessible name at all, which axe reports as a critical `button-name`. `pyproject.toml` pins
-# `gradio>=6.21,<7` for exactly that reason; the two tests below are what make the pin an assertion
+# `gradio>=6.21` for exactly that reason; the two tests below are what make the pin an assertion
 # rather than a claim.
 #
 # Squeezing the VIEWPORT does not reach it. Measured on this app: at a 180px viewport
