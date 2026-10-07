@@ -154,6 +154,19 @@ jobs:
           for name in skipped:
               print(f"  SKIPPED {name}")
 
+          # Named, not counted: the lane already passes more tests than the floor below, so a NEW
+          # test that silently skipped would still clear it. These must each have PASSED.
+          required = (
+              "test_gui_detect_reproduces_the_article_on_all_rois",
+              "test_the_gui_reads_an_upload_in_the_frame_the_labels_use",
+              "test_app_predict_table_is_the_decode_this_test_scores",
+              "test_evaluate_experimental_reproduces_paper_median",
+              "test_vanillin_oracle_reproduces_the_published_numbers",
+          )
+          missing = [r for r in required if not any(n.endswith("::" + r) for n in passed)]
+          if missing:
+              sys.exit(f"required model tests did not pass (failed or skipped): {missing}")
+
           # 13 measured 2026-08-07. A floor, not equality: widening RECOVERY_PHENOTYPES raises it
           # legitimately. Skips are not tolerated at all here -- every skip in this lane means an
           # artifact this job is responsible for fetching did not arrive where the test looks for it.
@@ -166,7 +179,8 @@ jobs:
           PY
 
       - name: Report success to the freshness watch
-        # No `if:` needed beyond the default: a step with none only runs if every prior step in
+        # Its `if:` names no status function, so GitHub still prepends the implicit `success()`:
+        # it runs only if every prior step in
         # this job succeeded, which is exactly "ping only on a genuinely successful nightly" --
         # including the guard-the-guard step above. Confirmed from this repo's own run history, not
         # just by analogy: run 33040589280 shows a `skipped` cache-miss download step followed by a
@@ -175,6 +189,9 @@ jobs:
         # No event-name restriction needed the way `security.yml`/`integrations.yml` have one: this
         # workflow only triggers on `schedule` and `workflow_dispatch`, both legitimate "the check
         # ran" events -- there is no `push` or `release` trigger here to filter out.
+        # Guarded to `main`: a manual dispatch on a branch is a real run of the lane but not the
+        # nightly, and its success must not reset the dead-man's switch for the scheduled one.
+        if: github.ref == 'refs/heads/main'
         uses: ./.github/actions/heartbeat-ping
         with:
           url: ${{ secrets.HEALTHCHECK_URL_NIGHTLY }}

@@ -46,6 +46,10 @@ preferred-citation:
   title: "MolDeTr: A Chemistry-Informed Deep Learning Model for Next-Generation Automated Analysis of 1H NMR Spectra"
   journal: "Analytical Chemistry"
   year: 2026
+  volume: 98
+  issue: 32
+  start: 23399
+  end: 23412
   doi: "10.1021/acs.analchem.5c03465"
   authors:
     - family-names: Schmid

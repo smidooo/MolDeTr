@@ -1,8 +1,8 @@
-"""Table 4 (experimental MAE / R^2) + per-class confusion-matrix accuracies — weight-free anchor.
+"""Table 1(d) (experimental MAE / R^2) + per-class confusion-matrix accuracies — weight-free anchor.
 
 Complements ``scripts/aggregate_experimental.py`` (which anchors the *median* headline numbers
 0.90 Hz / 0.20 Hz / 93.5 %). This module locks the paper numbers that have **no** committed script:
-Table 4's mean errors + R^2 and the per-proton-count accuracies behind the confusion matrix.
+Table 1(d)'s mean errors + R^2 and the per-proton-count accuracies behind the confusion matrix.
 
 Data: the committed ``structured_output/experimental_matched_pairs.json`` — verified byte-identical
 to the paper's private ``matches_total_data.json`` intermediate. Schema::
@@ -27,7 +27,7 @@ Metric definitions mirror the paper's private ``matching_4_experimental_evaluati
   (``calculate_errors`` lines 197 & 202 — NOT the plain std_dev on line 199).
 * R^2 = 1 - SS_res / SS_tot (``calculate_r2`` lines 278-281).
 
-Subset: Table 4's parameter errors are taken over **correctly-classified** matched pairs
+Subset: Table 1(d)'s parameter errors are taken over **correctly-classified** matched pairs
 (``pred.proton_count == label.proton_count``, n=198). Evidence this is the paper's subset: over all
 215 pairs the shift MAE is 1.398 Hz, but over the 198 correct-class pairs it is 1.3685 Hz = the
 paper's reported 1.368 (see ``test_shift_mae_requires_correct_class_subset``). Couplings are
@@ -62,7 +62,7 @@ def data() -> dict:
 
 
 def _correct_class(pairs: list) -> list:
-    """Matched pairs whose predicted proton count equals the label's (the Table 4 subset)."""
+    """Matched pairs whose predicted proton count equals the label's (the Table 1(d) subset)."""
     return [(p, l) for p, l in pairs if p["proton_count"] == l["proton_count"]]
 
 
@@ -92,7 +92,7 @@ def _mae(values: list[float]) -> float:
 
 
 def _std_dev_mae(values: list[float]) -> float:
-    """calculate_errors line 202: the Table 4 "±" = np.std(|err - mean(err)|)."""
+    """calculate_errors line 202: the Table 1(d) "±" = np.std(|err - mean(err)|)."""
     m = float(np.mean(values))
     return float(np.std([abs(v - m) for v in values]))
 
@@ -133,7 +133,7 @@ def test_dataset_shape(data):
 
 
 # --------------------------------------------------------------------------------------------------
-# Table 4: chemical-shift MAE / R^2
+# Table 1(d): chemical-shift MAE / R^2
 # --------------------------------------------------------------------------------------------------
 @pytest.mark.unit
 def test_table4_shift_mae(data):
@@ -151,7 +151,7 @@ def test_table4_shift_mae(data):
 def test_shift_mae_requires_correct_class_subset(data):
     """Guard the subset choice: over ALL 215 pairs the shift MAE is 1.398 Hz, NOT the paper's 1.368.
 
-    This is why Table 4's shift error is reported over correctly-classified spin systems only.
+    This is why Table 1(d)'s shift error is reported over correctly-classified spin systems only.
     """
     all_errs = _shift_errors_hz(data["matched_pairs_total"])
     assert _mae(all_errs) == pytest.approx(1.398, abs=0.01)
@@ -169,7 +169,7 @@ def test_table4_shift_r2(data):
 
 
 # --------------------------------------------------------------------------------------------------
-# Table 4: coupling-constant MAE / R^2
+# Table 1(d): coupling-constant MAE / R^2
 # --------------------------------------------------------------------------------------------------
 @pytest.mark.unit
 def test_table4_coupling_mae(data):
