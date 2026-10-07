@@ -83,7 +83,7 @@ app = [
     # Note what CI does and does not do: it never installs 6.20.0, so it re-proves the fix is
     # PRESENT at the pinned floor, not that 6.20 fails -- that half is the out-of-band measurement
     # above.
-    "gradio>=6.21,<7",
+    "gradio>=6.21,<6.29",
     "plotly>=5",  # interactive spectrum in the Gradio GUI (plotting.spectrum_figure)
 ]
 dev = [
